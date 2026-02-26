@@ -32,7 +32,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/utils"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 type GenericSyncer[T comparable] interface {
@@ -164,7 +164,7 @@ func (c *genericWatchingController[T]) EnqueueResourceIDAdd(resourceID *azcorear
 	if resourceID == nil {
 		return
 	}
-	if !apihelpers.ResourceTypeEqual(resourceID.ResourceType, c.resourceType) {
+	if !armhelpers.ResourceTypeEqual(resourceID.ResourceType, c.resourceType) {
 		c.EnqueueResourceIDAdd(resourceID.Parent, changed)
 		return
 	}

@@ -20,18 +20,24 @@ import (
 
 	"github.com/blang/semver/v4"
 
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/utils/ptr"
+
 	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/api/arm"
+	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
 func TestAdmitNodePoolUpdate_VersionValidation(t *testing.T) {
 	tests := []struct {
-		name             string
-		newVersion       string
-		activeVersions   []string // current active versions in ServiceProviderNodePool (first is highest)
-		clusterVersions  []string // active versions in ServiceProviderCluster (first is highest)
-		desiredVersion   string   // desired version in ServiceProviderNodePool.Spec
-		expectError      string
-		expectErrorCount int
+		name               string
+		newVersion         string
+		activeVersions     []string // current active versions in ServiceProviderNodePool (first is highest)
+		clusterVersions    []string // active versions in ServiceProviderCluster (first is highest)
+		desiredVersion     string   // desired version in ServiceProviderNodePool.Spec
+		allowMajorUpgrades bool     // experimental feature flag
+		expectError        string
+		expectErrorCount   int
 	}{
 		{
 			name:            "valid z-stream upgrade",
@@ -63,12 +69,55 @@ func TestAdmitNodePoolUpdate_VersionValidation(t *testing.T) {
 			expectError:     "cannot downgrade",
 		},
 		{
-			name:            "major version change not allowed",
-			activeVersions:  []string{"4.17.0"},
+			name:            "major version change not allowed by default",
+			activeVersions:  []string{"4.22.0"},
 			newVersion:      "5.0.0",
 			clusterVersions: []string{"5.0.0"},
-			desiredVersion:  "4.17.0",
+			desiredVersion:  "4.22.0",
 			expectError:     "major version changes are not supported",
+		},
+		{
+			name:               "valid major upgrade 4.22 to 5.0",
+			activeVersions:     []string{"4.22.0"},
+			newVersion:         "5.0.0",
+			clusterVersions:    []string{"5.0.0"},
+			desiredVersion:     "4.22.0",
+			allowMajorUpgrades: true,
+		},
+		{
+			name:               "valid major upgrade 4.23 to 5.1",
+			activeVersions:     []string{"4.23.0"},
+			newVersion:         "5.1.0",
+			clusterVersions:    []string{"5.1.0"},
+			desiredVersion:     "4.23.0",
+			allowMajorUpgrades: true,
+		},
+		{
+			name:               "invalid major upgrade 4.22 to 5.1",
+			activeVersions:     []string{"4.22.0"},
+			newVersion:         "5.1.0",
+			clusterVersions:    []string{"5.1.0"},
+			desiredVersion:     "4.22.0",
+			allowMajorUpgrades: true,
+			expectError:        "4.22 can only upgrade to 5.0",
+		},
+		{
+			name:               "invalid major upgrade 4.23 to 5.0",
+			activeVersions:     []string{"4.23.0"},
+			newVersion:         "5.0.0",
+			clusterVersions:    []string{"5.0.0"},
+			desiredVersion:     "4.23.0",
+			allowMajorUpgrades: true,
+			expectError:        "4.23 can only upgrade to 5.1",
+		},
+		{
+			name:               "invalid major upgrade 4.20 not supported",
+			activeVersions:     []string{"4.20.0"},
+			newVersion:         "5.0.0",
+			clusterVersions:    []string{"5.0.0"},
+			desiredVersion:     "4.20.0",
+			allowMajorUpgrades: true,
+			expectError:        "major version upgrades are not supported",
 		},
 		{
 			name:            "skipping minor versions not allowed",
@@ -120,7 +169,7 @@ func TestAdmitNodePoolUpdate_VersionValidation(t *testing.T) {
 		{
 			name:            "version already in active versions skips validation",
 			activeVersions:  []string{"4.18.0", "4.17.0"},
-			newVersion:      "4.17.0",
+			newVersion:      "4.18.0",
 			clusterVersions: []string{"4.18.0"},
 			desiredVersion:  "4.18.0",
 		},
@@ -180,6 +229,20 @@ func TestAdmitNodePoolUpdate_VersionValidation(t *testing.T) {
 				},
 			}
 
+			// Create operation based on allowMajorUpgrades flag
+			var op operation.Operation
+			if tt.allowMajorUpgrades {
+				op = operation.Operation{
+					Type: operation.Update,
+					Options: validation.AFECsToValidationOptions([]arm.Feature{{
+						Name:  ptr.To(api.FeatureExperimentalReleaseFeatures),
+						State: ptr.To("Registered"),
+					}}),
+				}
+			} else {
+				op = operation.Operation{Type: operation.Update}
+			}
+
 			// Build ServiceProviderNodePool with active versions
 			var activeVersions []api.HCPNodePoolActiveVersion
 			for _, v := range tt.activeVersions {
@@ -218,7 +281,7 @@ func TestAdmitNodePoolUpdate_VersionValidation(t *testing.T) {
 				},
 			}
 
-			errs := AdmitNodePoolUpdate(newNodePool, oldNodePool, cluster, spNodePool, spCluster)
+			errs := AdmitNodePoolUpdate(newNodePool, oldNodePool, cluster, spNodePool, spCluster, op)
 
 			if tt.expectError != "" {
 				if len(errs) == 0 {
@@ -298,7 +361,10 @@ func TestAdmitNodePoolUpdate_IncludesAdmitNodePoolChecks(t *testing.T) {
 		},
 	}
 
-	errs := AdmitNodePoolUpdate(newNodePool, oldNodePool, cluster, spNodePool, spCluster)
+	// Empty update operation (no experimental features)
+	op := operation.Operation{Type: operation.Update}
+
+	errs := AdmitNodePoolUpdate(newNodePool, oldNodePool, cluster, spNodePool, spCluster, op)
 
 	if len(errs) == 0 {
 		t.Fatal("expected error for channel group mismatch, got none")

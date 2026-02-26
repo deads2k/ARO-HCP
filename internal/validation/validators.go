@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/blang/semver/v4"
@@ -33,6 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+
+	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
 
 func NoExtraWhitespace(_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *string) field.ErrorList {
@@ -741,4 +745,76 @@ func MaximumIfNoAZ[T constraints.Integer](ctx context.Context, op operation.Oper
 
 	// If availability zone is NOT set, enforce the max limit using the existing Maximum validator
 	return Maximum(ctx, op, fldPath, value, oldValue, max)
+}
+
+// ValidateMajorUpgrade validates that a cross-major version upgrade follows the allowed upgrade paths.
+// Returns an error if the upgrade path is not allowed, nil otherwise.
+// Use the n-1 skew
+func ValidateMajorUpgrade(fromVersion, toVersion semver.Version) error {
+	sourceKey := fmt.Sprintf("%d.%d", fromVersion.Major, fromVersion.Minor)
+	targetKey := fmt.Sprintf("%d.%d", toVersion.Major, toVersion.Minor)
+
+	allowedTargets, exists := api.AllowMajorUpgradePaths[sourceKey]
+	if !exists {
+		return fmt.Errorf("invalid upgrade path from %s to %s: major version upgrades are not supported",
+			fromVersion.String(), toVersion.String())
+	}
+
+	if allowedTargets != targetKey {
+		return fmt.Errorf("invalid upgrade path from %s to %s: %s can only upgrade to %s",
+			fromVersion.String(), toVersion.String(), sourceKey, allowedTargets)
+	}
+
+	return nil
+}
+
+// ValidateNodePoolUpgrade performs common node pool version upgrade validation:
+// - No downgrades from highest active version
+// - Cannot exceed lowest control plane version
+// - No major version changes without AFEC (uses existing ValidateMajorUpgrade)
+// - No minor version skipping
+func ValidateNodePoolUpgrade(desiredVersion semver.Version, activeVersions []api.HCPNodePoolActiveVersion, lowestCPVersion *semver.Version, allowMajorUpgrade bool) error {
+	// Skip if already in active versions
+	if slices.ContainsFunc(activeVersions, func(av api.HCPNodePoolActiveVersion) bool {
+		return av.Version != nil && av.Version.EQ(desiredVersion)
+	}) {
+		return nil
+	}
+
+	lowest, highest := apihelpers.FindLowestAndHighestNodePoolVersion(activeVersions)
+
+	// No partial downgrades: desiredVersion >= highest active version
+	if highest != nil && desiredVersion.LT(*highest) {
+		return fmt.Errorf(
+			"invalid node pool version %s: cannot downgrade from current version %s",
+			desiredVersion.String(), highest.String(),
+		)
+	}
+
+	// Check if the desiredVersion <= control plane versions
+	// TODO: We may relax this constraint in the future
+	if lowestCPVersion != nil && desiredVersion.GT(*lowestCPVersion) {
+		return fmt.Errorf(
+			"invalid node pool version %s: cannot exceed control plane version %s",
+			desiredVersion.String(), lowestCPVersion.String(),
+		)
+	}
+
+	// No major version change unless FeatureExperimentalReleaseFeatures is registered
+	if lowest != nil && desiredVersion.Major > lowest.Major {
+		if !allowMajorUpgrade {
+			return fmt.Errorf("major version changes are not supported")
+		}
+		return ValidateMajorUpgrade(*lowest, desiredVersion)
+	}
+
+	// Minor skip validation
+	if lowest != nil && desiredVersion.Minor > lowest.Minor+1 {
+		return fmt.Errorf(
+			"invalid upgrade path from %s to %s: skipping minor versions is not allowed",
+			lowest.String(), desiredVersion.String(),
+		)
+	}
+
+	return nil
 }

@@ -531,6 +531,11 @@ func (f *Frontend) patchNodePool(writer http.ResponseWriter, request *http.Reque
 func (f *Frontend) updateNodePoolInCosmos(ctx context.Context, writer http.ResponseWriter, request *http.Request, httpStatusCode int, newInternalNodePool, oldInternalNodePool *api.HCPOpenShiftClusterNodePool) error {
 	logger := utils.LoggerFromContext(ctx)
 
+	subscription, err := f.dbClient.Subscriptions().Get(ctx, oldInternalNodePool.ID.SubscriptionID)
+	if err != nil {
+		return err
+	}
+
 	versionedInterface, err := VersionFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
@@ -538,14 +543,6 @@ func (f *Frontend) updateNodePoolInCosmos(ctx context.Context, writer http.Respo
 	correlationData, err := CorrelationDataFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
-	}
-	resourceID, err := utils.ResourceIDFromContext(ctx)
-	if err != nil {
-		return utils.TrackError(err)
-	}
-	subscription, err := f.dbClient.Subscriptions().Get(ctx, resourceID.SubscriptionID)
-	if err != nil {
-		return err
 	}
 	// Node pool validation checks some fields against the parent cluster
 	// so we have to request the cluster from Cluster Service.
@@ -565,6 +562,7 @@ func (f *Frontend) updateNodePoolInCosmos(ctx context.Context, writer http.Respo
 	if err != nil {
 		return utils.TrackError(err)
 	}
+
 	validationOp := operation.Operation{
 		Type:    operation.Update,
 		Options: validation.AFECsToValidationOptions(subscription.GetRegisteredFeatures()),
@@ -573,7 +571,7 @@ func (f *Frontend) updateNodePoolInCosmos(ctx context.Context, writer http.Respo
 	validationErrs := validation.ValidateNodePool(ctx, validationOp, newInternalNodePool, oldInternalNodePool)
 	// in addition to static validation, we have validation based on the state of the hcp cluster
 	// AdmitNodePoolUpdate includes AdmitNodePool checks plus version upgrade validation
-	validationErrs = append(validationErrs, admission.AdmitNodePoolUpdate(newInternalNodePool, oldInternalNodePool, cluster, spNodePool, spCluster)...)
+	validationErrs = append(validationErrs, admission.AdmitNodePoolUpdate(newInternalNodePool, oldInternalNodePool, cluster, spNodePool, spCluster, validationOp)...)
 	if err := arm.CloudErrorFromFieldErrors(validationErrs); err != nil {
 		return utils.TrackError(err)
 	}

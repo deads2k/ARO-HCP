@@ -23,7 +23,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/utils"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 // newInitialServiceProviderCluster returns a new ServiceProviderCluster with
@@ -46,7 +46,7 @@ func newInitialServiceProviderCluster(clusterResourceID *azcorearm.ResourceID) *
 func GetOrCreateServiceProviderCluster(
 	ctx context.Context, dbClient DBClient, clusterResourceID *azcorearm.ResourceID,
 ) (*api.ServiceProviderCluster, error) {
-	if !apihelpers.ResourceTypeEqual(clusterResourceID.ResourceType, api.ClusterResourceType) {
+	if !armhelpers.ResourceTypeEqual(clusterResourceID.ResourceType, api.ClusterResourceType) {
 		return nil, utils.TrackError(fmt.Errorf("expected resource type %s, got %s", api.ClusterResourceType, clusterResourceID.ResourceType))
 	}
 
