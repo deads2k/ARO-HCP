@@ -4,7 +4,7 @@
 	"_rid": "vWhbAJ1AYhMBAAAAAAAAAA==",
 	"_self": "dbs/vWhbAA==/colls/vWhbAJ1AYhM=/docs/vWhbAJ1AYhMBAAAAAAAAAA==/",
 	"_ts": 1764939717,
-	"id": "|subscriptions|subscriptionid|resourcegroups|resourcegroupname|providers|microsoft.redhatopenshift|hcpopenshiftclusters|parentcluster|hcpopenshiftcontrollers|test-controller",
+	"id": "c5d38d4a-5b4a-5d49-a7d8-5ad8771156ad",
 	"partitionKey": "subscriptionid",
 	"properties": {
 		"cosmosMetadata": {

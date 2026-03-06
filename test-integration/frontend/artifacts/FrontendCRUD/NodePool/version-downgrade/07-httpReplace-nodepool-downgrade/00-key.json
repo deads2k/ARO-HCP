@@ -1,3 +1,4 @@
 {
+	"id": "563595af-2ca1-5407-b01a-a88e6976b9de",
 	"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/downgrade/nodePools/downgrade-np"
 }

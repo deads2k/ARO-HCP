@@ -1,3 +1,4 @@
 {
+	"id": "f56ea445-d5ca-5f30-83d3-1b3b277e8910",
 	"resourceID": "/subscriptions/85176f51-8b54-4150-b6b5-b4ff5d007f5b/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/basic/nodePools/invalid-node-pool-version"
 }

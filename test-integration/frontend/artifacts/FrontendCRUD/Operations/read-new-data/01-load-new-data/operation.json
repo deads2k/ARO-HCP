@@ -4,7 +4,7 @@
 	"_rid": "oWlcAI5nKpQCAAAAAAAAAA==",
 	"_self": "dbs/oWlcAA==/colls/oWlcAI5nKpQ=/docs/oWlcAI5nKpQCAAAAAAAAAA==/",
 	"_ts": 1767898956,
-	"id": "|subscriptions|6b690bec-0c16-4ecb-8f67-781caf40bba7|providers|microsoft.redhatopenshift|hcpoperationstatuses|ab5d298a-2267-432a-ad71-313bbdae0349",
+	"id": "31ac4176-a7e8-5df0-9b57-3bce5ac5a1ef",
 	"partitionKey": "6b690bec-0c16-4ecb-8f67-781caf40bba7",
 	"properties": {
 		"cosmosUID": "",
