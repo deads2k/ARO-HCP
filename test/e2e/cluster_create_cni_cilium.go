@@ -16,6 +16,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +37,7 @@ var _ = Describe("Customer", func() {
 			const (
 				customerClusterName  = "cilium-cl"
 				customerNodePoolName = "cilium-np"
+				ciliumNamespace      = "kube-system"
 			)
 			tc := framework.NewTestContext()
 
@@ -53,6 +55,7 @@ var _ = Describe("Customer", func() {
 			clusterParams.ClusterName = customerClusterName
 			managedResourceGroupName := framework.SuffixName(*resourceGroup.Name, "-managed", 64)
 			clusterParams.ManagedResourceGroupName = managedResourceGroupName
+
 			By("setting no cni network configuration")
 			clusterParams.Network.NetworkType = "Other"
 			clusterParams.Network.PodCIDR = "10.128.0.0/14"
@@ -91,23 +94,76 @@ var _ = Describe("Customer", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(verifiers.VerifyHCPCluster(ctx, adminRESTConfig)).To(Succeed())
 
-			// TODO: add cilium setup
-			// TODO: rerun VerifyHCPCluster
+			By("getting kubeconfig content for Helm")
+			kubeconfigContent, err := framework.GenerateKubeconfig(adminRESTConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating cilium configuration")
+			ciliumValues := map[string]any{
+				"debug": map[string]any{
+					"enabled": true,
+				},
+				"k8s": map[string]any{
+					"requireIPv4PodCIDR": true,
+				},
+				"logSystemLoad": true,
+				"bpf": map[string]any{
+					"preallocateMaps": true,
+				},
+				"ipv4": map[string]any{
+					"enabled": true,
+				},
+				"ipv6": map[string]any{
+					"enabled": false,
+				},
+				"identityChangeGracePeriod": "0s",
+				"ipam": map[string]any{
+					"mode": "cluster-pool",
+					"operator": map[string]any{
+						"clusterPoolIPv4PodCIDRList": clusterParams.Network.PodCIDR,
+						"clusterPoolIPv4MaskSize":    clusterParams.Network.HostPrefix,
+					},
+				},
+				"endpointRoutes": map[string]any{
+					"enabled": true,
+				},
+				"tunnelPort": 4789,
+				"cni": map[string]any{
+					"binPath":      "/var/lib/cni/bin",
+					"confPath":     "/var/run/multus/cni/net.d",
+					"chainingMode": "portmap",
+				},
+				"prometheus": map[string]any{
+					"serviceMonitor": map[string]any{
+						"enabled": false,
+					},
+				},
+				"hubble": map[string]any{
+					"tls": map[string]any{
+						"enabled": false,
+					},
+				},
+			}
+
+			By("installing Cilium via Helm")
+			err = framework.InstallCiliumChart(ctx, "1.19.2", ciliumValues, kubeconfigContent, ciliumNamespace, customerClusterName)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("creating the node pool")
 			nodePoolParams := framework.NewDefaultNodePoolParams()
 			nodePoolParams.NodePoolName = customerNodePoolName
-			err = tc.CreateNodePoolFromParam(ctx,
+			nodePoolErr := tc.CreateNodePoolFromParam(ctx,
 				*resourceGroup.Name,
 				customerClusterName,
 				nodePoolParams,
 				45*time.Minute,
 			)
-			Expect(err).NotTo(HaveOccurred())
+			// We delay checking the error on purpose to get more details
+			// about the issue by running the verifiers.
 
-			By("checking nodes are in Ready state")
-			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady())
-			Expect(err).NotTo(HaveOccurred())
+			By("checking that cilium is running and nodes are in Ready state")
+			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady(), verifiers.VerifyCiliumOperational(ciliumNamespace, "k8s-app=cilium"))
+			Expect(errors.Join(err, nodePoolErr)).NotTo(HaveOccurred())
 
 			By("verifying a simple web app can run with cilium")
 			err = verifiers.VerifySimpleWebApp().Verify(ctx, adminRESTConfig)
