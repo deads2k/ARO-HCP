@@ -1891,6 +1891,12 @@
         "viewerGroups": {
           "type": "string"
         },
+        "crossClusterServiceLogsScript": {
+          "type": "string"
+        },
+        "crossClusterHostedControlPlaneLogsScript": {
+          "type": "string"
+        },
         "enableAutoScale": {
           "type": "boolean"
         },
