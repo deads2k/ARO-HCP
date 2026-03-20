@@ -433,6 +433,8 @@ kusto:
   adminGroups: ""
   autoScaleMax: 10
   autoScaleMin: 2
+  crossClusterHostedControlPlaneLogsScript: ""
+  crossClusterServiceLogsScript: ""
   enableAutoScale: true
   hostedControlPlaneLogsDatabase: HostedControlPlaneLogs
   kustoName: hcp-dev-us-2
