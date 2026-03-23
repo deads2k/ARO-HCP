@@ -157,3 +157,43 @@ func (iter *queryBillingIterator) GetContinuationToken() string {
 func (iter *queryBillingIterator) GetError() error {
 	return iter.err
 }
+
+// ListAll accumulates all pages from a DB GlobalLister into a slice.
+// It calls listFn with a page size hint of pageSize and follows continuation tokens
+// until all items have been collected.
+// Any failure to list or iterate causes an early return because the caller needs the complete
+// set of data to make correct decisions.
+// listFn is expected to accept a opts *DBClientListResourceDocsOptions that supports
+// paging via the PageSizeHint attribute.
+// ListAll assists client code in breaking large list queries into multiple smaller chunks of pageSize or smaller. This
+// helps reduce the load on the database at the cost of more round trips.
+// pageSize determines the maximum number of items to be retrieved at once. A negative value will set a dynamic
+// page size controlled by Cosmos.
+func ListAll[InternalAPIType any](
+	ctx context.Context,
+	pageSize int32,
+	listFn func(ctx context.Context, opts *DBClientListResourceDocsOptions) (DBClientIterator[InternalAPIType], error),
+) ([]*InternalAPIType, error) {
+	opts := &DBClientListResourceDocsOptions{
+		PageSizeHint: &pageSize,
+	}
+	all := make([]*InternalAPIType, 0)
+	for {
+		iterator, err := listFn(ctx, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list: %w", err)
+		}
+		for _, item := range iterator.Items(ctx) {
+			all = append(all, item)
+		}
+		if err := iterator.GetError(); err != nil {
+			return nil, fmt.Errorf("failed iterating: %w", err)
+		}
+		token := iterator.GetContinuationToken()
+		if token == "" {
+			break
+		}
+		opts.ContinuationToken = &token
+	}
+	return all, nil
+}
