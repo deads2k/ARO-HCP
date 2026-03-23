@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
-
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
@@ -126,7 +124,7 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 	// This is important to avoid leaking resources when the sync is done.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	maestroClient, err := c.createMaestroClientFromProvisionShard(ctx, clusterProvisionShard)
+	maestroClient, err := createMaestroClientFromCSProvisionShard(ctx, c.maestroSourceEnvironmentIdentifier, c.maestroClientBuilder, clusterProvisionShard)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
@@ -326,25 +324,4 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) getSing
 
 func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) CooldownChecker() controllerutils.CooldownChecker {
 	return c.cooldownChecker
-}
-
-// createMaestroClientFromProvisionShard creates a Maestro client for the given cluster provision shard.
-// the client is scoped to the Consumer Name associated to the provision shard, and to
-// the source ID associated to the provision shard and the environment specified
-// in c.maestroSourceEnvironmentIdentifier, which is a configuration parameter at
-// deployment time.
-func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) createMaestroClientFromProvisionShard(
-	ctx context.Context, clusterProvisionShard *arohcpv1alpha1.ProvisionShard,
-) (maestro.Client, error) {
-	provisionShardMaestroConsumerName := clusterProvisionShard.MaestroConfig().ConsumerName()
-	provisionShardMaestroRESTAPIEndpoint := clusterProvisionShard.MaestroConfig().RestApiConfig().Url()
-	provisionShardMaestroGRPCAPIEndpoint := clusterProvisionShard.MaestroConfig().GrpcApiConfig().Url()
-	// This allows us to be able to have visibility on the Maestro Bundles owned by the same source ID for a given
-	// provision shard and environment. This should have the same source ID as what CS has in each corresponding environment
-	// because otherwise we would not have visibility on the Maestro Bundles owned
-	maestroSourceID := maestro.GenerateMaestroSourceID(c.maestroSourceEnvironmentIdentifier, clusterProvisionShard.ID())
-
-	maestroClient, err := c.maestroClientBuilder.NewClient(ctx, provisionShardMaestroRESTAPIEndpoint, provisionShardMaestroGRPCAPIEndpoint, provisionShardMaestroConsumerName, maestroSourceID)
-
-	return maestroClient, err
 }

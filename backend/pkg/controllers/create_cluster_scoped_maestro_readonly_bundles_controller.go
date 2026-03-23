@@ -169,7 +169,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.C
 	// This is important to avoid leaking resources when the sync is done.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	maestroClient, err := c.createMaestroClientFromProvisionShard(ctx, clusterProvisionShard)
+	maestroClient, err := createMaestroClientFromCSProvisionShard(ctx, c.maestroSourceEnvironmentIdentifier, c.maestroClientBuilder, clusterProvisionShard)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
@@ -439,26 +439,4 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) getHostedClusterNamesp
 
 func (c *createClusterScopedMaestroReadonlyBundlesSyncer) CooldownChecker() controllerutils.CooldownChecker {
 	return c.cooldownChecker
-}
-
-// createMaestroClientFromProvisionShard creates a Maestro client for the given provision shard.
-// The client is scoped to the Maestro Consumer associated to the provision shard, as well
-// as to the the Maestro Source ID associated to the provision shard which is calculated from the provision shard ID and the
-// environment specified in c.maestroSourceEnvironmentIdentifier.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) createMaestroClientFromProvisionShard(
-	ctx context.Context, provisionShard *arohcpv1alpha1.ProvisionShard,
-) (maestro.Client, error) {
-	provisionShardMaestroConsumerName := provisionShard.MaestroConfig().ConsumerName()
-	provisionShardMaestroRESTAPIEndpoint := provisionShard.MaestroConfig().RestApiConfig().Url()
-	provisionShardMaestroGRPCAPIEndpoint := provisionShard.MaestroConfig().GrpcApiConfig().Url()
-	// This allows us to be able to have visibility on the Maestro Bundles owned by the same source ID for a given
-	// provision shard and environment. This should have the same source ID as what CS has in each corresponding environment
-	// because otherwise we would not have visibility on the Maestro Bundles owned
-	// TODO do we want to use the same source ID that CS uses or do we want intentionally a different one? This has consequences
-	// on the visibility of the Maestro Bundles, including processing of events sent by Maestro.
-	maestroSourceID := maestro.GenerateMaestroSourceID(c.maestroSourceEnvironmentIdentifier, provisionShard.ID())
-
-	maestroClient, err := c.maestroClientBuilder.NewClient(ctx, provisionShardMaestroRESTAPIEndpoint, provisionShardMaestroGRPCAPIEndpoint, provisionShardMaestroConsumerName, maestroSourceID)
-
-	return maestroClient, err
 }
