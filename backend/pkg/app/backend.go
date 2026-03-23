@@ -495,9 +495,13 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		activeOperationLister,
 		backendInformers,
 	)
+
+	maestroAPIMaestroBundleNameGenerator := maestro.NewMaestroAPIMaestroBundleNameGenerator()
+
 	maestroCreateClusterScopedReadonlyBundlesController := controllers.NewCreateClusterScopedMaestroReadonlyBundlesController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
 		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
+		maestroAPIMaestroBundleNameGenerator,
 	)
 	maestroReadAndPersistClusterScopedReadonlyBundlesContentController := controllers.NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
@@ -507,6 +511,7 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	maestroCreateNodePoolScopedReadonlyBundlesController := controllers.NewCreateNodePoolScopedMaestroReadonlyBundlesController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
 		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
+		maestroAPIMaestroBundleNameGenerator,
 	)
 	maestroReadAndPersistNodePoolScopedReadonlyBundlesContentController := controllers.NewReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,

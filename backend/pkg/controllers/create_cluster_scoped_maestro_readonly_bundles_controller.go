@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,10 +67,7 @@ type createClusterScopedMaestroReadonlyBundlesSyncer struct {
 
 	maestroClientBuilder maestro.MaestroClientBuilder
 
-	// uuidV4Generator is used to generate a new UUIDv4. It must be provided.
-	// We define it as a dependency to enable deterministic testing in some
-	// scenarios.
-	uuidV4Generator func() (uuid.UUID, error)
+	maestroAPIMaestroBundleNameGenerator maestro.MaestroAPIMaestroBundleNameGenerator
 }
 
 var _ controllerutils.ClusterSyncer = (*createClusterScopedMaestroReadonlyBundlesSyncer)(nil)
@@ -83,16 +79,17 @@ func NewCreateClusterScopedMaestroReadonlyBundlesController(
 	informers informers.BackendInformers,
 	maestroSourceEnvironmentIdentifier string,
 	maestroClientBuilder maestro.MaestroClientBuilder,
+	maestroAPIMaestroBundleNameGenerator maestro.MaestroAPIMaestroBundleNameGenerator,
 ) controllerutils.Controller {
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
-		cosmosClient:                       cosmosClient,
-		clusterServiceClient:               clusterServiceClient,
-		activeOperationLister:              activeOperationLister,
-		maestroSourceEnvironmentIdentifier: maestroSourceEnvironmentIdentifier,
-		maestroClientBuilder:               maestroClientBuilder,
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
+		cosmosClient:                         cosmosClient,
+		clusterServiceClient:                 clusterServiceClient,
+		activeOperationLister:                activeOperationLister,
+		maestroSourceEnvironmentIdentifier:   maestroSourceEnvironmentIdentifier,
+		maestroClientBuilder:                 maestroClientBuilder,
+		maestroAPIMaestroBundleNameGenerator: maestroAPIMaestroBundleNameGenerator,
 	}
 
 	controller := controllerutils.NewClusterWatchingController(
@@ -418,7 +415,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMa
 
 // buildInitialMaestroBundleReference builds an initial Maestro Bundle reference for a given maestro bundle internal name.
 func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialMaestroBundleReference(internalName api.MaestroBundleInternalName) (*api.MaestroBundleReference, error) {
-	maestroAPIMaestroBundleName, err := c.generateNewMaestroAPIMaestroBundleName()
+	maestroAPIMaestroBundleName, err := c.maestroAPIMaestroBundleNameGenerator.NewMaestroAPIMaestroBundleName()
 	if err != nil {
 		return nil, utils.TrackError(fmt.Errorf("failed to generate Maestro API Maestro Bundle name: %w", err))
 	}
@@ -429,17 +426,6 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialMaestroBun
 	}
 
 	return hostedClusterMWMaestroBundleReference, nil
-}
-
-// generateNewMaestroAPIMaestroBundleName generates a new Maestro API Maestro Bundle name.
-// Used to generate a new Maestro API Maestro Bundle name for a new Maestro Bundle reference.
-// The generated name is a UUIDv4.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) generateNewMaestroAPIMaestroBundleName() (string, error) {
-	newUUIDForMaestroAPIMaestroBundleName, err := c.uuidV4Generator()
-	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to generate UUIDv4 for Maestro API Maestro Bundle name: %w", err))
-	}
-	return newUUIDForMaestroAPIMaestroBundleName.String(), nil
 }
 
 // getHostedClusterNamespace gets the namespace for the hosted cluster based on the environment name and the cluster service OCM Cluster ID.
