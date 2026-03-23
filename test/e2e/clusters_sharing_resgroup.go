@@ -123,13 +123,16 @@ var _ = Describe("Customer", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("waiting for first cluster to complete creation")
-			_, err = poller1.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
+			pollCtx, pollCancel := context.WithTimeout(ctx, 45*time.Minute)
+			defer pollCancel()
+			_, err = poller1.PollUntilDone(pollCtx, &runtime.PollUntilDoneOptions{
 				Frequency: framework.StandardPollInterval,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("waiting for second cluster to complete creation")
-			_, err = poller2.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
+			defer pollCancel()
+			_, err = poller2.PollUntilDone(pollCtx, &runtime.PollUntilDoneOptions{
 				Frequency: framework.StandardPollInterval,
 			})
 			Expect(err).NotTo(HaveOccurred())
