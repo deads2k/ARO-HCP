@@ -175,6 +175,92 @@ func TestReferencedMaestroAPIMaestroBundleNamesByShard(t *testing.T) {
 	}
 }
 
+func TestReferencedMaestroAPIMaestroBundleNamesByShardFromNodePools(t *testing.T) {
+	spnpRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/nodePools/np/serviceProviderNodePools/default"))
+
+	tests := []struct {
+		name           string
+		spnpsByShard   map[string][]*api.ServiceProviderNodePool
+		wantErr        bool
+		errSubstr      string
+		wantShard      string
+		wantBundleName string
+	}{
+		{
+			name: "empty maestroAPIMaestroBundleName",
+			spnpsByShard: map[string][]*api.ServiceProviderNodePool{
+				"shard1": {
+					{
+						ResourceID: *spnpRID,
+						Status: api.ServiceProviderNodePoolStatus{
+							MaestroReadonlyBundles: api.MaestroBundleReferenceList{
+								{Name: "logical-name", MaestroAPIMaestroBundleName: ""},
+							},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "has empty maestroAPIMaestroBundleName",
+		},
+		{
+			name: "nil ref entry",
+			spnpsByShard: map[string][]*api.ServiceProviderNodePool{
+				"shard1": {
+					{
+						ResourceID: *spnpRID,
+						Status: api.ServiceProviderNodePoolStatus{
+							MaestroReadonlyBundles: api.MaestroBundleReferenceList{nil},
+						},
+					},
+				},
+			},
+			wantErr:   true,
+			errSubstr: "is nil",
+		},
+		{
+			name: "nil ServiceProviderNodePool",
+			spnpsByShard: map[string][]*api.ServiceProviderNodePool{
+				"shard1": {nil},
+			},
+			wantErr:   true,
+			errSubstr: "nil ServiceProviderNodePool",
+		},
+		{
+			name: "success",
+			spnpsByShard: map[string][]*api.ServiceProviderNodePool{
+				"s": {
+					{
+						ResourceID: *spnpRID,
+						Status: api.ServiceProviderNodePoolStatus{
+							MaestroReadonlyBundles: api.MaestroBundleReferenceList{
+								{MaestroAPIMaestroBundleName: "bundle-np"},
+							},
+						},
+					},
+				},
+			},
+			wantShard:      "s",
+			wantBundleName: "bundle-np",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := referencedMaestroAPIMaestroBundleNamesByShardFromNodePools(tt.spnpsByShard)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errSubstr)
+				return
+			}
+			require.NoError(t, err)
+			shardSet := out[tt.wantShard]
+			require.NotNil(t, shardSet, "expected shard %q in result", tt.wantShard)
+			_, ok := shardSet[tt.wantBundleName]
+			assert.True(t, ok, "expected bundle name %q under shard %q", tt.wantBundleName, tt.wantShard)
+		})
+	}
+}
+
 // paginationSPCGlobalLister returns different iterators based on ContinuationToken to simulate pagination.
 type paginationSPCGlobalLister struct {
 	iter1 database.DBClientIterator[api.ServiceProviderCluster]
@@ -281,6 +367,8 @@ func (s *simpleIterator[T]) GetError() error {
 
 var _ database.DBClientIterator[api.ServiceProviderCluster] = &simpleIterator[api.ServiceProviderCluster]{}
 
+var _ database.DBClientIterator[api.ServiceProviderNodePool] = &simpleIterator[api.ServiceProviderNodePool]{}
+
 func TestDeleteOrphanedMaestroReadonlyBundles_getAllServiceProviderClusters_Pagination(t *testing.T) {
 	ctx := context.Background()
 	spc1ResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/serviceProviderClusters/default"))
@@ -345,6 +433,54 @@ func TestDeleteOrphanedMaestroReadonlyBundles_getAllServiceProviderClusters_Iter
 	assert.Contains(t, err.Error(), "iteration error")
 }
 
+func TestDeleteOrphanedMaestroReadonlyBundles_getAllServiceProviderNodePools(t *testing.T) {
+	ctx := context.Background()
+	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
+	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/nodePools/worker/serviceProviderNodePools/default"))
+
+	tests := []struct {
+		name                string
+		setupDB             func(t *testing.T, ctx context.Context, mockDB *databasetesting.MockDBClient)
+		wantLen             int
+		wantFirstResourceID string
+	}{
+		{
+			name:    "empty DB returns no SPNPs",
+			setupDB: nil,
+			wantLen: 0,
+		},
+		{
+			name: "returns SPNPs created via CRUD",
+			setupDB: func(t *testing.T, ctx context.Context, mockDB *databasetesting.MockDBClient) {
+				spnp := &api.ServiceProviderNodePool{
+					CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
+					ResourceID:     *spnpResourceID,
+				}
+				spnpCRUD := mockDB.ServiceProviderNodePools(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName, clusterResourceID.Name, "worker")
+				_, err := spnpCRUD.Create(ctx, spnp, nil)
+				require.NoError(t, err)
+			},
+			wantLen:             1,
+			wantFirstResourceID: spnpResourceID.String(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockDB := databasetesting.NewMockDBClient()
+			if tt.setupDB != nil {
+				tt.setupDB(t, ctx, mockDB)
+			}
+			c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB}
+			all, err := c.getAllServiceProviderNodePools(ctx)
+			require.NoError(t, err)
+			require.Len(t, all, tt.wantLen)
+			if tt.wantFirstResourceID != "" {
+				assert.Equal(t, tt.wantFirstResourceID, all[0].ResourceID.String())
+			}
+		})
+	}
+}
+
 // alwaysErrorGlobalListers is a test double that makes the returned global listers
 // always return an error
 type alwaysErrorGlobalListers struct {
@@ -398,18 +534,102 @@ func (f *alwaysErrorGlobalLister[T]) List(ctx context.Context, options *database
 
 var _ database.GlobalLister[any] = (*alwaysErrorGlobalLister[any])(nil)
 
+// emptyGlobalLister returns an empty page for global list tests.
+type emptyGlobalLister[T any] struct{}
+
+func (e *emptyGlobalLister[T]) List(ctx context.Context, opts *database.DBClientListResourceDocsOptions) (database.DBClientIterator[T], error) {
+	return &simpleIterator[T]{}, nil
+}
+
+// failOnSecondSPNPGlobalLister fails ServiceProviderNodePools.List starting on the second call (initial SyncOnce list succeeds, fresh list inside nodepool orphan pass fails).
+type failOnSecondSPNPGlobalLister struct {
+	call int
+	err  error
+}
+
+func (f *failOnSecondSPNPGlobalLister) List(ctx context.Context, opts *database.DBClientListResourceDocsOptions) (database.DBClientIterator[api.ServiceProviderNodePool], error) {
+	f.call++
+	if f.call >= 2 {
+		return nil, f.err
+	}
+	return &simpleIterator[api.ServiceProviderNodePool]{}, nil
+}
+
+// syncOnceSPCOKFailSecondSPNPGlobalListers lists empty SPCs always, and fails the second global SPNP list (for SyncOnce integration).
+type syncOnceSPCOKFailSecondSPNPGlobalListers struct {
+	spnp *failOnSecondSPNPGlobalLister
+}
+
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) Subscriptions() database.GlobalLister[arm.Subscription] {
+	return &panicGlobalLister[arm.Subscription]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) Clusters() database.GlobalLister[api.HCPOpenShiftCluster] {
+	return &panicGlobalLister[api.HCPOpenShiftCluster]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) NodePools() database.GlobalLister[api.HCPOpenShiftClusterNodePool] {
+	return &panicGlobalLister[api.HCPOpenShiftClusterNodePool]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) ExternalAuths() database.GlobalLister[api.HCPOpenShiftClusterExternalAuth] {
+	return &panicGlobalLister[api.HCPOpenShiftClusterExternalAuth]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) ServiceProviderClusters() database.GlobalLister[api.ServiceProviderCluster] {
+	return &emptyGlobalLister[api.ServiceProviderCluster]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) ServiceProviderNodePools() database.GlobalLister[api.ServiceProviderNodePool] {
+	return g.spnp
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) Controllers() database.GlobalLister[api.Controller] {
+	return &panicGlobalLister[api.Controller]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) ManagementClusterContents() database.GlobalLister[api.ManagementClusterContent] {
+	return &panicGlobalLister[api.ManagementClusterContent]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) Operations() database.GlobalLister[api.Operation] {
+	return &panicGlobalLister[api.Operation]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) ActiveOperations() database.GlobalLister[api.Operation] {
+	return &panicGlobalLister[api.Operation]{}
+}
+func (g *syncOnceSPCOKFailSecondSPNPGlobalListers) BillingDocs() database.GlobalLister[database.BillingDocument] {
+	return &panicGlobalLister[database.BillingDocument]{}
+}
+
+var _ database.GlobalListers = (*syncOnceSPCOKFailSecondSPNPGlobalListers)(nil)
+
 func TestDeleteOrphanedMaestroReadonlyBundles_SyncOnce_ListServiceProviderClustersError(t *testing.T) {
+	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
+	ctrl := gomock.NewController(t)
 	mockDB := databasetesting.NewMockDBClient()
 	listErr := fmt.Errorf("list SPCs error")
 	mockDB.SetGlobalListers(&alwaysErrorGlobalListers{err: listErr})
 
-	c := &deleteOrphanedMaestroReadonlyBundles{
-		cosmosClient: mockDB,
-	}
-	err := c.SyncOnce(context.Background(), nil)
+	mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+	mockCS.EXPECT().ListProvisionShards().Return(ocm.NewSimpleProvisionShardListIterator(nil, nil))
+
+	c := NewDeleteOrphanedMaestroReadonlyBundlesController(mockDB, mockCS, nil, "test-env")
+	err := c.SyncOnce(ctx, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get all ServiceProviderClusters")
 	assert.Contains(t, err.Error(), "list SPCs error")
+}
+
+func TestDeleteOrphanedMaestroReadonlyBundles_SyncOnce_ListServiceProviderNodePoolsError(t *testing.T) {
+	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
+	ctrl := gomock.NewController(t)
+	mockDB := databasetesting.NewMockDBClient()
+	listErr := fmt.Errorf("list SPNPs error")
+	mockDB.SetGlobalListers(&syncOnceSPCOKFailSecondSPNPGlobalListers{
+		spnp: &failOnSecondSPNPGlobalLister{err: listErr},
+	})
+
+	mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+	mockCS.EXPECT().ListProvisionShards().Return(ocm.NewSimpleProvisionShardListIterator(nil, nil))
+
+	c := NewDeleteOrphanedMaestroReadonlyBundlesController(mockDB, mockCS, nil, "test-env")
+	err := c.SyncOnce(ctx, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error getting all ServiceProviderNodePools (fresh snapshot)")
+	assert.Contains(t, err.Error(), "list SPNPs error")
 }
 
 func TestDeleteOrphanedMaestroReadonlyBundles_SyncOnce_NoServiceProviderClusters_Success(t *testing.T) {
@@ -762,7 +982,46 @@ func TestDeleteOrphanedMaestroReadonlyBundles_mapServiceProviderClustersByProvis
 	}
 }
 
-func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted(t *testing.T) {
+func TestDeleteOrphanedMaestroReadonlyBundles_mapServiceProviderNodePoolsByProvisionShard(t *testing.T) {
+	ctx := context.Background()
+	noopMaestroShardClient := &shardMaestroClient{
+		maestroClient:           nil,
+		maestroClientCancelFunc: func() {},
+	}
+	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
+	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/nodePools/worker/serviceProviderNodePools/default"))
+
+	t.Run("success single shard", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockDB := databasetesting.NewMockDBClient()
+		mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+		cluster := &api.HCPOpenShiftCluster{
+			TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
+			ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+				ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/csid")),
+			},
+		}
+		_, err := mockDB.HCPClusters("sub", "rg").Create(ctx, cluster, nil)
+		require.NoError(t, err)
+		spnp := &api.ServiceProviderNodePool{
+			CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
+			ResourceID:     *spnpResourceID,
+		}
+		provisionShard := buildTestProvisionShard("test-consumer")
+		mockCS.EXPECT().GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).Return(provisionShard, nil)
+		clients := map[string]*shardMaestroClient{provisionShard.ID(): noopMaestroShardClient}
+		c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
+		defer cancelMaestroClientsByProvisionShard(clients)
+		shardToSPNPs, err := c.mapServiceProviderNodePoolsByProvisionShard(ctx, []*api.ServiceProviderNodePool{spnp}, clients)
+		require.NoError(t, err)
+		require.Len(t, shardToSPNPs, 1)
+		spnps := shardToSPNPs[provisionShard.ID()]
+		require.Len(t, spnps, 1)
+		assert.Equal(t, spnpResourceID.String(), spnps[0].ResourceID.String())
+	})
+}
+
+func TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted(t *testing.T) {
 	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
 	spcResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/serviceProviderClusters/default"))
 
@@ -975,7 +1234,7 @@ func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundl
 			shard := buildTestProvisionShard("test-consumer")
 			clients, initialShardToSPCs := tt.setupMock(t, mockMaestro, mockDB, mockCS, shard)
 			c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
-			err := c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
+			err := c.ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errSubstr)
@@ -986,10 +1245,171 @@ func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundl
 	}
 }
 
-// TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_shardScopedDeletes
+func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedNodePoolScopedMaestroReadonlyBundlesAreDeleted(t *testing.T) {
+	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
+	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/nodePools/worker/serviceProviderNodePools/default"))
+
+	tests := []struct {
+		name      string
+		setupMock func(*testing.T, *maestro.MockClient, *databasetesting.MockDBClient, *ocm.MockClusterServiceClientSpec, *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool)
+		wantErr   bool
+		errSubstr string
+	}{
+		{
+			name: "empty maestro clients map does not perform anything",
+			setupMock: func(t *testing.T, _ *maestro.MockClient, _ *databasetesting.MockDBClient, _ *ocm.MockClusterServiceClientSpec, _ *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				return nil, nil
+			},
+			wantErr: false,
+		},
+		{
+			name: "second global ServiceProviderNodePools list error",
+			setupMock: func(_ *testing.T, m *maestro.MockClient, mockDB *databasetesting.MockDBClient, _ *ocm.MockClusterServiceClientSpec, shard *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				listErr := fmt.Errorf("fresh list SPNPs error")
+				mockDB.SetGlobalListers(&alwaysErrorGlobalListers{err: listErr})
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{}, nil)
+				return map[string]*shardMaestroClient{
+					shard.ID(): {maestroClient: m, maestroClientCancelFunc: func() {}},
+				}, map[string][]*api.ServiceProviderNodePool{}
+			},
+			wantErr:   true,
+			errSubstr: "error getting all ServiceProviderNodePools (fresh snapshot)",
+		},
+		{
+			name: "an error is returned when listing Maestro bundles fails",
+			setupMock: func(_ *testing.T, m *maestro.MockClient, _ *databasetesting.MockDBClient, _ *ocm.MockClusterServiceClientSpec, shard *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("maestro list error"))
+				return map[string]*shardMaestroClient{
+					shard.ID(): {maestroClient: m, maestroClientCancelFunc: func() {}},
+				}, map[string][]*api.ServiceProviderNodePool{}
+			},
+			wantErr:   true,
+			errSubstr: "failed to list nodepool-scoped Maestro Bundles",
+		},
+		{
+			name: "skips bundle without nodepool readonly managed-by label",
+			setupMock: func(_ *testing.T, m *maestro.MockClient, _ *databasetesting.MockDBClient, _ *ocm.MockClusterServiceClientSpec, shard *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				bundleList := &workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "other-bundle",
+								Namespace: "consumer",
+								Labels:    map[string]string{readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueClusterScoped},
+							},
+						},
+					},
+				}
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(bundleList, nil)
+				return map[string]*shardMaestroClient{
+					shard.ID(): {maestroClient: m, maestroClientCancelFunc: func() {}},
+				}, map[string][]*api.ServiceProviderNodePool{}
+			},
+		},
+		{
+			name: "skips Maestro bundle referenced by a ServiceProviderNodePool on the shard",
+			setupMock: func(t *testing.T, m *maestro.MockClient, mockDB *databasetesting.MockDBClient, mockCS *ocm.MockClusterServiceClientSpec, shard *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				clusterRID := spnpResourceID.Parent.Parent
+				cluster := &api.HCPOpenShiftCluster{
+					TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterRID}},
+					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+						ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/csid")),
+					},
+				}
+				_, err := mockDB.HCPClusters(clusterRID.SubscriptionID, clusterRID.ResourceGroupName).Create(ctx, cluster, nil)
+				require.NoError(t, err)
+				mockCS.EXPECT().GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).Return(shard, nil).AnyTimes()
+				spnp := &api.ServiceProviderNodePool{
+					CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
+					ResourceID:     *spnpResourceID,
+					Status: api.ServiceProviderNodePoolStatus{
+						MaestroReadonlyBundles: api.MaestroBundleReferenceList{
+							{MaestroAPIMaestroBundleName: "referenced-np-bundle"},
+						},
+					},
+				}
+				_, err = mockDB.ServiceProviderNodePools(clusterRID.SubscriptionID, clusterRID.ResourceGroupName, clusterRID.Name, spnpResourceID.Parent.Name).Create(context.Background(), spnp, nil)
+				require.NoError(t, err)
+				bundleList := &workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "referenced-np-bundle",
+								Namespace: "consumer",
+								Labels:    map[string]string{readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueNodePoolScoped},
+							},
+						},
+					},
+				}
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(bundleList, nil)
+				return map[string]*shardMaestroClient{
+					shard.ID(): {maestroClient: m, maestroClientCancelFunc: func() {}},
+				}, map[string][]*api.ServiceProviderNodePool{shard.ID(): {spnp}}
+			},
+		},
+		{
+			name: "deletes Maestro bundle not referenced by any ServiceProviderNodePool on the shard",
+			setupMock: func(t *testing.T, m *maestro.MockClient, mockDB *databasetesting.MockDBClient, mockCS *ocm.MockClusterServiceClientSpec, shard *arohcpv1alpha1.ProvisionShard) (map[string]*shardMaestroClient, map[string][]*api.ServiceProviderNodePool) {
+				clusterRID := spnpResourceID.Parent.Parent
+				cluster := &api.HCPOpenShiftCluster{
+					TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterRID}},
+					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+						ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/csid")),
+					},
+				}
+				_, err := mockDB.HCPClusters(clusterRID.SubscriptionID, clusterRID.ResourceGroupName).Create(ctx, cluster, nil)
+				require.NoError(t, err)
+				mockCS.EXPECT().GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).Return(shard, nil).AnyTimes()
+				spnp := &api.ServiceProviderNodePool{
+					CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
+					ResourceID:     *spnpResourceID,
+					Status: api.ServiceProviderNodePoolStatus{
+						MaestroReadonlyBundles: api.MaestroBundleReferenceList{
+							{MaestroAPIMaestroBundleName: "kept-np-bundle"},
+						},
+					},
+				}
+				_, err = mockDB.ServiceProviderNodePools(clusterRID.SubscriptionID, clusterRID.ResourceGroupName, clusterRID.Name, spnpResourceID.Parent.Name).Create(context.Background(), spnp, nil)
+				require.NoError(t, err)
+				orphanMeta := metav1.ObjectMeta{
+					Name:      "orphaned-np-bundle",
+					Namespace: "consumer",
+					UID:       types.UID("orphan-np-uid"),
+					Labels:    map[string]string{readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueNodePoolScoped},
+				}
+				bundleList := &workv1.ManifestWorkList{Items: []workv1.ManifestWork{{ObjectMeta: orphanMeta}}}
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(bundleList, nil)
+				m.EXPECT().Delete(gomock.Any(), "orphaned-np-bundle", metav1.DeleteOptions{}).Return(nil)
+				return map[string]*shardMaestroClient{
+					shard.ID(): {maestroClient: m, maestroClientCancelFunc: func() {}},
+				}, map[string][]*api.ServiceProviderNodePool{shard.ID(): {spnp}}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockMaestro := maestro.NewMockClient(ctrl)
+			mockDB := databasetesting.NewMockDBClient()
+			mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+			shard := buildTestProvisionShard("test-consumer")
+			clients, initialShardToSPNPs := tt.setupMock(t, mockMaestro, mockDB, mockCS, shard)
+			c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
+			err := c.ensureOrphanedNodePoolScopedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPNPs)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errSubstr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_shardScopedDeletes
 // verifies that when processing a Maestro bundle in shard A, if it doesn't have a corresponding SPC associated to shard A
 // it is deleted, even if there's a SPC associated to other shards that contains the same maestro bundle name (per-shard reference scope).
-func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_shardScopedDeletes(t *testing.T) {
+func TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_clusterScopedDeletes(t *testing.T) {
 	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
 	ctrl := gomock.NewController(t)
 	mockShard1 := maestro.NewMockClient(ctrl)
@@ -1078,14 +1498,14 @@ func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundl
 	mockShard2.EXPECT().Delete(gomock.Any(), "bundle-X", metav1.DeleteOptions{}).Return(nil)
 
 	c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
-	err = c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
+	err = c.ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
 	require.NoError(t, err)
 }
 
-// TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_bundleOnlyOnShardANoDeleteOnShardB
+// TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_bundleOnlyOnShardANoDeleteOnShardB
 // verifies that bundle N exists only on shard A's Maestro and is referenced by an SPC on shard A, while shard B's
 // Maestro lists no such bundle: processing shard B never issues a Delete for N (and shard A skips N as referenced).
-func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_bundleOnlyOnShardANoDeleteOnShardB(t *testing.T) {
+func TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_bundleOnlyOnShardANoDeleteOnShardB(t *testing.T) {
 	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
 	ctrl := gomock.NewController(t)
 	mockShardA := maestro.NewMockClient(ctrl)
@@ -1170,14 +1590,14 @@ func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundl
 	mockShardB.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{Items: []workv1.ManifestWork{}}, nil)
 
 	c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
-	err = c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
+	err = c.ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
 	require.NoError(t, err)
 }
 
-// TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_ReferenceOnlyOnFreshGlobalList
+// TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_ReferenceOnlyOnFreshGlobalList
 // verifies that an SPC document present only on the second global Cosmos list (not in the cached SPC snapshot)
 // still prevents deletion of the referenced bundle.
-func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundlesAreDeleted_ReferenceOnlyOnFreshGlobalList(t *testing.T) {
+func TestDeleteOrphanedMaestroReadonlyBundles_ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted_ReferenceOnlyOnFreshGlobalList(t *testing.T) {
 	ctx := utils.ContextWithLogger(context.Background(), testr.New(t))
 	ctrl := gomock.NewController(t)
 	mockMaestro := maestro.NewMockClient(ctrl)
@@ -1233,7 +1653,7 @@ func TestDeleteOrphanedMaestroReadonlyBundles_ensureOrphanedMaestroReadonlyBundl
 	mockMaestro.EXPECT().List(gomock.Any(), gomock.Any()).Return(bundleList, nil)
 
 	c := &deleteOrphanedMaestroReadonlyBundles{cosmosClient: mockDB, clusterServiceClient: mockCS}
-	err = c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
+	err = c.ensureClusterScopedOrphanedMaestroReadonlyBundlesAreDeleted(ctx, clients, initialShardToSPCs)
 	require.NoError(t, err)
 }
 
@@ -1299,6 +1719,8 @@ func TestDeleteOrphanedMaestroReadonlyBundles_SyncOnce_FullFlow_DeletesOrphanedB
 	}
 	mockMaestro.EXPECT().List(gomock.Any(), gomock.Any()).Return(bundleList, nil)
 	mockMaestro.EXPECT().Delete(gomock.Any(), "orphaned-bundle", metav1.DeleteOptions{}).Return(nil)
+	// Second Maestro list: nodepool-scoped bundles pass after cluster-scoped orphan cleanup.
+	mockMaestro.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{}, nil)
 
 	controller := NewDeleteOrphanedMaestroReadonlyBundlesController(mockDB, mockCS, mockMaestroBuilder, "test-env")
 	err = controller.SyncOnce(ctx, nil)
