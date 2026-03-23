@@ -23,7 +23,6 @@ import (
 	"github.com/google/uuid"
 	workv1 "open-cluster-management.io/api/work/v1"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -266,7 +265,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 		return lastPersistedSPC, utils.TrackError(fmt.Errorf("unrecognized Maestro Bundle internal name: %s", maestroBundleInternalName))
 	}
 
-	resultMaestroBundle, err := c.getOrCreateMaestroBundle(ctx, maestroClient, desiredMaestroBundle)
+	resultMaestroBundle, err := maestro.GetOrCreateMaestroBundle(ctx, maestroClient, desiredMaestroBundle)
 	if err != nil {
 		return lastPersistedSPC, utils.TrackError(fmt.Errorf("failed to get or create Maestro Bundle: %w", err))
 	}
@@ -450,34 +449,6 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) generateNewMaestroAPIM
 // Internally in CS this is the "CDNamespace" attribute associated to the cluster.
 func (c *createClusterScopedMaestroReadonlyBundlesSyncer) getHostedClusterNamespace(envName string, csClusterID string) string {
 	return fmt.Sprintf("ocm-%s-%s", envName, csClusterID)
-}
-
-// getOrCreateMaestroBundle gets (or creates if it does not exist) a Maestro Bundle for a given Maestro Bundle namespaced name.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) getOrCreateMaestroBundle(ctx context.Context, maestroClient maestro.Client, maestroBundle *workv1.ManifestWork) (*workv1.ManifestWork, error) {
-	logger := utils.LoggerFromContext(ctx)
-	existingMaestroBundle, err := maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})
-	if err == nil {
-		logger.Info(fmt.Sprintf("retrieved maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-		return existingMaestroBundle, nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		logger.Error(err, "failed to get Maestro Bundle and it is not already exists error")
-		return nil, utils.TrackError(fmt.Errorf("failed to get Maestro Bundle: %w", err))
-	}
-
-	logger.Info(fmt.Sprintf("attempting to create maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-	existingMaestroBundle, err = maestroClient.Create(ctx, maestroBundle, metav1.CreateOptions{})
-	if err == nil {
-		logger.Info(fmt.Sprintf("created maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-		return existingMaestroBundle, nil
-	}
-	if !k8serrors.IsAlreadyExists(err) {
-		logger.Error(err, "failed to create Maestro Bundle and it is not already exists error")
-		return nil, utils.TrackError(fmt.Errorf("failed to create Maestro Bundle: %w", err))
-	}
-	logger.Error(err, "failed to create Maestro Bundle because it returned already exists error. Attempting to get it again")
-	existingMaestroBundle, err = maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})
-	return existingMaestroBundle, err
 }
 
 func (c *createClusterScopedMaestroReadonlyBundlesSyncer) CooldownChecker() controllerutils.CooldownChecker {
