@@ -23,7 +23,6 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -40,8 +39,6 @@ import (
 )
 
 const (
-	// readonlyBundleManagedByK8sLabelKey is the key of the K8s label that is used to identify the controller that manages the readonly Maestro bundle.
-	readonlyBundleManagedByK8sLabelKey = "aro-hcp.azure.com/readonly-bundle-managed-by"
 	// readonlyBundleManagedByK8sLabelValueClusterScoped is the K8s label associated to the readonlyBundleManagedByK8sLabelKey
 	// key that indicates that the readonly Maestro bundle is managed by the create
 	// cluster scoped maestro readonly bundles controller.
@@ -226,7 +223,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 	// and it makes it resistant to crashes/reboots.
 	if existingMaestroBundleRef == nil {
 		var err error
-		existingMaestroBundleRef, err = c.buildInitialMaestroBundleReference(maestroBundleInternalName)
+		existingMaestroBundleRef, err = buildInitialMaestroBundleReference(maestroBundleInternalName, c.maestroAPIMaestroBundleNameGenerator)
 		if err != nil {
 			return lastPersistedSPC, utils.TrackError(fmt.Errorf("failed to build initial Maestro Bundle reference: %w", err))
 		}
@@ -332,100 +329,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMa
 		Namespace: hostedCluster.Namespace,
 	}
 
-	return c.buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hostedCluster)
-}
-
-// buildInitialReadonlyMaestroBundle builds an initial readonly Maestro Bundle for a given resource specified in obj.
-// objResourceIdentifier is the resource identifier of the resource specified in obj.
-// maestroBundleNamespacedName is the namespaced name of the Maestro Bundle.
-// Used to create the readonly Maestro bundle associated to the resource specified in obj.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName types.NamespacedName, objResourceIdentifier workv1.ResourceIdentifier, obj runtime.Object) *workv1.ManifestWork {
-	maestroBundleObjMeta := metav1.ObjectMeta{
-		Name:            maestroBundleNamespacedName.Name,
-		Namespace:       maestroBundleNamespacedName.Namespace,
-		ResourceVersion: "0", // TODO is this needed when creating a maestro bundle?
-		Labels: map[string]string{
-			// We define it as a K8s label because Maestro supports server-side filtering based on K8s labels.
-			// We can define it as a K8s label because for this specific use case we can comply with
-			// K8s labels length and charset restrictions https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set.
-			readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueClusterScoped,
-		},
-	}
-
-	// We build the Maestro Bundle that will contain the resource specified in obj.
-	// Aside from putting the resource (manifest) previously built above, we
-	// also define a FeedbackRule that will allow us to retrieve the whole content
-	// from the management cluster
-	maestroBundle := &workv1.ManifestWork{
-		ObjectMeta: maestroBundleObjMeta,
-		Spec: workv1.ManifestWorkSpec{
-			Workload: workv1.ManifestsTemplate{
-				Manifests: []workv1.Manifest{
-					{
-						RawExtension: runtime.RawExtension{
-							// We put the resource (manifest) specified in obj.
-							// In Maestro only the desired `spec` as defined in the bundle can be retrieved
-							// from here when querying the Maestro Bundle.
-							// To retrieve another section other than the desired spec Maestro
-							// requires defining FeedbackRule(s) in the Maestro bundle.
-							// For maestro readonly resources, not even the desired spec can be retrieved from here. For
-							// those type of resources it needs to be retrieved via status feedback rule(s) too.
-							// For owned resources, here the desired spec can be retrieved but that
-							// is not necessarily the actual spec in the management cluster side. If that is
-							// desired it is again necessary to get the spec via FeedbackRule(s).
-							Object: obj,
-						},
-					},
-				},
-			},
-			ManifestConfigs: []workv1.ManifestConfigOption{
-				// We also need to define the ManifestConfig associated to the resource(manifest)
-				// that is being put within the Maestro Bundle.
-				{
-					// ResourceIdentifier needs to be specified and it is the information
-					// associated to the manifest that is being put within the Maestro Bundle.
-					ResourceIdentifier: objResourceIdentifier,
-					// We need to set the UpdateStrategy to read only. This
-					// creates a "readonly maestro bundle".
-					UpdateStrategy: &workv1.UpdateStrategy{
-						Type: workv1.UpdateStrategyTypeReadOnly,
-					},
-					// We define a feedbackrule based on JSONPath. We alias the name
-					// of this JSONPath as "resource" and its real JSONPath is "@" which
-					// signals the whole object is retrieved. This includes both spec
-					// and status.
-					FeedbackRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: "resource",
-									Path: "@",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return maestroBundle
-}
-
-// buildInitialMaestroBundleReference builds an initial Maestro Bundle reference for a given maestro bundle internal name.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialMaestroBundleReference(internalName api.MaestroBundleInternalName) (*api.MaestroBundleReference, error) {
-	maestroAPIMaestroBundleName, err := c.maestroAPIMaestroBundleNameGenerator.NewMaestroAPIMaestroBundleName()
-	if err != nil {
-		return nil, utils.TrackError(fmt.Errorf("failed to generate Maestro API Maestro Bundle name: %w", err))
-	}
-	hostedClusterMWMaestroBundleReference := &api.MaestroBundleReference{
-		Name:                        internalName,
-		MaestroAPIMaestroBundleName: maestroAPIMaestroBundleName,
-		MaestroAPIMaestroBundleID:   "",
-	}
-
-	return hostedClusterMWMaestroBundleReference, nil
+	return buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hostedCluster, readonlyBundleManagedByK8sLabelValueClusterScoped)
 }
 
 // getHostedClusterNamespace gets the namespace for the hosted cluster based on the environment name and the cluster service OCM Cluster ID.

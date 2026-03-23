@@ -24,7 +24,6 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -111,7 +110,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) generateMaestroBundle
 }
 
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPNodePoolKey) error {
-	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).Get(ctx, key.HCPClusterName)
+	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).Get(ctx, key.HCPNodePoolName)
 	if database.IsResponseError(err, http.StatusNotFound) {
 		return nil // nodepool doesn't exist, no work to do
 	}
@@ -189,9 +188,9 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.
 	csClusterDomainPrefix := csCluster.DomainPrefix()
 
 	// We sync the Maestro Bundles that need to be synced.
-	// We pass the latest existingServiceProviderCluster into each iteration and use the returned
-	// updated SPC for the next, so that multiple bundles see persisted updates from previous iterations.
-	// We always apply updatedSPC (even on error) so in-memory state stays in sync with Cosmos
+	// We pass the latest existingServiceProviderNodePool into each iteration and use the returned
+	// updated SPNP for the next, so that multiple bundles see persisted updates from previous iterations.
+	// We always apply updatedSPNP (even on error) so in-memory state stays in sync with Cosmos
 	// when syncMaestroBundle persisted a partial change before failing.
 	var syncErrors []error
 	for _, maestroBundleInternalName := range maestroBundlesToSync {
@@ -208,9 +207,9 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.
 	return utils.TrackError(errors.Join(syncErrors...))
 }
 
-// syncMaestroBundle ensures the given Maestro bundle exists in Maestro, as well as a reference to it in ServiceProviderCluster.
-// It returns the updated ServiceProviderCluster (after any Replace calls) so the caller can pass it into the next sync.
-// On error, the first return value is always the lastest persisted ServiceProviderClass SPC, so the
+// syncMaestroBundle ensures the given Maestro bundle exists in Maestro, as well as a reference to it in ServiceProviderNodePool.
+// It returns the updated ServiceProviderNodePool (after any Replace calls) so the caller can pass it into the next sync.
+// On error, the first return value is always the lastest persisted ServiceProviderNodePool, so the
 // caller can keep in-memory state in sync and subsequent bundle syncs in the same run never see stale data.
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 	ctx context.Context,
@@ -234,7 +233,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 	// and it makes it resistant to crashes/reboots.
 	if existingMaestroBundleRef == nil {
 		var err error
-		existingMaestroBundleRef, err = c.buildInitialMaestroBundleReference(maestroBundleInternalName)
+		existingMaestroBundleRef, err = buildInitialMaestroBundleReference(maestroBundleInternalName, c.maestroAPIMaestroBundleNameGenerator)
 		if err != nil {
 			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to build initial Maestro Bundle reference: %w", err))
 		}
@@ -244,7 +243,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 		}
 		existingServiceProviderNodePool, err = serviceProviderNodePoolsDBClient.Replace(ctx, existingServiceProviderNodePool, nil)
 		if err != nil {
-			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to replace ServiceProviderCluster in database: %w", err))
+			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to replace ServiceProviderNodePool in database: %w", err))
 		}
 		lastPersistedSPNP = existingServiceProviderNodePool
 		existingMaestroBundleRef, err = existingServiceProviderNodePool.Status.MaestroReadonlyBundles.Get(maestroBundleInternalName)
@@ -252,7 +251,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to get Maestro Bundle reference: %w", err))
 		}
 		if existingMaestroBundleRef == nil {
-			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("maestro Bundle reference %q not found in ServiceProviderCluster", maestroBundleInternalName))
+			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("maestro Bundle reference %q not found in ServiceProviderNodePool", maestroBundleInternalName))
 		}
 	}
 
@@ -275,7 +274,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 		return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to get or create Maestro Bundle: %w", err))
 	}
 
-	// If the Maestro API MaestroBundle ID is not set we store the returned Maestro Bundle ID in the corresponding Maestro Bundle reference of the ServiceProviderCluster in Cosmos.
+	// If the Maestro API MaestroBundle ID is not set we store the returned Maestro Bundle ID in the corresponding Maestro Bundle reference of the ServiceProviderNodePool in Cosmos.
 	if len(existingMaestroBundleRef.MaestroAPIMaestroBundleID) == 0 {
 		bundleID := string(resultMaestroBundle.UID)
 		existingMaestroBundleRef.MaestroAPIMaestroBundleID = bundleID
@@ -285,7 +284,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 		}
 		existingServiceProviderNodePool, err = serviceProviderNodePoolsDBClient.Replace(ctx, existingServiceProviderNodePool, nil)
 		if err != nil {
-			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to replace ServiceProviderCluster in database: %w", err))
+			return lastPersistedSPNP, utils.TrackError(fmt.Errorf("failed to replace ServiceProviderNodePool in database: %w", err))
 		}
 		lastPersistedSPNP = existingServiceProviderNodePool
 	}
@@ -340,100 +339,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyM
 		Namespace: hypershiftNodePool.Namespace,
 	}
 
-	return c.buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hypershiftNodePool)
-}
-
-// buildInitialReadonlyMaestroBundle builds an initial readonly Maestro Bundle for a given resource specified in obj.
-// objResourceIdentifier is the resource identifier of the resource specified in obj.
-// maestroBundleNamespacedName is the namespaced name of the Maestro Bundle.
-// Used to create the readonly Maestro bundle associated to the resource specified in obj.
-func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName types.NamespacedName, objResourceIdentifier workv1.ResourceIdentifier, obj runtime.Object) *workv1.ManifestWork {
-	maestroBundleObjMeta := metav1.ObjectMeta{
-		Name:            maestroBundleNamespacedName.Name,
-		Namespace:       maestroBundleNamespacedName.Namespace,
-		ResourceVersion: "0", // TODO is this needed when creating a maestro bundle?
-		Labels: map[string]string{
-			// We define it as a K8s label because Maestro supports server-side filtering based on K8s labels.
-			// We can define it as a K8s label because for this specific use case we can comply with
-			// K8s labels length and charset restrictions https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set.
-			readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueNodePoolScoped,
-		},
-	}
-
-	// We build the Maestro Bundle that will contain the resource specified in obj.
-	// Aside from putting the resource (manifest) previously built above, we
-	// also define a FeedbackRule that will allow us to retrieve the whole content
-	// from the management cluster
-	maestroBundle := &workv1.ManifestWork{
-		ObjectMeta: maestroBundleObjMeta,
-		Spec: workv1.ManifestWorkSpec{
-			Workload: workv1.ManifestsTemplate{
-				Manifests: []workv1.Manifest{
-					{
-						RawExtension: runtime.RawExtension{
-							// We put the resource (manifest) specified in obj.
-							// In Maestro only the desired `spec` as defined in the bundle can be retrieved
-							// from here when querying the Maestro Bundle.
-							// To retrieve another section other than the desired spec Maestro
-							// requires defining FeedbackRule(s) in the Maestro bundle.
-							// For maestro readonly resources, not even the desired spec can be retrieved from here. For
-							// those type of resources it needs to be retrieved via status feedback rule(s) too.
-							// For owned resources, here the desired spec can be retrieved but that
-							// is not necessarily the actual spec in the management cluster side. If that is
-							// desired it is again necessary to get the spec via FeedbackRule(s).
-							Object: obj,
-						},
-					},
-				},
-			},
-			ManifestConfigs: []workv1.ManifestConfigOption{
-				// We also need to define the ManifestConfig associated to the resource(manifest)
-				// that is being put within the Maestro Bundle.
-				{
-					// ResourceIdentifier needs to be specified and it is the information
-					// associated to the manifest that is being put within the Maestro Bundle.
-					ResourceIdentifier: objResourceIdentifier,
-					// We need to set the UpdateStrategy to read only. This
-					// creates a "readonly maestro bundle".
-					UpdateStrategy: &workv1.UpdateStrategy{
-						Type: workv1.UpdateStrategyTypeReadOnly,
-					},
-					// We define a feedbackrule based on JSONPath. We alias the name
-					// of this JSONPath as "resource" and its real JSONPath is "@" which
-					// signals the whole object is retrieved. This includes both spec
-					// and status.
-					FeedbackRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: "resource",
-									Path: "@",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return maestroBundle
-}
-
-// buildInitialMaestroBundleReference builds an initial Maestro Bundle reference for a given maestro bundle internal name.
-func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildInitialMaestroBundleReference(internalName api.MaestroBundleInternalName) (*api.MaestroBundleReference, error) {
-	maestroAPIMaestroBundleName, err := c.maestroAPIMaestroBundleNameGenerator.NewMaestroAPIMaestroBundleName()
-	if err != nil {
-		return nil, utils.TrackError(fmt.Errorf("failed to generate Maestro API Maestro Bundle name: %w", err))
-	}
-	nodePoolMaestroBundleReference := &api.MaestroBundleReference{
-		Name:                        internalName,
-		MaestroAPIMaestroBundleName: maestroAPIMaestroBundleName,
-		MaestroAPIMaestroBundleID:   "",
-	}
-
-	return nodePoolMaestroBundleReference, nil
+	return buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hypershiftNodePool, readonlyBundleManagedByK8sLabelValueNodePoolScoped)
 }
 
 // getNodePoolNamespace gets the namespace for the node pool based on the environment name, the cluster service OCM Cluster ID and the node pool service OCM Node Pool ID.

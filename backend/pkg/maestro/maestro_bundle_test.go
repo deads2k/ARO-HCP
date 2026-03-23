@@ -16,6 +16,7 @@ package maestro
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -124,6 +125,112 @@ func TestGetOrCreateMaestroBundle(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantBundle, result)
+			}
+		})
+	}
+}
+
+func TestForEachMaestroBundle(t *testing.T) {
+	ctx := context.Background()
+	callbackErr := errors.New("stop here")
+
+	tests := []struct {
+		name         string
+		setupMock    func(*MockClient)
+		listOpts     metav1.ListOptions
+		errAfterName string
+		wantNames    []string
+		wantErr      bool
+		errContains  []string
+		errIs        error
+	}{
+		{
+			name: "empty list",
+			setupMock: func(m *MockClient) {
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{},
+				}, nil)
+			},
+			wantNames: []string{},
+		},
+		{
+			name: "invokes fn for each bundle in order on one page",
+			setupMock: func(m *MockClient) {
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{
+						{ObjectMeta: metav1.ObjectMeta{Name: "a"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "b"}},
+					},
+				}, nil)
+			},
+			wantNames: []string{"a", "b"},
+		},
+		{
+			name: "paginates using continue token",
+			setupMock: func(m *MockClient) {
+				m.EXPECT().List(gomock.Any(), metav1.ListOptions{Limit: 10}).Return(&workv1.ManifestWorkList{
+					ListMeta: metav1.ListMeta{Continue: "next-page"},
+					Items:    []workv1.ManifestWork{{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+				}, nil)
+				m.EXPECT().List(gomock.Any(), metav1.ListOptions{Limit: 10, Continue: "next-page"}).Return(&workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+				}, nil)
+			},
+			listOpts:  metav1.ListOptions{Limit: 10},
+			wantNames: []string{"first", "second"},
+		},
+		{
+			name: "returns wrapped error when list fails",
+			setupMock: func(m *MockClient) {
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("upstream failure"))
+			},
+			wantNames:   []string{},
+			wantErr:     true,
+			errContains: []string{"failed to list Maestro Bundles", "upstream failure"},
+		},
+		{
+			name: "returns callback error and stops iteration",
+			setupMock: func(m *MockClient) {
+				m.EXPECT().List(gomock.Any(), gomock.Any()).Return(&workv1.ManifestWorkList{
+					Items: []workv1.ManifestWork{
+						{ObjectMeta: metav1.ObjectMeta{Name: "a"}},
+						{ObjectMeta: metav1.ObjectMeta{Name: "b"}},
+					},
+				}, nil)
+			},
+			errAfterName: "a",
+			wantNames:    []string{"a"},
+			wantErr:      true,
+			errIs:        callbackErr,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockMaestro := NewMockClient(ctrl)
+			tt.setupMock(mockMaestro)
+
+			names := make([]string, 0)
+			err := ForEachMaestroBundle(ctx, mockMaestro, tt.listOpts, func(mw *workv1.ManifestWork) error {
+				names = append(names, mw.Name)
+				if tt.errAfterName != "" && mw.Name == tt.errAfterName {
+					return callbackErr
+				}
+				return nil
+			})
+
+			assert.Equal(t, tt.wantNames, names)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errIs != nil {
+					require.ErrorIs(t, err, tt.errIs)
+				}
+				for _, sub := range tt.errContains {
+					assert.Contains(t, err.Error(), sub)
+				}
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

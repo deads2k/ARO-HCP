@@ -138,208 +138,6 @@ func (e *errorInjectingSPCCRUD) Get(ctx context.Context, resourceID string) (*ap
 
 var _ database.ServiceProviderClusterCRUD = &errorInjectingSPCCRUD{}
 
-func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_buildDegradedCondition(t *testing.T) {
-	syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{}
-
-	cond := syncer.buildDegradedCondition(api.ConditionTrue, "MaestroBundleNotFound", "bundle not found")
-	assert.Equal(t, "Degraded", cond.Type)
-	assert.Equal(t, api.ConditionTrue, cond.Status)
-	assert.Equal(t, "MaestroBundleNotFound", cond.Reason)
-	assert.Equal(t, "bundle not found", cond.Message)
-
-	condFalse := syncer.buildDegradedCondition(api.ConditionFalse, "", "")
-	assert.Equal(t, api.ConditionFalse, condFalse.Status)
-	assert.Empty(t, condFalse.Reason)
-	assert.Empty(t, condFalse.Message)
-}
-
-func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_buildObjectsFromUnstructuredObj(t *testing.T) {
-	syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{}
-
-	t.Run("single object returns one item", func(t *testing.T) {
-		obj := &unstructured.Unstructured{}
-		obj.SetGroupVersionKind(schema.GroupVersionKind{Group: "hypershift.openshift.io", Version: "v1beta1", Kind: "HostedCluster"})
-		obj.SetName("test-hc")
-		obj.SetNamespace("test-ns")
-
-		objs, err := syncer.buildObjectsFromUnstructuredObj(obj)
-		require.NoError(t, err)
-		require.Len(t, objs, 1)
-		assert.Equal(t, obj, objs[0].Object)
-	})
-
-	t.Run("list object flattens items", func(t *testing.T) {
-		// Build an Unstructured that represents a K8s ConfigMapList with two ConfigMap items.
-		item1 := map[string]interface{}{"kind": "HostedClusterList", "metadata": map[string]interface{}{"name": "cm1"}}
-		item2 := map[string]interface{}{"kind": "HostedClusterList", "metadata": map[string]interface{}{"name": "cm2"}}
-		listObj := &unstructured.Unstructured{}
-		listObj.SetUnstructuredContent(map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "ConfigMapList",
-			"items":      []interface{}{item1, item2},
-		})
-		objs, err := syncer.buildObjectsFromUnstructuredObj(listObj)
-		require.NoError(t, err)
-		require.Len(t, objs, 2)
-
-		// RawExtension has Object set (not Raw) when coming from buildObjectsFromUnstructuredObj; unmarshal to typed.
-		require.NotNil(t, objs[0].Object, "Object should be set")
-		u1 := objs[0].Object.(*unstructured.Unstructured)
-		cm1 := &hsv1beta1.HostedCluster{}
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u1.UnstructuredContent(), cm1)
-		require.NoError(t, err)
-		assert.Equal(t, "cm1", cm1.Name)
-
-		u2 := objs[1].Object.(*unstructured.Unstructured)
-		cm2 := &hsv1beta1.HostedCluster{}
-		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u2.UnstructuredContent(), cm2)
-		require.NoError(t, err)
-		assert.Equal(t, "cm2", cm2.Name)
-	})
-}
-
-// buildTestMaestroBundleWithStatusFeedback builds a ManifestWork with exactly one resource status manifest
-// and one status feedback value named "resource" with JsonRaw type.
-func buildTestMaestroBundleWithStatusFeedback(name, namespace, rawJSON string) *workv1.ManifestWork {
-	jsonRaw := rawJSON
-	return &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Status: workv1.ManifestWorkStatus{
-			ResourceStatus: workv1.ManifestResourceStatus{
-				Manifests: []workv1.ManifestCondition{
-					{
-						ResourceMeta: workv1.ManifestResourceMeta{
-							Group:     "hypershift.openshift.io",
-							Version:   "v1beta1",
-							Kind:      "HostedCluster",
-							Name:      "test-hc",
-							Namespace: "test-ns",
-						},
-						StatusFeedbacks: workv1.StatusFeedbackResult{
-							Values: []workv1.FeedbackValue{
-								{
-									Name: "resource",
-									Value: workv1.FieldValue{
-										Type:    workv1.JsonRaw,
-										JsonRaw: &jsonRaw,
-									},
-								},
-							},
-						},
-						Conditions: []metav1.Condition{},
-					},
-				},
-			},
-		},
-	}
-}
-
-func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_getSingleResourceStatusFeedbackRawJSONFromMaestroBundle(t *testing.T) {
-	syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{}
-	validJSON := `{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"test"}}`
-
-	tests := []struct {
-		name    string
-		bundle  *workv1.ManifestWork
-		want    string
-		wantErr bool
-		errSub  string
-	}{
-		{
-			name:   "success - returns raw JSON",
-			bundle: buildTestMaestroBundleWithStatusFeedback("bundle-1", "ns", validJSON),
-			want:   validJSON,
-		},
-		{
-			name: "error - zero manifests",
-			bundle: &workv1.ManifestWork{
-				Status: workv1.ManifestWorkStatus{
-					ResourceStatus: workv1.ManifestResourceStatus{
-						Manifests: []workv1.ManifestCondition{},
-					},
-				},
-			},
-			wantErr: true,
-			errSub:  "expected exactly one resource within the Maestro Bundle, got 0",
-		},
-		{
-			name: "error - two manifests",
-			bundle: &workv1.ManifestWork{
-				Status: workv1.ManifestWorkStatus{
-					ResourceStatus: workv1.ManifestResourceStatus{
-						Manifests: []workv1.ManifestCondition{
-							{ResourceMeta: workv1.ManifestResourceMeta{}, Conditions: []metav1.Condition{}},
-							{ResourceMeta: workv1.ManifestResourceMeta{}, Conditions: []metav1.Condition{}},
-						},
-					},
-				},
-			},
-			wantErr: true,
-			errSub:  "expected exactly one resource within the Maestro Bundle, got 2",
-		},
-		{
-			name: "error - zero status feedback values",
-			bundle: &workv1.ManifestWork{
-				Status: workv1.ManifestWorkStatus{
-					ResourceStatus: workv1.ManifestResourceStatus{
-						Manifests: []workv1.ManifestCondition{
-							{
-								ResourceMeta:    workv1.ManifestResourceMeta{},
-								StatusFeedbacks: workv1.StatusFeedbackResult{Values: []workv1.FeedbackValue{}},
-								Conditions:      []metav1.Condition{},
-							},
-						},
-					},
-				},
-			},
-			wantErr: true,
-			errSub:  "expected exactly one status feedback value",
-		},
-		{
-			name: "error - wrong feedback name",
-			bundle: func() *workv1.ManifestWork {
-				b := buildTestMaestroBundleWithStatusFeedback("b", "ns", validJSON)
-				b.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values[0].Name = "wrong"
-				return b
-			}(),
-			wantErr: true,
-			errSub:  "expected status feedback value name to be 'resource', got wrong",
-		},
-		{
-			name: "error - wrong feedback type",
-			bundle: func() *workv1.ManifestWork {
-				b := buildTestMaestroBundleWithStatusFeedback("b", "ns", validJSON)
-				b.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values[0].Value.Type = workv1.String
-				return b
-			}(),
-			wantErr: true,
-			errSub:  "expected status feedback value type to be JsonRaw",
-		},
-		{
-			name: "error - nil JsonRaw",
-			bundle: func() *workv1.ManifestWork {
-				b := buildTestMaestroBundleWithStatusFeedback("b", "ns", validJSON)
-				b.Status.ResourceStatus.Manifests[0].StatusFeedbacks.Values[0].Value.JsonRaw = nil
-				return b
-			}(),
-			wantErr: true,
-			errSub:  "expected status feedback value JsonRaw to be not nil",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := syncer.getSingleResourceStatusFeedbackRawJSONFromMaestroBundle(tt.bundle)
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errSub)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.want, string(got))
-			}
-		})
-	}
-}
-
 func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_calculateManagementClusterContentFromMaestroBundle(t *testing.T) {
 	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
 	cluster := &api.HCPOpenShiftCluster{
@@ -413,8 +211,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_calculat
 			mockMaestro := maestro.NewMockClient(ctrl)
 			tt.maestroGet(mockMaestro)
 
-			syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{}
-			got, err := syncer.calculateManagementClusterContentFromMaestroBundle(context.Background(), cluster, ref, mockMaestro)
+			got, err := calculateManagementClusterContentFromMaestroBundle(context.Background(), cluster.ID, ref, mockMaestro)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errSub)
@@ -453,8 +250,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		mockDB := databasetesting.NewMockDBClient()
 		mccCRUD := mockDB.ManagementClusterContents("sub", "rg", "cluster")
 
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		err := syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.NoError(t, err)
 
 		// Content should have been created (name = bundle internal name)
@@ -483,8 +279,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		_, err := mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		err = syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
@@ -520,8 +315,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		_, err := mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		err = syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
@@ -535,7 +329,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		ctrl := gomock.NewController(t)
 		mockMaestro := maestro.NewMockClient(ctrl)
 		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
-		// Get is called once when building desired for pre-create, and once inside readAndPersistMaestroBundleContent.
+		// Get is called once when building desired for pre-create, and once inside readAndPersistMaestroReadonlyBundleContent.
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil).Times(2)
 
 		mockDB := databasetesting.NewMockDBClient()
@@ -543,8 +337,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
 		// Pre-create content that matches exactly what the syncer would compute (same KubeContent and Degraded=False condition)
 		// so that DeepEqual(existing, desired) is true and Replace is not called.
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		desired, err := syncer.calculateManagementClusterContentFromMaestroBundle(ctx, cluster, ref, mockMaestro)
+		desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, cluster.ID, ref, mockMaestro)
 		require.NoError(t, err)
 		require.NotNil(t, desired)
 		existing := &api.ManagementClusterContent{
@@ -555,7 +348,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 		_, err = mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		err = syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.NoError(t, err)
 
 		// Document should still exist with same content (no Replace was needed)
@@ -587,8 +380,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 			},
 		}
 
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		err := syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to replace ManagementClusterContent")
 		assert.True(t, database.IsResponseError(err, http.StatusPreconditionFailed), "expected 412 Precondition Failed")
@@ -609,8 +401,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_readAndP
 			},
 		}
 
-		syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{cosmosClient: mockDB}
-		err := syncer.readAndPersistMaestroBundleContent(ctx, cluster, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, cluster.ID, ref, mockMaestro)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get ManagementClusterContent")
 		assert.Contains(t, err.Error(), "cosmos connection error")

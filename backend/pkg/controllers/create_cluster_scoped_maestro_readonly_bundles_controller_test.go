@@ -106,11 +106,9 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_getHostedClusterNamespa
 }
 
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialMaestroBundleReference(t *testing.T) {
-	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
-	}
+	generator := maestro.NewMaestroAPIMaestroBundleNameGenerator()
 
-	ref, err := syncer.buildInitialMaestroBundleReference(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster)
+	ref, err := buildInitialMaestroBundleReference(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster, generator)
 	require.NoError(t, err)
 
 	assert.NotNil(t, ref)
@@ -450,10 +448,6 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *te
 }
 
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialReadonlyMaestroBundle(t *testing.T) {
-	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
-	}
-
 	maestroBundleNamespacedName := types.NamespacedName{
 		Name:      "custom-bundle",
 		Namespace: "custom-namespace",
@@ -478,7 +472,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialReadonlyMae
 		Namespace: configMap.Namespace,
 	}
 
-	bundle := syncer.buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, resourceIdentifier, configMap)
+	bundle := buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, resourceIdentifier, configMap, readonlyBundleManagedByK8sLabelValueClusterScoped)
 
 	// Verify bundle metadata
 	assert.NotNil(t, bundle)

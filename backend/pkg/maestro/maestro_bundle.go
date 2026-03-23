@@ -53,3 +53,27 @@ func GetOrCreateMaestroBundle(ctx context.Context, maestroClient Client, maestro
 	existingMaestroBundle, err = maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})
 	return existingMaestroBundle, err
 }
+
+// ForEachMaestroBundle lists all Maestro Bundles across all pages matching opts using the Maestro client client and calls fn
+// for each Maestro Bundle.
+// Pagination can be controlled by setting the Limit attribute in opts.
+// fn is called for each bundle in page order. If fn returns an error, iteration stops and the error is returned.
+func ForEachMaestroBundle(ctx context.Context, client Client, opts metav1.ListOptions, fn func(*workv1.ManifestWork) error) error {
+	for {
+		bundles, err := client.List(ctx, opts)
+		if err != nil {
+			return utils.TrackError(fmt.Errorf("failed to list Maestro Bundles: %w", err))
+		}
+		for i := range bundles.Items {
+			if err := fn(&bundles.Items[i]); err != nil {
+				return err
+			}
+		}
+		token := bundles.GetContinue()
+		if token == "" {
+			break
+		}
+		opts.Continue = token
+	}
+	return nil
+}
