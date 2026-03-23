@@ -84,27 +84,40 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_buildClusterEmptyNodeP
 	csClusterID := "11111111111111111111111111111111"
 	csClusterDomainPrefix := "test-domprefix"
 	csNodePoolID := "nodepool-id-1234"
+	expectedNodePoolName := fmt.Sprintf("%s-%s", csClusterDomainPrefix, csNodePoolID)
 	np := syncer.buildClusterEmptyNodePool(csClusterID, csClusterDomainPrefix, csNodePoolID)
 
 	assert.NotNil(t, np)
 	assert.Equal(t, "NodePool", np.Kind)
 	assert.Equal(t, hsv1beta1.SchemeGroupVersion.String(), np.APIVersion)
-	assert.Equal(t, csClusterDomainPrefix, np.Name)
-	assert.Equal(t, fmt.Sprintf("ocm-%s-%s-%s", syncer.maestroSourceEnvironmentIdentifier, csClusterID, csNodePoolID), np.Namespace)
+	assert.Equal(t, expectedNodePoolName, np.Name)
+	assert.Equal(t, fmt.Sprintf("ocm-%s-%s", syncer.maestroSourceEnvironmentIdentifier, csClusterID), np.Namespace)
 }
 
 func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_getNodePoolNamespace(t *testing.T) {
 	envName := "testenv"
 	csClusterID := "11111111111111111111111111111111"
-	csNodePoolID := "nodepool-abc"
-	expected := fmt.Sprintf("ocm-%s-%s-%s", envName, csClusterID, csNodePoolID)
+	expected := fmt.Sprintf("ocm-%s-%s", envName, csClusterID)
 
 	syncer := &createNodePoolScopedMaestroReadonlyBundlesSyncer{
-		maestroSourceEnvironmentIdentifier:   envName,
-		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
+		maestroSourceEnvironmentIdentifier: envName,
 	}
 
-	result := syncer.getNodePoolNamespace(envName, csClusterID, csNodePoolID)
+	result := syncer.getNodePoolNamespace(envName, csClusterID)
+	assert.Equal(t, expected, result)
+}
+
+func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_getNodePoolName(t *testing.T) {
+	envName := "testenv"
+	csClusterDomainPrefix := "test-domprefix"
+	csNodePoolID := "nodepool-abc"
+	expected := fmt.Sprintf("%s-%s", csClusterDomainPrefix, csNodePoolID)
+
+	syncer := &createNodePoolScopedMaestroReadonlyBundlesSyncer{
+		maestroSourceEnvironmentIdentifier: envName,
+	}
+
+	result := syncer.getNodePoolName(csClusterDomainPrefix, csNodePoolID)
 	assert.Equal(t, expected, result)
 }
 
@@ -149,6 +162,7 @@ func TestBuildInitialReadonlyMaestroBundleForNodePool(t *testing.T) {
 		Name:      "test-maestro-api-maestro-bundle-name",
 		Namespace: "test-maestro-consumer",
 	}
+	expectedNodePoolName := fmt.Sprintf("%s-%s", csClusterDomainPrefix, strings.ToLower(nodepool.Name))
 
 	bundle := syncer.buildInitialReadonlyMaestroBundleForNodePool(nodepool, csClusterDomainPrefix, maestroBundleNamespacedName)
 	require.NotNil(t, bundle)
@@ -162,8 +176,8 @@ func TestBuildInitialReadonlyMaestroBundleForNodePool(t *testing.T) {
 	manifestConfig := bundle.Spec.ManifestConfigs[0]
 	assert.Equal(t, "nodepools", manifestConfig.ResourceIdentifier.Resource)
 	assert.Equal(t, hsv1beta1.SchemeGroupVersion.Group, manifestConfig.ResourceIdentifier.Group)
-	assert.Equal(t, csClusterDomainPrefix, manifestConfig.ResourceIdentifier.Name)
-	expectedNamespace := fmt.Sprintf("ocm-testenv-11111111111111111111111111111111-%s", strings.ToLower(nodepoolResourceID.Name))
+	assert.Equal(t, expectedNodePoolName, manifestConfig.ResourceIdentifier.Name)
+	expectedNamespace := "ocm-testenv-11111111111111111111111111111111"
 	assert.Equal(t, expectedNamespace, manifestConfig.ResourceIdentifier.Namespace)
 
 	expectedNodePool := syncer.buildClusterEmptyNodePool(

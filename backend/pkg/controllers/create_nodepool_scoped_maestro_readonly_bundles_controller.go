@@ -167,7 +167,11 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.
 	// we are guaranteed to have a shard allocated for the cluster. If this changes in the future
 	// we would need to change the logic in controllers to check that the retrieved cluster has a
 	// shard allocated.
-	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, existingNodePool.ServiceProviderProperties.ClusterServiceID)
+
+	csClusterID := existingNodePool.ServiceProviderProperties.ClusterServiceID.ClusterID()
+	csClusterHREF := ocm.GenerateAROHCPClusterHREF(csClusterID)
+	csClusterInternalID := api.Must(api.NewInternalID(csClusterHREF))
+	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, csClusterInternalID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard from Cluster Service: %w", err))
 	}
@@ -181,7 +185,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
 
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, existingNodePool.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, csClusterInternalID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster from Cluster Service: %w", err))
 	}
@@ -308,8 +312,8 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildClusterEmptyNode
 	//   decouple from this concept of CDNamespace and we would use the stored value when needed. However, if we want to
 	//   create resources in the same namespace as the old ones then we would still need to keep forever the concept of "env name part used to calculate
 	//   some k8s resource names/namespaces".
-	nodePoolNamespace := c.getNodePoolNamespace(c.maestroSourceEnvironmentIdentifier, csClusterID, csNodePoolID)
-	nodePoolName := csClusterDomainPrefix
+	nodePoolNamespace := c.getNodePoolNamespace(c.maestroSourceEnvironmentIdentifier, csClusterID)
+	nodePoolName := c.getNodePoolName(csClusterDomainPrefix, csNodePoolID)
 
 	// We first build the resource (manifest) that we want to put within the Maestro Bundle.
 	// The resource is empty and it only has the type information and the object meta
@@ -331,7 +335,8 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildClusterEmptyNode
 // buildInitialReadonlyMaestroBundleForNodePool builds an initial readonly Maestro Bundle a the Cluster's Hypershift NodePool.
 // Used to create the readonly Maestro bundle associated to it.
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMaestroBundleForNodePool(nodePool *api.HCPOpenShiftClusterNodePool, csClusterDomainPrefix string, maestroBundleNamespacedName types.NamespacedName) *workv1.ManifestWork {
-	hypershiftNodePool := c.buildClusterEmptyNodePool(nodePool.ServiceProviderProperties.ClusterServiceID.ID(), csClusterDomainPrefix, nodePool.ID.Name)
+	csClusterID := nodePool.ServiceProviderProperties.ClusterServiceID.ClusterID()
+	hypershiftNodePool := c.buildClusterEmptyNodePool(csClusterID, csClusterDomainPrefix, nodePool.ID.Name)
 	maestroBundleResourceIdentifier := workv1.ResourceIdentifier{
 		Group:     hsv1beta1.SchemeGroupVersion.Group,
 		Resource:  "nodepools",
@@ -342,13 +347,21 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyM
 	return buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hypershiftNodePool, readonlyBundleManagedByK8sLabelValueNodePoolScoped)
 }
 
-// getNodePoolNamespace gets the namespace for the node pool based on the environment name, the cluster service OCM Cluster ID and the node pool service OCM Node Pool ID.
+// getNodePoolNamespace gets the namespace for the node pool based on the environment name and the cluster service OCM Cluster ID.
 // For example, if the Node Pool URL is /api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111/nodepools/XXXX then the
-// cluster service OCM Cluster ID is 11111111111111111111111111111111 and the node pool service OCM Node Pool ID is XXXX.
-// The namespace is of the format ocm-<envName>-<csClusterID>-<csNodePoolID>. This is how CS calculates Hypershift's NodePool namespace.
+// cluster service OCM Cluster ID is 11111111111111111111111111111111.
+// The namespace is of the format ocm-<envName>-<csClusterID>. This is how CS calculates Hypershift's NodePool namespace.
 // Internally in CS this is the "CDNamespace" attribute associated to the cluster.
-func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) getNodePoolNamespace(envName string, csClusterID string, csNodePoolID string) string {
-	return fmt.Sprintf("ocm-%s-%s-%s", envName, csClusterID, csNodePoolID)
+func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) getNodePoolNamespace(envName string, csClusterID string) string {
+	return fmt.Sprintf("ocm-%s-%s", envName, csClusterID)
+}
+
+// getNodePoolName gets the name for the node pool based on the cluster domain prefix and the node pool service OCM Node Pool ID.
+// For example, if the Node Pool URL is /api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111/nodepools/XXXX and the
+// cluster's domain prefix is test-domprefix then the name is test-domprefix-XXXX.
+// The name is of the format <csClusterDomainPrefix>-<csNodePoolID>.
+func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) getNodePoolName(csClusterDomainPrefix string, csNodePoolID string) string {
+	return fmt.Sprintf("%s-%s", csClusterDomainPrefix, csNodePoolID)
 }
 
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) CooldownChecker() controllerutils.CooldownChecker {

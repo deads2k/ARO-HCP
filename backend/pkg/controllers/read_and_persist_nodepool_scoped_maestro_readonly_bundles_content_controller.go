@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
 	"github.com/Azure/ARO-HCP/backend/pkg/maestro"
+	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
@@ -105,7 +106,10 @@ func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) SyncOn
 	// we are guaranteed to have a shard allocated for the cluster. If this changes in the future
 	// we would need to change the logic in controllers to check that the retrieved cluster has a
 	// shard allocated.
-	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, existingNodePool.ServiceProviderProperties.ClusterServiceID)
+	csClusterID := existingNodePool.ServiceProviderProperties.ClusterServiceID.ClusterID()
+	csClusterHREF := ocm.GenerateAROHCPClusterHREF(csClusterID)
+	csClusterInternalID := api.Must(api.NewInternalID(csClusterHREF))
+	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, csClusterInternalID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard from Cluster Service: %w", err))
 	}
