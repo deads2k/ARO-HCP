@@ -340,17 +340,6 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_getSingl
 	}
 }
 
-func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_managementClusterContentResourceIDFromClusterResourceID(t *testing.T) {
-	syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{}
-	clusterRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/mycluster"))
-
-	got := syncer.managementClusterContentResourceIDFromClusterResourceID(clusterRID, api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster)
-	require.NotNil(t, got)
-	assert.Equal(t, got.ResourceType.Type, api.ManagementClusterContentResourceType.Type)
-	// Name is the last segment of the resource ID (the management cluster content name)
-	assert.Equal(t, got.Name, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
-}
-
 func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_calculateManagementClusterContentFromMaestroBundle(t *testing.T) {
 	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
 	cluster := &api.HCPOpenShiftCluster{

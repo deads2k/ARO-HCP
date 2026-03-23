@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -150,8 +148,8 @@ func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) calcul
 	ctx context.Context, nodePool *api.HCPOpenShiftClusterNodePool, nodePoolMaestroBundleReference *api.MaestroBundleReference,
 	maestroClient maestro.Client,
 ) (*api.ManagementClusterContent, error) {
-	managementClusterContentResourceID := c.managementClusterContentResourceIDFromClusterResourceID(nodePool.ID.Parent, nodePoolMaestroBundleReference.Name)
-	desired := c.newInitialManagementClusterContent(managementClusterContentResourceID)
+	managementClusterContentResourceID := controllerutils.ManagementClusterContentResourceIDFromClusterResourceID(nodePool.ID.Parent, nodePoolMaestroBundleReference.Name)
+	desired := controllerutils.NewInitialManagementClusterContent(managementClusterContentResourceID)
 
 	existingMaestroBundle, err := maestroClient.Get(ctx, nodePoolMaestroBundleReference.MaestroAPIMaestroBundleName, metav1.GetOptions{})
 	if err != nil && !k8serrors.IsNotFound(err) {
@@ -348,23 +346,4 @@ func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) create
 	maestroClient, err := c.maestroClientBuilder.NewClient(ctx, provisionShardMaestroRESTAPIEndpoint, provisionShardMaestroGRPCAPIEndpoint, provisionShardMaestroConsumerName, maestroSourceID)
 
 	return maestroClient, err
-}
-
-// newInitialManagementClusterContent returns a new ManagementClusterContent with
-// the given resource ID as its parent. The resource ID is assumed to be a
-// cluster resource ID.
-// The returned value can be used to consistently initialize a new ManagementClusterContent
-func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) newInitialManagementClusterContent(managementClusterContentResourceID *azcorearm.ResourceID) *api.ManagementClusterContent {
-	return &api.ManagementClusterContent{
-		CosmosMetadata: api.CosmosMetadata{
-			ResourceID: managementClusterContentResourceID,
-		},
-		ResourceID: *managementClusterContentResourceID,
-	}
-}
-
-// managementClusterContentResourceIDFromClusterResourceID returns the resource ID for the
-// ManagementClusterContent associated to the given cluster resource ID and maestro bundle internal name.
-func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) managementClusterContentResourceIDFromClusterResourceID(clusterResourceID *azcorearm.ResourceID, maestroBundleInternalName api.MaestroBundleInternalName) *azcorearm.ResourceID {
-	return api.Must(azcorearm.ParseResourceID(fmt.Sprintf("%s/%s/%s", clusterResourceID.String(), api.ManagementClusterContentResourceTypeName, maestroBundleInternalName)))
 }
