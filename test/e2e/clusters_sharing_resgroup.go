@@ -131,7 +131,7 @@ var _ = Describe("Customer", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("waiting for second cluster to complete creation")
-			defer pollCancel()
+
 			_, err = poller2.PollUntilDone(pollCtx, &runtime.PollUntilDoneOptions{
 				Frequency: framework.StandardPollInterval,
 			})
