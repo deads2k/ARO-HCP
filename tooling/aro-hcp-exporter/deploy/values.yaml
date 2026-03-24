@@ -22,8 +22,7 @@ subscriptionNames:
 listenAddress: ":8080"
 cacheTTL: "60m"
 collectionInterval: "2m"
-enabledCollectors:
-- service-tag-usage
+enabledCollectors: "{{ .customExporter.enabledCollectors }}"
 clusterNames: "{{ .svc.aks.name }},{{ .mgmt.aks.name }}"
 kustRegion: "__kustoRegion__"
 kustoCluster: "{{ .kusto.kustoName }}"

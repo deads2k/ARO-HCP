@@ -32,7 +32,7 @@ spec:
         - --listen-address={{ .Values.listenAddress }}
         - --cache-ttl={{ .Values.cacheTTL }}
         - --collection-interval={{ .Values.collectionInterval }}
-        - --enabled-collectors={{ join "," .Values.enabledCollectors | quote }}
+        - --enabled-collectors={{ .Values.enabledCollectors | quote }}
         ports:
         - name: metrics
           containerPort: 8080
