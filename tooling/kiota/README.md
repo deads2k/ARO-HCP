@@ -29,3 +29,16 @@ Kiota's approach generates minimal, focused clients that only include the endpoi
 ## Generated SDKs
 
 - Microsoft Graph SDK: Application registration, group management, user information
+
+## OpenAPI Spec Maintenance
+
+The `openapi.yaml` file in this directory is a manually curated subset of the official Microsoft Graph v1.0 OpenAPI spec:
+
+https://raw.githubusercontent.com/microsoftgraph/msgraph-metadata/master/openapi/v1.0/openapi.yaml
+
+When adding new API endpoints:
+
+1. Find the path definition in the upstream spec linked above
+2. Copy the path, parameters, and any referenced schemas/responses into `openapi.yaml`
+3. Reuse existing `$ref` entries (e.g. `#/components/parameters/filter`) where possible
+4. Run `make generate-kiota` to regenerate the SDK

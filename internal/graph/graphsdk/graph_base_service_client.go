@@ -13,6 +13,7 @@ import (
 	i7294a22093d408fdca300f11b81a887d89c47b764af06c8b803e2323973fdb83 "github.com/microsoft/kiota-serialization-text-go"
 
 	idf7caef0f65f266a3e5a784cea8c38bec3b37b48bd3f97fa13346951840ed725 "github.com/Azure/ARO-HCP/internal/graph/graphsdk/applications"
+	if6046e80789a0c5773d5f75b200aee44c49709771ab916d2fd8cf39111f1d89c "github.com/Azure/ARO-HCP/internal/graph/graphsdk/me"
 	i1cf72d00d8b9f424739b4127f1a166682abe5384004c3593a6292a580bdf45b7 "github.com/Azure/ARO-HCP/internal/graph/graphsdk/serviceprincipals"
 )
 
@@ -59,6 +60,12 @@ func NewGraphBaseServiceClient(requestAdapter i2ae4187f7daee263371cb1c977df63981
 	m.BaseRequestBuilder.PathParameters["baseurl"] = m.BaseRequestBuilder.RequestAdapter.GetBaseUrl()
 	m.BaseRequestBuilder.RequestAdapter.EnableBackingStore(backingStore)
 	return m
+}
+
+// Me the me property
+// returns a *MeRequestBuilder when successful
+func (m *GraphBaseServiceClient) Me() *if6046e80789a0c5773d5f75b200aee44c49709771ab916d2fd8cf39111f1d89c.MeRequestBuilder {
+	return if6046e80789a0c5773d5f75b200aee44c49709771ab916d2fd8cf39111f1d89c.NewMeRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
 
 // ServicePrincipals provides operations to manage the collection of servicePrincipal entities.

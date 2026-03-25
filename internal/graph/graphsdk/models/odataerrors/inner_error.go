@@ -47,7 +47,7 @@ func (m *InnerError) GetClientRequestId() *string {
 	return nil
 }
 
-// GetDate gets the Date property value. Date when the error occured.
+// GetDate gets the Date property value. Date when the error occurred.
 // returns a *Time when successful
 func (m *InnerError) GetDate() *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time {
 	val, err := m.GetBackingStore().Get("date")
@@ -175,7 +175,7 @@ func (m *InnerError) SetClientRequestId(value *string) {
 	}
 }
 
-// SetDate sets the Date property value. Date when the error occured.
+// SetDate sets the Date property value. Date when the error occurred.
 func (m *InnerError) SetDate(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time) {
 	err := m.GetBackingStore().Set("date", value)
 	if err != nil {
