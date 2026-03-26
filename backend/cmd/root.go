@@ -320,18 +320,17 @@ func (f *BackendRootCmdFlags) ToBackendOptions(ctx context.Context, cmd *cobra.C
 		return nil, utils.TrackError(fmt.Errorf("failed to create backend identity azure clients: %w", err))
 	}
 
-	fpaMIDataplaneClientBuilder, err := app.NewFirstPartyApplicationManagedIdentitiesDataplaneClientBuilder(
-		fpaTokenCredRetriever,
-		f.InsecureAzureManagedIdentityMockCertificateBundlePath, f.InsecureAzureManagedIdentityMockClientID, f.InsecureAzureManagedIdentityMockServicePrincipalID, f.InsecureAzureManagedIdentityMockTenantID,
-		azureConfig,
-	)
-	if err != nil {
-		return nil, utils.TrackError(fmt.Errorf("error getting FPA MI dataplane client builder: %w", err))
-	}
-	smiClientBuilder := app.NewServiceManagedIdentityClientBuilder(fpaMIDataplaneClientBuilder, azureConfig)
-
+	var fpaMIDataplaneClientBuilder azureclient.FPAMIDataplaneClientBuilder
 	var checkAccessV2ClientBuilder azureclient.CheckAccessV2ClientBuilder
 	if !f.InsecureIgnoreUserAzureManagedIdentitiesThatNeedManagedIdentitiesDataplaneAvailableAndUseMock {
+		// In ARO-HCP environments where we have a real FPA, we use the FPA identity to create the FPA MI dataplane client builder
+		fpaMIDataplaneClientBuilder = azureclient.NewFPAMIDataplaneClientBuilder(
+			azureConfig.AzureRuntimeConfig.ServiceTenantID,
+			fpaTokenCredRetriever,
+			azureConfig.AzureRuntimeConfig.ManagedIdentitiesDataPlaneAudienceResource,
+			azureConfig.CloudEnvironment.AZCoreClientOptions(),
+		)
+
 		// In ARO-HCP environments where we have a real FPA, we use the FPA identity to create the Check Access V2 client
 		checkAccessV2ClientBuilder = azureclient.NewRealFPAIdentityCheckAccessV2ClientBuilder(
 			fpaTokenCredRetriever, azureConfig.CloudEnvironment.CheckAccessV2Endpoint(f.AzureLocation),
@@ -351,7 +350,18 @@ func (f *BackendRootCmdFlags) ToBackendOptions(ctx context.Context, cmd *cobra.C
 			azureConfig.CloudEnvironment.CheckAccessV2Endpoint(f.AzureLocation),
 			azureConfig.CloudEnvironment.CheckAccessV2Scope(), azureConfig.CloudEnvironment.AZCoreClientOptions(),
 		)
+
+		// In ARO-HCP environments where we don't have a real FPA, we use the HardcodedIdentityFPAMIDataplaneClientBuilder to create the FPA MI dataplane client builder
+		fpaMIDataplaneClientBuilder, err = newHardcodedIdentityFPAMIDataplaneClientBuilder(
+			f.InsecureAzureManagedIdentityMockCertificateBundlePath, f.InsecureAzureManagedIdentityMockClientID, f.InsecureAzureManagedIdentityMockServicePrincipalID, f.InsecureAzureManagedIdentityMockTenantID,
+			azureConfig,
+		)
+		if err != nil {
+			return nil, utils.TrackError(fmt.Errorf("error getting hardcoded identity FPA MI dataplane client builder: %w", err))
+		}
 	}
+
+	smiClientBuilder := app.NewServiceManagedIdentityClientBuilder(fpaMIDataplaneClientBuilder, azureConfig)
 
 	cosmosDBClient, err := app.NewCosmosDBClient(
 		ctx, f.AzureCosmosDBURL, f.AzureCosmosDBName,

@@ -16,9 +16,7 @@ package app
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
-	"os"
 	"time"
 
 	azureclient "github.com/Azure/ARO-HCP/backend/pkg/azure/client"
@@ -66,44 +64,6 @@ func NewFirstPartyApplicationClientBuilder(fpaTokenCredRetriever fpa.FirstPartyA
 	)
 
 	return fpaClientBuilder, nil
-}
-
-func NewFirstPartyApplicationManagedIdentitiesDataplaneClientBuilder(
-	fpaTokenCredRetriever fpa.FirstPartyApplicationTokenCredentialRetriever,
-	azureMIMockCertBundlePath string, azureMIMockClientID string, azureMIMockPrincipalID string, azureMIMockTenantID string,
-	azureConfig *azureconfig.AzureConfig,
-) (azureclient.FPAMIDataplaneClientBuilder, error) {
-	if len(azureMIMockCertBundlePath) > 0 && len(azureMIMockClientID) > 0 && len(azureMIMockPrincipalID) > 0 && len(azureMIMockTenantID) > 0 {
-		// TODO this can be improved at some point to support detecting when
-		// the cert bundle path content changes. We could use a file watcher similar
-		// to the one used in the fpa token credential retriever, and pass the retriever
-		// to the client builder.
-		bundle, err := os.ReadFile(azureMIMockCertBundlePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read bundle file: %w", err)
-		}
-		bundleBase64Encoded := base64.StdEncoding.EncodeToString(bundle)
-		hardcodedIdentity := &azureclient.HardcodedIdentity{
-			ClientID:     azureMIMockClientID,
-			ClientSecret: bundleBase64Encoded,
-			PrincipalID:  azureMIMockPrincipalID,
-			TenantID:     azureMIMockTenantID,
-		}
-		hardcodedIdentityFPAMIDataplaneClientBuilder := azureclient.NewHardcodedIdentityFPAMIDataplaneClientBuilder(
-			azureConfig.CloudEnvironment.CloudConfiguration(),
-			hardcodedIdentity,
-		)
-		return hardcodedIdentityFPAMIDataplaneClientBuilder, nil
-	}
-
-	fpaMIdataplaneClientBuilder := azureclient.NewFPAMIDataplaneClientBuilder(
-		azureConfig.AzureRuntimeConfig.ServiceTenantID,
-		fpaTokenCredRetriever,
-		azureConfig.AzureRuntimeConfig.ManagedIdentitiesDataPlaneAudienceResource,
-		azureConfig.CloudEnvironment.AZCoreClientOptions(),
-	)
-
-	return fpaMIdataplaneClientBuilder, nil
 }
 
 func NewServiceManagedIdentityClientBuilder(fpaMIdataplaneClientBuilder azureclient.FPAMIDataplaneClientBuilder, azureConfig *azureconfig.AzureConfig) azureclient.ServiceManagedIdentityClientBuilder {
