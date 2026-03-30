@@ -46,13 +46,15 @@ func NewClusterRecursiveDataDumpController(
 		nextDataDumpChecker: controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
 	}
 
-	return controllerutils.NewClusterWatchingController(
+	controller := controllerutils.NewClusterWatchingController(
 		"DataDump",
 		cosmosClient,
 		backendInformers,
 		1*time.Minute,
 		syncer,
 	)
+
+	return controller
 }
 
 func (c *clusterRecursiveDataDump) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {

@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/internal/api"
@@ -33,18 +36,27 @@ type operationNodePoolCreate struct {
 	notificationClient   *http.Client
 }
 
-func NewOperationNodePoolCreateSynchronizer(
+func NewOperationNodePoolCreateController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	c := &operationNodePoolCreate{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationNodePoolCreate{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
 
-	return c
+	controller := NewGenericOperationController(
+		"OperationNodePoolCreate",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (c *operationNodePoolCreate) ShouldProcess(ctx context.Context, operation *api.Operation) bool {

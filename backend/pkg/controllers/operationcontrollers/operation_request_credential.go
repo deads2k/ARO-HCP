@@ -18,6 +18,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	cmv1 "github.com/openshift-online/ocm-sdk-go/clustersmgmt/v1"
 
@@ -35,16 +38,27 @@ type operationRequestCredential struct {
 	notificationClient   *http.Client
 }
 
-func NewOperationRequestCredentialSynchronizer(
+func NewOperationRequestCredentialController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	return &operationRequestCredential{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationRequestCredential{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
+
+	controller := NewGenericOperationController(
+		"OperationRequestCredential",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (opsync *operationRequestCredential) ShouldProcess(ctx context.Context, operation *api.Operation) bool {

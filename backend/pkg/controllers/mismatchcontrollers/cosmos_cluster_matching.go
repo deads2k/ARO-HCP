@@ -25,6 +25,7 @@ import (
 	ocmerrors "github.com/openshift-online/ocm-sdk-go/errors"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
@@ -38,15 +39,23 @@ type cosmosClusterMatching struct {
 }
 
 // NewCosmosClusterMatchingController periodically looks for mismatched cluster-service and cosmos externalauths
-func NewCosmosClusterMatchingController(clock utilsclock.PassiveClock, cosmosClient database.DBClient, clusterServiceClient ocm.ClusterServiceClientSpec) controllerutils.ClusterSyncer {
-	c := &cosmosClusterMatching{
+func NewCosmosClusterMatchingController(clock utilsclock.PassiveClock, cosmosClient database.DBClient, clusterServiceClient ocm.ClusterServiceClientSpec, informers informers.BackendInformers) controllerutils.Controller {
+	syncer := &cosmosClusterMatching{
 		clock:                clock,
 		cooldownChecker:      controllerutils.NewTimeBasedCooldownChecker(1 * time.Hour),
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 	}
 
-	return c
+	controller := controllerutils.NewClusterWatchingController(
+		"CosmosMatchingClusters",
+		cosmosClient,
+		informers,
+		60*time.Minute,
+		syncer,
+	)
+
+	return controller
 }
 
 func (c *cosmosClusterMatching) synchronizeClusters(ctx context.Context, keyObj controllerutils.HCPClusterKey) error {

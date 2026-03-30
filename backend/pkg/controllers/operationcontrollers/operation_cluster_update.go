@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/internal/api"
@@ -33,19 +36,28 @@ type operationClusterUpdate struct {
 	notificationClient   *http.Client
 }
 
-// NewOperationClusterUpdateSynchronizer periodically lists all clusters and for each out when the cluster was created and its state.
-func NewOperationClusterUpdateSynchronizer(
+// NewOperationClusterUpdateController periodically lists all clusters and for each out when the cluster was created and its state.
+func NewOperationClusterUpdateController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	c := &operationClusterUpdate{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationClusterUpdate{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
 
-	return c
+	controller := NewGenericOperationController(
+		"OperationClusterUpdate",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (c *operationClusterUpdate) ShouldProcess(ctx context.Context, operation *api.Operation) bool {

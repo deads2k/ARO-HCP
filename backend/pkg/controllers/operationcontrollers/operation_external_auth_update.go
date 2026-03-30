@@ -19,6 +19,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/internal/api"
@@ -33,18 +36,27 @@ type operationExternalAuthUpdate struct {
 	notificationClient   *http.Client
 }
 
-func NewOperationExternalAuthUpdateSynchronizer(
+func NewOperationExternalAuthUpdateController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	c := &operationExternalAuthUpdate{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationExternalAuthUpdate{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
 
-	return c
+	controller := NewGenericOperationController(
+		"OperationExternalAuthUpdate",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (c *operationExternalAuthUpdate) ShouldProcess(ctx context.Context, operation *api.Operation) bool {
