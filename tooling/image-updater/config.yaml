@@ -32,6 +32,15 @@ images:
     targets:
     - jsonPath: defaults.hypershift.image.digest
       filePath: ../../config/config.yaml
+  # HyperShift shared ingress HAProxy image
+  hypershift-shared-ingress:
+    group: hypershift-stack
+    source:
+      image: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-shared-ingress-main
+      tagPattern: "^[a-f0-9]{40}$"
+    targets:
+    - jsonPath: defaults.hypershift.sharedIngressImage.digest
+      filePath: ../../config/config.yaml
   # Clusters Service image
   clusters-service:
     group: cs
