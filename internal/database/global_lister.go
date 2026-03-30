@@ -43,6 +43,9 @@ type GlobalListers interface {
 	ServiceProviderClusters() GlobalLister[api.ServiceProviderCluster]
 	ServiceProviderNodePools() GlobalLister[api.ServiceProviderNodePool]
 	Controllers() GlobalLister[api.Controller]
+	// ManagementClusterContents lists ManagementClusterContent documents across
+	// partitions for every Cosmos resource type where managementClusterContents
+	// is nested as a direct child resource. Those types are registered on the lister implementation.
 	ManagementClusterContents() GlobalLister[api.ManagementClusterContent]
 	Operations() GlobalLister[api.Operation]
 	ActiveOperations() GlobalLister[api.Operation]
@@ -118,9 +121,12 @@ func (g *cosmosGlobalListers) Controllers() GlobalLister[api.Controller] {
 }
 
 func (g *cosmosGlobalListers) ManagementClusterContents() GlobalLister[api.ManagementClusterContent] {
-	return &cosmosGlobalLister[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]]{
+	return &cosmosManagementClusterContentGlobalLister{
 		containerClient: g.resources,
-		resourceType:    api.ManagementClusterContentResourceType,
+		managementClusterContentResourceTypes: []azcorearm.ResourceType{
+			api.ClusterScopedManagementClusterContentResourceType,
+			api.NodePoolScopedManagementClusterContentResourceType,
+		},
 	}
 }
 
@@ -246,4 +252,38 @@ func (l *cosmosBillingGlobalLister) List(ctx context.Context, options *DBClientL
 		return newQueryBillingSinglePageIterator(pager), nil
 	}
 	return newQueryBillingIterator(pager), nil
+}
+
+// cosmosManagementClusterContentGlobalLister lists managementClusterContents whether nested under a
+// cluster or under a node pool.
+type cosmosManagementClusterContentGlobalLister struct {
+	containerClient                       *azcosmos.ContainerClient
+	managementClusterContentResourceTypes []azcorearm.ResourceType
+}
+
+func (l *cosmosManagementClusterContentGlobalLister) List(ctx context.Context, options *DBClientListResourceDocsOptions) (DBClientIterator[api.ManagementClusterContent], error) {
+	var resourceTypeConditions []string
+	for _, resourceType := range l.managementClusterContentResourceTypes {
+		resourceTypeConditions = append(resourceTypeConditions, fmt.Sprintf("STRINGEQUALS(c.resourceType, %q, true)", resourceType.String()))
+	}
+	whereClause := strings.Join(resourceTypeConditions, " OR ")
+	query := fmt.Sprintf("SELECT * FROM c WHERE %s", whereClause)
+
+	queryOptions := azcosmos.QueryOptions{
+		PageSizeHint: -1,
+	}
+	if options != nil {
+		if options.PageSizeHint != nil {
+			queryOptions.PageSizeHint = max(*options.PageSizeHint, -1)
+		}
+		queryOptions.ContinuationToken = options.ContinuationToken
+	}
+
+	partitionKey := azcosmos.NewPartitionKey()
+	pager := l.containerClient.NewQueryItemsPager(query, partitionKey, &queryOptions)
+
+	if options != nil && ptr.Deref(options.PageSizeHint, -1) > 0 {
+		return newQueryResourcesSinglePageIterator[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]](pager), nil
+	}
+	return newQueryResourcesIterator[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]](pager), nil
 }

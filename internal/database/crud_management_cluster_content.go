@@ -21,3 +21,7 @@ import (
 type ManagementClusterContentCRUD interface {
 	ResourceCRUD[api.ManagementClusterContent]
 }
+
+type ManagementClusterContentContainer interface {
+	ManagementClusterContents(resourceName string) ManagementClusterContentCRUD
+}

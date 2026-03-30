@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -40,13 +39,13 @@ import (
 )
 
 const (
-	// readonlyBundleManagedByK8sLabelValueClusterScoped is the K8s label associated to the readonlyBundleManagedByK8sLabelKey
+	// readonlyBundleManagedByK8sLabelValueNodePoolScoped is the K8s label associated to the readonlyBundleManagedByK8sLabelKey
 	// key that indicates that the readonly Maestro bundle is managed by the create
 	// nodepool scoped maestro readonly bundles controller.
 	readonlyBundleManagedByK8sLabelValueNodePoolScoped = "create-nodepool-scoped-maestro-readonly-bundles-controller"
 )
 
-// createClusterScopedMaestroReadonlyBundlesSyncer is a controller that creates Maestro readonly bundles for the clusters.
+// createNodePoolScopedMaestroReadonlyBundlesSyncer is a controller that creates Maestro readonly bundles for the node pools.
 // It is responsible for creating the Maestro readonly bundles and storing a reference to them in Cosmos. It does
 // not persist the content of the Maestro bundles themselves. That is the responsibility of the
 // readAndPersistMaestroReadonlyBundlesContentSyncer controller.
@@ -101,14 +100,6 @@ func NewCreateNodePoolScopedMaestroReadonlyBundlesController(
 	return controller
 }
 
-// generateMaestroBundleInternalName generates a Maestro Bundle internal name for a given NodePool.
-// Used to generate a Maestro Bundle internal name for a new Maestro Bundle reference.
-// The generated name is a concatenation of the prefix with the lowercased name of the NodePool.
-// Example: "readonlyHypershiftNodePool-my-nodepool"
-func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) generateMaestroBundleInternalName(nodePool *api.HCPOpenShiftClusterNodePool) api.MaestroBundleInternalName {
-	return api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + strings.ToLower(nodePool.Name))
-}
-
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPNodePoolKey) error {
 	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).Get(ctx, key.HCPNodePoolName)
 	if database.IsResponseError(err, http.StatusNotFound) {
@@ -127,7 +118,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.
 	// Any Maestro Bundle internal name that is not in this list will not be synced by the
 	// controller and reported as an error.
 	recognizedMaestroBundles := []api.MaestroBundleInternalName{
-		c.generateMaestroBundleInternalName(existingNodePool),
+		api.MaestroBundleInternalNameReadonlyHypershiftNodePool,
 	}
 
 	var maestroBundlesToSync []api.MaestroBundleInternalName
@@ -267,7 +258,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 
 	var desiredMaestroBundle *workv1.ManifestWork
 	switch maestroBundleInternalName {
-	case c.generateMaestroBundleInternalName(existingNodePool):
+	case api.MaestroBundleInternalNameReadonlyHypershiftNodePool:
 		desiredMaestroBundle = c.buildInitialReadonlyMaestroBundleForNodePool(existingNodePool, csClusterDomainPrefix, maestroBundleNamespacedName)
 	default:
 		return lastPersistedSPNP, utils.TrackError(fmt.Errorf("unrecognized Maestro Bundle internal name: %s", maestroBundleInternalName))
@@ -296,7 +287,7 @@ func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 	return lastPersistedSPNP, nil
 }
 
-// buildClusterEmptyNodePool returns an empty hosted cluster representing a Cluster's Hypershift NodePool resource.
+// buildClusterEmptyNodePool returns an empty node pool representing a Cluster's Hypershift NodePool resource.
 // It strictly contains the type information and the object meta information necessary to identify the resource in the management cluster.
 // It can be used to provide as the input of a Maestro resource bundle.
 func (c *createNodePoolScopedMaestroReadonlyBundlesSyncer) buildClusterEmptyNodePool(csClusterID string, csClusterDomainPrefix string, csNodePoolID string) *hsv1beta1.NodePool {

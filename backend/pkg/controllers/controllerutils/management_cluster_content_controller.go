@@ -23,8 +23,7 @@ import (
 )
 
 // NewInitialManagementClusterContent returns a new ManagementClusterContent with
-// the given resource ID as its parent. The resource ID is assumed to be a
-// cluster resource ID.
+// the given full managementClusterContents ARM resource ID.
 // The returned value can be used to consistently initialize a new ManagementClusterContent
 func NewInitialManagementClusterContent(managementClusterContentResourceID *azcorearm.ResourceID) *api.ManagementClusterContent {
 	return &api.ManagementClusterContent{
@@ -35,8 +34,9 @@ func NewInitialManagementClusterContent(managementClusterContentResourceID *azco
 	}
 }
 
-// ManagementClusterContentResourceIDFromClusterResourceID returns the resource ID for the
-// ManagementClusterContent associated to the given cluster resource ID and maestro bundle internal name.
-func ManagementClusterContentResourceIDFromClusterResourceID(clusterResourceID *azcorearm.ResourceID, maestroBundleInternalName api.MaestroBundleInternalName) *azcorearm.ResourceID {
-	return api.Must(azcorearm.ParseResourceID(fmt.Sprintf("%s/%s/%s", clusterResourceID.String(), api.ManagementClusterContentResourceTypeName, maestroBundleInternalName)))
+// ManagementClusterContentResourceIDFromParentResourceID returns the resource ID for the
+// ManagementClusterContent nested under parentResourceID with the given
+// maestro bundle internal name.
+func ManagementClusterContentResourceIDFromParentResourceID(parentResourceID *azcorearm.ResourceID, maestroBundleInternalName api.MaestroBundleInternalName) *azcorearm.ResourceID {
+	return api.Must(azcorearm.ParseResourceID(fmt.Sprintf("%s/%s/%s", parentResourceID.String(), api.ManagementClusterContentResourceTypeName, maestroBundleInternalName)))
 }

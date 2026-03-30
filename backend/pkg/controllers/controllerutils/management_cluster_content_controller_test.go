@@ -28,9 +28,19 @@ import (
 func TestManagementClusterContentResourceIDFromClusterResourceID(t *testing.T) {
 	clusterRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/mycluster"))
 
-	got := ManagementClusterContentResourceIDFromClusterResourceID(clusterRID, api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster)
+	got := ManagementClusterContentResourceIDFromParentResourceID(clusterRID, api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster)
 	require.NotNil(t, got)
-	assert.Equal(t, got.ResourceType.Type, api.ManagementClusterContentResourceType.Type)
+	assert.Equal(t, got.ResourceType.Type, api.ClusterScopedManagementClusterContentResourceType.Type)
 	// Name is the last segment of the resource ID (the management cluster content name)
 	assert.Equal(t, got.Name, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+}
+
+func TestManagementClusterContentResourceIDFromNodePoolResourceID(t *testing.T) {
+	nodePoolRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/mycluster/nodePools/mynodepool"))
+
+	got := ManagementClusterContentResourceIDFromParentResourceID(nodePoolRID, api.MaestroBundleInternalNameReadonlyHypershiftNodePool)
+	require.NotNil(t, got)
+	assert.Equal(t, got.ResourceType.Type, api.NodePoolScopedManagementClusterContentResourceType.Type)
+	// Name is the last segment of the resource ID (the management cluster content name)
+	assert.Equal(t, got.Name, string(api.MaestroBundleInternalNameReadonlyHypershiftNodePool))
 }

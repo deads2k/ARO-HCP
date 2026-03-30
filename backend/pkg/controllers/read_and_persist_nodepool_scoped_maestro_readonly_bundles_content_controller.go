@@ -30,11 +30,11 @@ import (
 	"github.com/Azure/ARO-HCP/internal/utils"
 )
 
-// readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer is a controller that reads the Maestro readonly bundles
-// references stored in the ServiceProviderCluster resource, retrieves the Maestro readonly bundles using those
+// readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer is a controller that reads the Maestro readonly bundles
+// references stored in the ServiceProviderNodePool resource, retrieves the Maestro readonly bundles using those
 // references, extracts the content of the Maestro readonly bundles and persists them in Cosmos.
 // It is not responsible for creating the Maestro readonly bundles themselves. That is the responsibility of
-// the createMaestroReadonlyBundlesSyncer controller.
+// the createNodePoolScopedMaestroReadonlyBundlesSyncer controller.
 // As of now we support reading the content of the Maestro readonly bundle of the Hypershift's NodePools associated
 // to the Cluster.
 // This controller assumes that it has full ownership of the ManagementClusterContent resource.
@@ -122,9 +122,11 @@ func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) SyncOn
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
 
+	managementClusterContentsDBClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).ManagementClusterContents(key.HCPNodePoolName)
+
 	var syncErrors []error
 	for _, maestroBundleReference := range existingServiceProviderNodePool.Status.MaestroReadonlyBundles {
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, c.cosmosClient, existingNodePool.ID.Parent, maestroBundleReference, maestroClient)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, existingNodePool.ID, maestroBundleReference, maestroClient, managementClusterContentsDBClient)
 		if err != nil {
 			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to read and persist NodePool: %w", err)))
 		}

@@ -511,6 +511,18 @@ func (m *mockHCPClusterCRUD) Controllers(hcpClusterName string) database.Resourc
 	return newMockResourceCRUD[api.Controller, database.GenericDocument[api.Controller]](m.client, parentResourceID, api.ClusterControllerResourceType)
 }
 
+func (m *mockHCPClusterCRUD) ManagementClusterContents(hcpClusterName string) database.ManagementClusterContentCRUD {
+	parentResourceID := api.Must(azcorearm.ParseResourceID(
+		path.Join(
+			m.parentResourceID.String(),
+			"providers",
+			m.resourceType.Namespace,
+			m.resourceType.Type,
+			hcpClusterName)))
+
+	return newMockManagementClusterContentCRUD(m.client, parentResourceID, api.ClusterScopedManagementClusterContentResourceType)
+}
+
 var _ database.HCPClusterCRUD = &mockHCPClusterCRUD{}
 
 // mockNodePoolsCRUD implements database.NodePoolsCRUD.
@@ -527,6 +539,17 @@ func (m *mockNodePoolsCRUD) Controllers(nodePoolName string) database.ResourceCR
 		)))
 
 	return newMockResourceCRUD[api.Controller, database.GenericDocument[api.Controller]](m.client, parentResourceID, api.NodePoolControllerResourceType)
+}
+
+func (m *mockNodePoolsCRUD) ManagementClusterContents(nodePoolName string) database.ManagementClusterContentCRUD {
+	parentResourceID := api.Must(azcorearm.ParseResourceID(
+		path.Join(
+			m.parentResourceID.String(),
+			m.resourceType.Types[len(m.resourceType.Types)-1],
+			nodePoolName,
+		)))
+
+	return newMockManagementClusterContentCRUD(m.client, parentResourceID, api.NodePoolScopedManagementClusterContentResourceType)
 }
 
 var _ database.NodePoolsCRUD = &mockNodePoolsCRUD{}
@@ -689,10 +712,10 @@ type mockManagementClusterContentCRUD struct {
 	*mockResourceCRUD[api.ManagementClusterContent, database.GenericDocument[api.ManagementClusterContent]]
 }
 
-func newMockManagementClusterContentCRUD(client *MockDBClient, parentResourceID *azcorearm.ResourceID) *mockManagementClusterContentCRUD {
+func newMockManagementClusterContentCRUD(client *MockDBClient, parentResourceID *azcorearm.ResourceID, resourceType azcorearm.ResourceType) *mockManagementClusterContentCRUD {
 	return &mockManagementClusterContentCRUD{
 		mockResourceCRUD: newMockResourceCRUD[api.ManagementClusterContent, database.GenericDocument[api.ManagementClusterContent]](
-			client, parentResourceID, api.ManagementClusterContentResourceType),
+			client, parentResourceID, resourceType),
 	}
 }
 

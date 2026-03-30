@@ -119,9 +119,11 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
 
+	managementClusterContentsDBClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).ManagementClusterContents(key.HCPClusterName)
+
 	var syncErrors []error
 	for _, maestroBundleReference := range existingServiceProviderCluster.Status.MaestroReadonlyBundles {
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, c.cosmosClient, existingCluster.ID, maestroBundleReference, maestroClient)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, existingCluster.ID, maestroBundleReference, maestroClient, managementClusterContentsDBClient)
 		if err != nil {
 			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to read and persist HostedCluster: %w", err)))
 		}

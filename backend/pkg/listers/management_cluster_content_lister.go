@@ -22,10 +22,11 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api"
 )
 
-// ManagementClusterContentLister lists ManagementClusterContent from an informer's indexer.
+// ManagementClusterContentLister lists ManagementClusterContent from the shared informer indexer.
 type ManagementClusterContentLister interface {
 	List(ctx context.Context) ([]*api.ManagementClusterContent, error)
 	ListForCluster(ctx context.Context, subscriptionID, resourceGroupName, clusterName string) ([]*api.ManagementClusterContent, error)
+	ListForNodePool(ctx context.Context, subscriptionName, resourceGroupName, clusterName, nodePoolName string) ([]*api.ManagementClusterContent, error)
 }
 
 // managementClusterContentLister implements ManagementClusterContentLister backed by a SharedIndexInformer.
@@ -47,4 +48,9 @@ func (l *managementClusterContentLister) List(ctx context.Context) ([]*api.Manag
 func (l *managementClusterContentLister) ListForCluster(ctx context.Context, subscriptionID, resourceGroupName, clusterName string) ([]*api.ManagementClusterContent, error) {
 	key := api.ToClusterResourceIDString(subscriptionID, resourceGroupName, clusterName)
 	return listFromIndex[api.ManagementClusterContent](l.indexer, ByCluster, key)
+}
+
+func (l *managementClusterContentLister) ListForNodePool(ctx context.Context, subscriptionName, resourceGroupName, clusterName, nodePoolName string) ([]*api.ManagementClusterContent, error) {
+	key := api.ToNodePoolResourceIDString(subscriptionName, resourceGroupName, clusterName, nodePoolName)
+	return listFromIndex[api.ManagementClusterContent](l.indexer, ByNodePool, key)
 }

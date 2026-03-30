@@ -85,7 +85,7 @@ func (c *controlPlaneActiveVersionSyncer) SyncOnce(ctx context.Context, key cont
 		return utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
 	}
 
-	managementClusterContentClient := c.cosmosClient.ManagementClusterContents(key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName)
+	managementClusterContentClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).ManagementClusterContents(key.HCPClusterName)
 	managementClusterContent, err := managementClusterContentClient.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
 	if database.IsResponseError(err, http.StatusNotFound) {
 		return nil

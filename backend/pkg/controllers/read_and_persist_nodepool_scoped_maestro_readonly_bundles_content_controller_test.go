@@ -49,15 +49,7 @@ import (
 // errorInjectingDBClientForNodePoolReadPersist wraps MockDBClient to return error-injecting CRUDs.
 type errorInjectingDBClientForNodePoolReadPersist struct {
 	*databasetesting.MockDBClient
-	mccCRUD  database.ManagementClusterContentCRUD
 	spnpCRUD database.ServiceProviderNodePoolCRUD
-}
-
-func (e *errorInjectingDBClientForNodePoolReadPersist) ManagementClusterContents(subscriptionID, resourceGroupName, clusterName string) database.ManagementClusterContentCRUD {
-	if e.mccCRUD != nil {
-		return e.mccCRUD
-	}
-	return e.MockDBClient.ManagementClusterContents(subscriptionID, resourceGroupName, clusterName)
 }
 
 func (e *errorInjectingDBClientForNodePoolReadPersist) ServiceProviderNodePools(subscriptionID, resourceGroupName, clusterName, nodePoolName string) database.ServiceProviderNodePoolCRUD {
@@ -119,9 +111,8 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_calcula
 			},
 		},
 	}
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
 	ref := &api.MaestroBundleReference{
-		Name:                        bundleInternalName,
+		Name:                        api.MaestroBundleInternalNameReadonlyHypershiftNodePool,
 		MaestroAPIMaestroBundleName: "bundle-name",
 	}
 
@@ -187,7 +178,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_calcula
 			mockMaestro := maestro.NewMockClient(ctrl)
 			tt.maestroGet(mockMaestro)
 
-			got, err := calculateManagementClusterContentFromMaestroBundle(context.Background(), nodepool.ID.Parent, ref, mockMaestro)
+			got, err := calculateManagementClusterContentFromMaestroBundle(context.Background(), nodepool.ID, ref, mockMaestro)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errSub)
@@ -213,7 +204,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 			},
 		},
 	}
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 	ref := &api.MaestroBundleReference{
 		Name:                        bundleInternalName,
 		MaestroAPIMaestroBundleName: "bundle-name",
@@ -224,12 +215,13 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 	require.NoError(t, err)
 	validNPJSON := string(npJSONBytes)
 
-	// ManagementClusterContents is keyed by the cluster name (nodePool.ID.Parent.Name)
+	// Node-pool–scoped ManagementClusterContents are nested under the node pool ARM resource.
 	const mccContainerSub = "sub"
 	const mccContainerRG = "rg"
 	const mccContainerCluster = "cluster"
-	existingMCCResourceIDStr := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/%s/managementClusterContents/%s",
-		mccContainerSub, mccContainerRG, mccContainerCluster, bundleInternalName)
+	const mccNodePoolName = "test-nodepool"
+	existingMCCResourceIDStr := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/%s/nodePools/%s/managementClusterContents/%s",
+		mccContainerSub, mccContainerRG, mccContainerCluster, mccNodePoolName, bundleInternalName)
 
 	t.Run("creates new ManagementClusterContent when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -238,9 +230,9 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
 
 		mockDB := databasetesting.NewMockDBClient()
-		mccCRUD := mockDB.ManagementClusterContents(mccContainerSub, mccContainerRG, mccContainerCluster)
+		mccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
 
-		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(bundleInternalName))
@@ -257,7 +249,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
 
 		mockDB := databasetesting.NewMockDBClient()
-		mccCRUD := mockDB.ManagementClusterContents(mccContainerSub, mccContainerRG, mccContainerCluster)
+		mccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
 		existingRID := api.Must(azcorearm.ParseResourceID(existingMCCResourceIDStr))
 		existing := &api.ManagementClusterContent{
 			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
@@ -267,7 +259,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		_, err := mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(bundleInternalName))
@@ -292,7 +284,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
 
 		mockDB := databasetesting.NewMockDBClient()
-		mccCRUD := mockDB.ManagementClusterContents(mccContainerSub, mccContainerRG, mccContainerCluster)
+		mccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
 		existingRID := api.Must(azcorearm.ParseResourceID(existingMCCResourceIDStr))
 		existingContent := &metav1.List{Items: []runtime.RawExtension{{Raw: []byte(`{}`)}}}
 		existing := &api.ManagementClusterContent{
@@ -303,7 +295,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		_, err := mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(bundleInternalName))
@@ -319,9 +311,9 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil).Times(2)
 
 		mockDB := databasetesting.NewMockDBClient()
-		mccCRUD := mockDB.ManagementClusterContents(mccContainerSub, mccContainerRG, mccContainerCluster)
+		mccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
 		existingRID := api.Must(azcorearm.ParseResourceID(existingMCCResourceIDStr))
-		desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, nodepool.ID.Parent, ref, mockMaestro)
+		desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, nodepool.ID, ref, mockMaestro)
 		require.NoError(t, err)
 		existing := &api.ManagementClusterContent{
 			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
@@ -331,7 +323,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		_, err = mccCRUD.Create(ctx, existing, nil)
 		require.NoError(t, err)
 
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.NoError(t, err)
 
 		got, err := mccCRUD.Get(ctx, string(bundleInternalName))
@@ -353,15 +345,15 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 			Status:         api.ManagementClusterContentStatus{KubeContent: &metav1.List{Items: []runtime.RawExtension{{Raw: []byte(validNPJSON)}}}},
 		}
 
-		mockDB := &errorInjectingDBClientForNodePoolReadPersist{
-			MockDBClient: databasetesting.NewMockDBClient(),
-			mccCRUD: &errorInjectingMCCCRUDForNodePool{
-				getResult:  existingDoc,
-				replaceErr: databasetesting.NewPreconditionFailedError(),
-			},
+		mockDB := databasetesting.NewMockDBClient()
+		baseMccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
+		mccCRUD := &errorInjectingMCCCRUDForNodePool{
+			ManagementClusterContentCRUD: baseMccCRUD,
+			getResult:                    existingDoc,
+			replaceErr:                   databasetesting.NewPreconditionFailedError(),
 		}
 
-		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to replace ManagementClusterContent")
 		assert.True(t, database.IsResponseError(err, http.StatusPreconditionFailed), "expected 412 Precondition Failed")
@@ -373,14 +365,14 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_readAnd
 		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validNPJSON)
 		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
 
-		mockDB := &errorInjectingDBClientForNodePoolReadPersist{
-			MockDBClient: databasetesting.NewMockDBClient(),
-			mccCRUD: &errorInjectingMCCCRUDForNodePool{
-				getErr: fmt.Errorf("cosmos connection error"),
-			},
+		mockDB := databasetesting.NewMockDBClient()
+		baseMccCRUD := mockDB.HCPClusters(mccContainerSub, mccContainerRG).NodePools(mccContainerCluster).ManagementClusterContents(mccNodePoolName)
+		mccCRUD := &errorInjectingMCCCRUDForNodePool{
+			ManagementClusterContentCRUD: baseMccCRUD,
+			getErr:                       fmt.Errorf("cosmos connection error"),
 		}
 
-		err := readAndPersistMaestroReadonlyBundleContent(ctx, mockDB, nodepool.ID.Parent, ref, mockMaestro)
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, nodepool.ID, ref, mockMaestro, mccCRUD)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get ManagementClusterContent")
 		assert.Contains(t, err.Error(), "cosmos connection error")
@@ -533,7 +525,7 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnc
 	_, err := nodepoolsCRUD.Create(ctx, nodepool, nil)
 	require.NoError(t, err)
 
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
 	spnp := &api.ServiceProviderNodePool{
 		CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
@@ -597,14 +589,13 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnc
 	_, err := nodepoolsCRUD.Create(ctx, nodepool, nil)
 	require.NoError(t, err)
 
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
 	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
 	spnp := &api.ServiceProviderNodePool{
 		CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
 		ResourceID:     *spnpResourceID,
 		Status: api.ServiceProviderNodePoolStatus{
 			MaestroReadonlyBundles: api.MaestroBundleReferenceList{
-				{Name: bundleInternalName, MaestroAPIMaestroBundleName: "bundle-name"},
+				{Name: api.MaestroBundleInternalNameReadonlyHypershiftNodePool, MaestroAPIMaestroBundleName: "bundle-name"},
 			},
 		},
 	}
@@ -632,9 +623,8 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnc
 	err = syncer.SyncOnce(ctx, key)
 	require.NoError(t, err)
 
-	// ManagementClusterContents is keyed by cluster name (nodePool.ID.Parent.Name)
-	mccCRUD := mockDBClient.ManagementClusterContents(key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName)
-	got, err := mccCRUD.Get(ctx, string(bundleInternalName))
+	mccCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).ManagementClusterContents(key.HCPNodePoolName)
+	got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftNodePool))
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.NotNil(t, got.Status.KubeContent)

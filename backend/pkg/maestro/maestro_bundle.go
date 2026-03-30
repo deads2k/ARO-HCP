@@ -26,7 +26,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/utils"
 )
 
-// getOrCreateMaestroBundle gets (or creates if it does not exist) a Maestro Bundle for a given Maestro Bundle namespaced name.
+// GetOrCreateMaestroBundle gets (or creates if it does not exist) a Maestro Bundle for a given Maestro Bundle namespaced name.
 func GetOrCreateMaestroBundle(ctx context.Context, maestroClient Client, maestroBundle *workv1.ManifestWork) (*workv1.ManifestWork, error) {
 	logger := utils.LoggerFromContext(ctx)
 	existingMaestroBundle, err := maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})

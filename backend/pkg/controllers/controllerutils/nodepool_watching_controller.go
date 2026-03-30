@@ -63,7 +63,8 @@ func NewNodePoolWatchingController(
 	if informers != nil {
 		nodePoolInformer, _ := informers.NodePools()
 		serviceProviderNodePoolInformer, _ := informers.ServiceProviderNodePools()
-		err := nodePoolController.QueueForInformers(resyncDuration, nodePoolInformer, serviceProviderNodePoolInformer)
+		managementClusterContentInformer, _ := informers.ManagementClusterContents()
+		err := nodePoolController.QueueForInformers(resyncDuration, nodePoolInformer, serviceProviderNodePoolInformer, managementClusterContentInformer)
 		if err != nil {
 			panic(err) // coding error
 		}

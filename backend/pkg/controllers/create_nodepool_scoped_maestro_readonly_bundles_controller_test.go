@@ -123,7 +123,7 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_getNodePoolName(t *tes
 
 func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_buildInitialMaestroBundleReferenceForNodePool(t *testing.T) {
 	generator := maestro.NewMaestroAPIMaestroBundleNameGenerator()
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "my-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 
 	ref, err := buildInitialMaestroBundleReference(bundleInternalName, generator)
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *t
 
 	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
 	nodepoolResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool"))
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 
 	tests := []struct {
 		name                        string
@@ -578,7 +578,7 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_SyncOnce_AllBundlesAlr
 	_, err := nodepoolsCRUD.Create(ctx, nodepool, nil)
 	require.NoError(t, err)
 
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
 	spnp := &api.ServiceProviderNodePool{
 		CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
@@ -695,7 +695,7 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_SyncOnce_SyncLoopExecu
 	require.NoError(t, err)
 	require.NotNil(t, updatedSPNP)
 
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 	bundleRef, err := updatedSPNP.Status.MaestroReadonlyBundles.Get(bundleInternalName)
 	require.NoError(t, err)
 	require.NotNil(t, bundleRef)
@@ -744,7 +744,7 @@ func TestCreateNodePoolScopedMaestroReadonlyBundlesSyncer_SyncOnce_ProcessesPart
 	_, err := nodepoolsCRUD.Create(ctx, nodepool, nil)
 	require.NoError(t, err)
 
-	bundleInternalName := api.MaestroBundleInternalName(api.MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix + "test-nodepool")
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
 	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
 	spnp := &api.ServiceProviderNodePool{
 		CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},

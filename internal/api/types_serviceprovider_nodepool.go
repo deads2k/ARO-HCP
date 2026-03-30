@@ -118,11 +118,9 @@ type ServiceProviderNodePoolStatusVersion struct {
 }
 
 const (
-	// MaestroBundleInternalNameReadonlyHypershiftNodePool is the prefix of the internal name of the Maestro Bundle
-	// that represents a NodePool's Hypershift's NodePool K8s resource. The full name of the maestro internal bundle
-	// is constructed by concatenating the prefix with the lowercased name of the NodePool.
-	// Example: "readonlyHypershiftNodePool-my-nodepool"
-	MaestroBundleInternalNameReadonlyHypershiftNodePoolPrefix = "readonlyHypershiftNodePool-"
+	// MaestroBundleInternalNameReadonlyHypershiftNodePool is the internal name of the Maestro Bundle that represents
+	// the NodePool's Hypershift's NodePool K8s resource.
+	MaestroBundleInternalNameReadonlyHypershiftNodePool MaestroBundleInternalName = "readonlyHypershiftNodePool"
 )
 
 // HCPNodePoolActiveVersion represents a single version active in the nodepool.

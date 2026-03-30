@@ -200,15 +200,14 @@ func getSingleResourceStatusFeedbackRawJSONFromMaestroBundle(maestroBundle *work
 }
 
 // calculateManagementClusterContentFromMaestroBundle builds the desired ManagementClusterContent from a Maestro
-// bundle reference. clusterResourceID is the HCP cluster ARM resource ID (for node pool–scoped bundles, pass the
-// node pool resource's parent cluster ID).
+// bundle reference. parentResourceID is the ARM ID of the document parent
 func calculateManagementClusterContentFromMaestroBundle(
 	ctx context.Context,
-	clusterResourceID *azcorearm.ResourceID,
+	parentResourceID *azcorearm.ResourceID,
 	maestroBundleReference *api.MaestroBundleReference,
 	maestroClient maestro.Client,
 ) (*api.ManagementClusterContent, error) {
-	managementClusterContentResourceID := controllerutils.ManagementClusterContentResourceIDFromClusterResourceID(clusterResourceID, maestroBundleReference.Name)
+	managementClusterContentResourceID := controllerutils.ManagementClusterContentResourceIDFromParentResourceID(parentResourceID, maestroBundleReference.Name)
 	desired := controllerutils.NewInitialManagementClusterContent(managementClusterContentResourceID)
 
 	existingMaestroBundle, err := maestroClient.Get(ctx, maestroBundleReference.MaestroAPIMaestroBundleName, metav1.GetOptions{})
@@ -263,25 +262,18 @@ func calculateManagementClusterContentFromMaestroBundle(
 }
 
 // readAndPersistMaestroReadonlyBundleContent reads a Maestro readonly bundle and creates or updates the corresponding
-// ManagementClusterContent in Cosmos. hcpClusterResourceID must be the HCP OpenShift cluster ARM resource ID (for
-// node pool–scoped bundles, pass the node pool resource's parent cluster ID).
+// ManagementClusterContent in Cosmos. parentResourceID is the resource id of the parent resource of the ManagementClusterContent.
 func readAndPersistMaestroReadonlyBundleContent(
 	ctx context.Context,
-	cosmosClient database.DBClient,
-	hcpClusterResourceID *azcorearm.ResourceID,
+	parentResourceID *azcorearm.ResourceID,
 	maestroBundleReference *api.MaestroBundleReference,
 	maestroClient maestro.Client,
+	managementClusterContentsDBClient database.ManagementClusterContentCRUD,
 ) error {
-	desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, hcpClusterResourceID, maestroBundleReference, maestroClient)
+	desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, parentResourceID, maestroBundleReference, maestroClient)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to calculate ManagementClusterContent from Maestro Bundle: %w", err))
 	}
-
-	managementClusterContentsDBClient := cosmosClient.ManagementClusterContents(
-		hcpClusterResourceID.SubscriptionID,
-		hcpClusterResourceID.ResourceGroupName,
-		hcpClusterResourceID.Name,
-	)
 
 	existing, err := managementClusterContentsDBClient.Get(ctx, desired.CosmosMetadata.ResourceID.Name)
 	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
