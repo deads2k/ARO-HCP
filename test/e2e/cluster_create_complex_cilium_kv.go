@@ -68,7 +68,7 @@ var _ = Describe("Customer", func() {
 			}
 
 			By("creating a resource group")
-			resourceGroup, err := tc.NewResourceGroup(ctx, "e2e-cilium", tc.Location())
+			resourceGroup, err := tc.NewResourceGroup(ctx, "complex-cilium-kv", tc.Location())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating cluster parameters")
