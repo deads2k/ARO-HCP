@@ -47,8 +47,7 @@
         }
       },
       "required": [
-        "name",
-        "ownerIds"
+        "name"
       ]
     },
     "semVer": {
@@ -3191,6 +3190,10 @@
     "automationDryRun": {
       "type": "boolean",
       "description": "Whether automation account runs in dry-run mode"
+    },
+    "entraAppOwnerIds": {
+      "$ref": "#/definitions/csv",
+      "description": "Owner IDs for Entra application registrations. Replaces nested ownerIds in entraApplication objects."
     }
   },
   "additionalProperties": false,

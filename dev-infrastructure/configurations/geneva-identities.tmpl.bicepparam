@@ -17,4 +17,5 @@ param genevaActionsManageCertificates = {{ .geneva.actions.certificate.manage }}
 param genevaActionApplicationUseSNI = {{ .geneva.actions.application.useSNI }}
 param genevaActionApplicationManage = {{ .geneva.actions.application.manage }}
 param genevaActionApplicationName = '{{ .geneva.actions.application.name }}'
+param entraAppOwnerIds = '{{ .entraAppOwnerIds }}'
 param genevaActionApplicationOwnerIds = '{{ .geneva.actions.application.ownerIds }}'

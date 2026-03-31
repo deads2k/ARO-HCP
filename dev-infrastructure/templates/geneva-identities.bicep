@@ -19,9 +19,17 @@ param genevaActionsCertificateIssuer string
 param genevaActionsManageCertificates bool
 param genevaActionsCertificateDomain string
 param genevaActionApplicationName string
+param entraAppOwnerIds string
 param genevaActionApplicationOwnerIds string
 param genevaActionApplicationManage bool
 param genevaActionApplicationUseSNI bool
+
+// TODO: remove genevaActionApplicationOwnerIds fallback once entraAppOwnerIds is set in sdp-pipelines config
+var ownerIds = !empty(entraAppOwnerIds)
+  ? entraAppOwnerIds
+  : !empty(genevaActionApplicationOwnerIds)
+      ? genevaActionApplicationOwnerIds
+      : fail('At least one of entraAppOwnerIds or genevaActionApplicationOwnerIds must be provided')
 
 resource ev2MSI 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: ev2MsiName
@@ -80,7 +88,7 @@ resource genevaApp 'Microsoft.Graph/applications@beta' = if (genevaActionApplica
       ]
     : []
   owners: {
-    relationships: [for ownerId in csvToArray(genevaActionApplicationOwnerIds): ownerId]
+    relationships: [for ownerId in csvToArray(ownerIds): ownerId]
   }
   keyCredentials: !genevaActionApplicationUseSNI
     ? [
@@ -101,6 +109,6 @@ resource genevaApp 'Microsoft.Graph/applications@beta' = if (genevaActionApplica
 resource genevaSp 'Microsoft.Graph/servicePrincipals@beta' = if (genevaActionApplicationManage) {
   appId: genevaApp.appId
   owners: {
-    relationships: [for ownerId in csvToArray(genevaActionApplicationOwnerIds): ownerId]
+    relationships: [for ownerId in csvToArray(ownerIds): ownerId]
   }
 }
