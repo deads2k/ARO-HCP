@@ -30,8 +30,8 @@ set -euo pipefail
 KEYVAULT_NAME="${OPSTOOL_KEYVAULT_NAME:-opstool-kv-usw3}"
 
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
-# Directory.Read.All application permission
-DIRECTORY_READ_ALL="7ab1d382-f21e-4acd-a863-ba3e13f7da61"
+# Organization.Read.All application permission (for /v1.0/organization directory quota)
+ORGANIZATION_READ_ALL="498476ce-e0fe-48b0-b801-37ba7e2685c6"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -53,13 +53,14 @@ header()        { echo ""; echo "━━━━━━━━━━━━━━━�
 # resolved to IDs at runtime.
 
 setup_redhat() {
-    local APPLICATION_NAME="tenant-quota-collector-redhat0"
+    local APPLICATION_NAME="custom-metrics-collector-redhat0-ms-graph-ro"
     local KEYVAULT_SECRET_NAME="custom-metrics-collector-redhat0-client-secret"
     local DIRECTORY_QUOTA=true
     local SUBSCRIPTIONS=(
         "ARO Hosted Control Planes (EA Subscription 1)"
-        "ARO SRE Team - INT (EA Subscription 3)"
-        "ARO HCP E2E"
+        # TODO: Uncomment after getting role assignment write access
+        # "ARO SRE Team - INT (EA Subscription 3)"
+        "ARO HCP E2E Hosted Clusters (EA Subscription)"
     )
 
     create_or_get_sp "${APPLICATION_NAME}"
@@ -119,20 +120,20 @@ grant_graph_permissions() {
     header "Granting Graph API permissions"
 
     local existing
-    existing=$(az ad app show --id "${app_id}" \
-        --query "requiredResourceAccess[?resourceAppId=='${GRAPH_APP_ID}'].resourceAccess[].id" \
-        -o tsv 2>/dev/null || true)
+    existing=$(az rest --method GET \
+        --url "https://graph.microsoft.com/v1.0/servicePrincipals(appId='${app_id}')/appRoleAssignments" \
+        --query "value[].appRoleId" -o tsv 2>/dev/null || true)
 
-    if echo "${existing}" | grep -q "${DIRECTORY_READ_ALL}"; then
-        print_info "Directory.Read.All already granted"
+    if echo "${existing}" | grep -q "${ORGANIZATION_READ_ALL}"; then
+        print_info "Organization.Read.All already granted"
     else
-        print_info "Adding Directory.Read.All permission..."
+        print_info "Adding Organization.Read.All permission..."
         az ad app permission add \
             --id "${app_id}" \
             --api "${GRAPH_APP_ID}" \
-            --api-permissions "${DIRECTORY_READ_ALL}=Role"
+            --api-permissions "${ORGANIZATION_READ_ALL}=Role"
 
-        print_info "Requesting admin consent..."
+        print_info "Requesting admin consent (requires tenant admin)..."
         az ad app permission admin-consent --id "${app_id}"
         print_success "Graph API permissions granted"
     fi
@@ -157,12 +158,18 @@ grant_subscription_reader() {
         fi
 
         print_info "Assigning Reader on '${sub_name}' (${sub_id})..."
-        az role assignment create \
+        local output
+        if output=$(az role assignment create \
             --assignee "${app_id}" \
             --role "Reader" \
-            --scope "/subscriptions/${sub_id}" 2>/dev/null \
-            && print_success "Reader assigned" \
-            || print_info "(already assigned)"
+            --scope "/subscriptions/${sub_id}" 2>&1); then
+            print_success "Reader assigned"
+        elif echo "${output}" | grep -qi "conflict\|already exists"; then
+            print_info "Reader already assigned"
+        else
+            print_error "Failed to assign Reader role:"
+            echo "  ${output}" | head -3
+        fi
     done
 }
 

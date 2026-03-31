@@ -64,6 +64,19 @@ func NewCredentialProvider(logger *slog.Logger) *CredentialProvider {
 	}
 }
 
+// ValidateCredentials attempts to create credentials for all configured
+// tenants. Returns an error if any secret is missing or any credential
+// cannot be constructed — intended to be called at startup to fail fast.
+func (p *CredentialProvider) ValidateCredentials(tenants []config.TenantConfig) error {
+	for _, t := range tenants {
+		if _, err := p.GetCredential(t); err != nil {
+			return fmt.Errorf("tenant %s: %w", t.GetDisplayName(), err)
+		}
+		p.logger.Info("Validated credentials", "tenant", t.GetDisplayName())
+	}
+	return nil
+}
+
 func (p *CredentialProvider) GetCredential(tenant config.TenantConfig) (*azidentity.ClientSecretCredential, error) {
 	cacheKey := tenant.TenantID + ":" + tenant.ServicePrincipalClientId
 

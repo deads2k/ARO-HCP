@@ -53,9 +53,12 @@ type TenantConfig struct {
 
 type SubscriptionConfig struct {
 	Name                string   `yaml:"name"`
-	SubscriptionID      string   `yaml:"subscriptionId"`
 	RoleAssignmentLimit int      `yaml:"roleAssignmentLimit,omitempty"`
 	Regions             []string `yaml:"regions"`
+
+	// SubscriptionID is resolved at runtime from the Name field using the
+	// Azure subscriptions API. Not parsed from config YAML.
+	SubscriptionID string `yaml:"-"`
 }
 
 func LoadFromFile(path string) (*Config, error) {
@@ -108,9 +111,6 @@ func (c *Config) Validate() error {
 		seen[t.TenantID] = true
 
 		for j, s := range t.Subscriptions {
-			if s.SubscriptionID == "" {
-				return fmt.Errorf("tenant[%d].subscriptions[%d]: subscriptionId is required", i, j)
-			}
 			if s.Name == "" {
 				return fmt.Errorf("tenant[%d].subscriptions[%d]: name is required", i, j)
 			}

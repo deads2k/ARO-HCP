@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -35,7 +36,6 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
 	if err := run(logger); err != nil {
 		logger.Error("Fatal error", "error", err)
 		os.Exit(1)
@@ -43,7 +43,9 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
-	configPath := getEnv("CONFIG_PATH", "/etc/config/config.yaml")
+	configPath := envOrDefault("CONFIG_PATH", "/etc/config/config.yaml")
+	port := envOrDefault("PORT", "8080")
+
 	cfg, err := config.LoadFromFile(configPath)
 	if err != nil {
 		return err
@@ -57,11 +59,20 @@ func run(logger *slog.Logger) error {
 
 	credProvider := tenantquota.NewCredentialProvider(logger)
 
-	dirCollector := tenantquota.NewCollector(cfg, logger, credProvider)
+	if err := credProvider.ValidateCredentials(cfg.Tenants); err != nil {
+		return fmt.Errorf("credential validation failed: %w", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	if cfg.HasSubscriptions() {
+		if err := subscriptionquota.ResolveSubscriptionIDs(ctx, cfg, credProvider, logger); err != nil {
+			return fmt.Errorf("subscription ID resolution failed: %w", err)
+		}
+	}
+
+	dirCollector := tenantquota.NewCollector(cfg, logger, credProvider)
 	go dirCollector.Start(ctx)
 
 	registry := prometheus.NewRegistry()
@@ -79,7 +90,6 @@ func run(logger *slog.Logger) error {
 	mux.HandleFunc("/readyz", healthHandler)
 	mux.HandleFunc("/version", versionHandler)
 
-	port := getEnv("PORT", "8080")
 	server := &http.Server{
 		Addr:              ":" + port,
 		Handler:           mux,
@@ -129,7 +139,7 @@ func versionHandler(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func getEnv(key, defaultValue string) string {
+func envOrDefault(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}

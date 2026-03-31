@@ -92,8 +92,7 @@ clouds:
               directoryQuota: true
               subscriptions:
                 - name: "ARO Hosted Control Planes (EA Subscription 1)"
-                  subscriptionId: "1d3378d3-5a3f-4712-85a1-2485495dfc4b"
-                  roleAssignmentLimit: 8000
+                  roleAssignmentLimit: 4000
                   regions:
                     - westus3
                 - name: "ARO HCP E2E Hosted Clusters (EA Subscription)"

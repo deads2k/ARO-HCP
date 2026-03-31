@@ -227,8 +227,7 @@
       "type": "object",
       "description": "Configuration for monitoring quota in a single subscription",
       "properties": {
-        "name": { "type": "string", "description": "Subscription display name" },
-        "subscriptionId": { "type": "string", "description": "Azure subscription ID" },
+        "name": { "type": "string", "description": "Subscription display name (used to resolve the subscription ID at runtime)" },
         "roleAssignmentLimit": { "type": "integer", "description": "Role assignment limit for the subscription (default 4000)" },
         "regions": {
           "type": "array",
@@ -236,7 +235,7 @@
           "items": { "type": "string" }
         }
       },
-      "required": ["name", "subscriptionId", "regions"]
+      "required": ["name", "regions"]
     }
   }
 }

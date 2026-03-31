@@ -5,6 +5,10 @@ DEPLOY_ENV ?= opstool
 -include $(TENANT_QUOTA_COLLECTOR_DIR)/../../../setup-templatize-env.mk
 -include $(TENANT_QUOTA_COLLECTOR_DIR)/../../../.bingo/Variables.mk
 
+# Opstool uses its own config file, not the main config.yaml
+OPSTOOL_CONFIG_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../../config/config-opstool.yaml
+DEV_SETTINGS_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../../tooling/templatize/settings.yaml
+
 ARO_HCP_REVISION ?= $(shell git rev-parse HEAD)
 ARO_HCP_IMAGE_ACR ?= arohcpsvcdev
 ARO_HCP_IMAGE_REGISTRY ?= ${ARO_HCP_IMAGE_ACR}.azurecr.io
@@ -22,13 +26,70 @@ endif
 .DEFAULT_GOAL := tenant-quota-collector
 
 tenant-quota-collector:
-	go build -ldflags="-X github.com/Azure/ARO-HCP/internal/version.CommitSHA=${TENANT_QUOTA_IMAGE_TAG}" -o tenant-quota-collector .
+	GOWORK=off go build -ldflags="-X github.com/Azure/ARO-HCP/internal/version.CommitSHA=${TENANT_QUOTA_IMAGE_TAG}" -o tenant-quota-collector .
 
-run:
-	CONFIG_PATH=./deploy/templates/configmap.yaml ./tenant-quota-collector
+# ---------------------------------------------------------------------------
+# Local config rendering
+# ---------------------------------------------------------------------------
+# Renders config-opstool.yaml through templatize to produce the config.yaml
+# that the tool expects. This is the same content that ends up in the
+# ConfigMap data["config.yaml"] during a real deployment.
+_output/config.yaml: $(TEMPLATIZE) deploy/config.yaml.tmpl $(OPSTOOL_CONFIG_FILE)
+	$(TEMPLATIZE) generate \
+		--config-file $(OPSTOOL_CONFIG_FILE) \
+		--dev-settings-file $(DEV_SETTINGS_FILE) \
+		--dev-environment $(DEPLOY_ENV) \
+		--input deploy/config.yaml.tmpl \
+		--output $@
+
+render-config: _output/config.yaml
+.PHONY: render-config
+
+# ---------------------------------------------------------------------------
+# Fetch secrets from Key Vault for local development
+# ---------------------------------------------------------------------------
+# Downloads SP client secrets from the opstool Key Vault into _output/secrets/.
+# Requires: az login (into the dev tenant where the Key Vault lives)
+KEYVAULT_NAME ?= opstool-kv-usw3
+SECRETS_DIR := _output/secrets
+
+fetch-secrets: _output/config.yaml
+	@mkdir -p $(SECRETS_DIR)
+	@for secret_name in $$(grep 'keyVaultSecretName:' _output/config.yaml | sed 's/.*keyVaultSecretName: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/'); do \
+		echo "Fetching secret: $$secret_name"; \
+		az keyvault secret show \
+			--vault-name $(KEYVAULT_NAME) \
+			--name "$$secret_name" \
+			--query value -o tsv > $(SECRETS_DIR)/$$secret_name || \
+			{ echo "ERROR: Failed to fetch $$secret_name"; exit 1; }; \
+	done
+	@echo "Secrets stored in $(SECRETS_DIR)/"
+.PHONY: fetch-secrets
+
+# ---------------------------------------------------------------------------
+# Run locally
+# ---------------------------------------------------------------------------
+run: export GOWORK=off
+run: _output/config.yaml fetch-secrets
+	SECRETS_STORE_PATH=$(SECRETS_DIR) CONFIG_PATH=_output/config.yaml go run main.go
+
+# ---------------------------------------------------------------------------
+# Setup service principal
+# ---------------------------------------------------------------------------
+# Usage: make setup-sp TENANT=RedHat0
+TENANT ?=
+setup-sp: tenant-quota-collector _output/config.yaml
+ifndef TENANT
+	$(error TENANT is required, e.g. make setup-sp TENANT=RedHat0)
+endif
+	./tenant-quota-collector setup service-principal \
+		--config _output/config.yaml \
+		--tenant $(TENANT)
+.PHONY: setup-sp
 
 clean:
-	rm -f tenant-quota-collector
+	rm -rf tenant-quota-collector _output/
+.PHONY: clean
 
 image: Dockerfile $(shell find . -name '*.go' -o -name 'go.mod' -o -name 'go.sum') Makefile
 	cd $(TENANT_QUOTA_COLLECTOR_DIR)/../../.. && \

@@ -21,7 +21,6 @@ data:
         subscriptions:
           {{- range .subscriptions }}
           - name: "{{ .name }}"
-            subscriptionId: "{{ .subscriptionId }}"
             roleAssignmentLimit: {{ .roleAssignmentLimit | default 4000 }}
             regions:
               {{- range .regions }}

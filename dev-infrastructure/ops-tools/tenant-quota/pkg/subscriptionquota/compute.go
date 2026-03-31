@@ -46,7 +46,7 @@ func (s *ComputeQuotaSource) Collect(ctx context.Context, cred *azidentity.Clien
 			return nil, fmt.Errorf("list compute usage for %s/%s: %w", subscriptionID, region, err)
 		}
 		for _, usage := range page.Value {
-			if usage.CurrentValue == nil || *usage.CurrentValue == 0 {
+			if usage.CurrentValue == nil || *usage.CurrentValue <= 0 {
 				continue
 			}
 			var limit float64
