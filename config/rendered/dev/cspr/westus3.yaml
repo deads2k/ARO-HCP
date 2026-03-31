@@ -411,7 +411,8 @@ hypershift:
   sharedIngressIPTag: ""
   sharedIngressImage:
     digest: sha256:1af59b7a29432314bde54e8977fa45fa92dc48885efbf0df601418ec0912f472
-    repository: quay-cache/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-shared-ingress-main
+    registry: quay.io
+    repository: redhat-user-workloads/crt-redhat-acm-tenant/hypershift-shared-ingress-main
 imageSync:
   environmentName: aro-hcp-image-sync
   ocMirror:
