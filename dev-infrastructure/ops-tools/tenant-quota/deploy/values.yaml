@@ -1,63 +1,16 @@
 # Default values for tenant-quota collector
-# This chart deploys the tenant-quota collector to the opstool environment
+# This chart deploys the tenant-quota collector to the opstool environment.
 #
-# =============================================================================
-# HOW TO ADD A NEW TENANT (4 Steps)
-# =============================================================================
+# Tenant configuration is sourced from config/config-opstool.yaml and
+# projected here via templatize range loops. To add a new tenant:
 #
-# STEP 1: Create a Service Principal in the Target Tenant
-# --------------------------------------------------------
-# The service principal needs permission to read organization quota data.
-# Run these commands while logged into the TARGET tenant:
+#   1. Create an SP:  scripts/manage-service-principals.sh --tenant <name>
+#   2. Add config:    config/config-opstool.yaml under opstool.tenantQuota.tenants
+#   3. Redeploy:      templatize pipeline run ... --step deploy
 #
-#   # Login to the target tenant
-#   az login --tenant <target-tenant-id>
-#
-#   # Create the service principal (note the appId and password in output)
-#   az ad sp create-for-rbac --name "tenant-quota-collector-<tenant-name>" \
-#       --role "Reader" --scopes "/subscriptions/<subscription-id>"
-#
-#   # Grant Directory.Read.All permission (requires admin consent)
-#   az ad app permission add --id <app-id> \
-#       --api 00000003-0000-0000-c000-000000000000 \
-#       --api-permissions 7ab1d382-f21e-4acd-a863-ba3e13f7da61=Role
-#
-#   # Request admin consent (or ask an admin to approve in Azure Portal)
-#   az ad app permission admin-consent --id <app-id>
-#
-# STEP 2: Store the Client Secret in Key Vault
-# --------------------------------------------------------
-# Store the service principal's password in the opstool Key Vault.
-# The collector reads secrets from this Key Vault at runtime.
-#
-#   # Login back to the dev tenant (where Key Vault is)
-#   az login
-#
-#   # Store the secret (use the password from step 1)
-#   az keyvault secret set \
-#       --vault-name "opstool-kv-wus3" \
-#       --name "custom-metrics-collector-<tenant-name>-client-secret" \
-#       --value "<password-from-step-1>"
-#
-# STEP 3: Add the Tenant Entry Below
-# --------------------------------------------------------
-# Add a new entry to the 'tenants' list with the values from step 1.
-# The tenantId is the Azure AD tenant where the SP was created.
-# The servicePrincipalClientId is the appId from step 1.
-# The keyVaultSecretName is the secret name from step 2.
-#
-# STEP 4: Redeploy with Templatize
-# --------------------------------------------------------
-# After adding the tenant entry, redeploy the collector:
-#
-#   # From the repo root
-#   ./templatize-bin pipeline run \
-#       --service-group Microsoft.Azure.ARO.HCP.Opstool.TenantQuota \
-#       --topology-file topology-opstool.yaml \
-#       --config-file config/config-opstool.yaml \
-#       --dev-settings-file tooling/templatize/settings.yaml \
-#       --dev-environment opstool \
-#       --step deploy
+# For SP secret renewal:
+#   scripts/renew-sp-secret.sh --list
+#   scripts/renew-sp-secret.sh --tenant <name>
 #
 # =============================================================================
 # Image configuration - uses templatize variable substitution
@@ -65,76 +18,30 @@ imageRegistry: "{{ .opstool.tenantQuota.image.registry }}"
 imageRepository: "{{ .opstool.tenantQuota.image.repository }}"
 imageTag: "{{ .opstool.tenantQuota.image.tag }}"
 # Managed Identity (injected by templatize from pipeline outputs)
-# This UAMI is used to read secrets from Key Vault
 msiClientId: "__tenantQuotaUAMIClientId__"
 # Secret Provider configuration
-# Key Vault where all tenant SP secrets are stored (in the dev tenant)
 secretProvider:
   keyVault: "__keyVaultName__"
   msiClientId: "__tenantQuotaUAMIClientId__"
-  tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408" # Dev tenant ID
+  tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
 # =============================================================================
-# TENANT CONFIGURATIONS
+# Tenant configurations projected from config-opstool.yaml
 # =============================================================================
-# Each tenant entry collects quota metrics from a specific Azure AD tenant.
-# Metrics are labeled with tenant_id and tenant_name for easy identification.
-#
-# MULTI-TENANT SUPPORT:
-# This collector monitors Azure AD directory quota (users, groups, apps, etc.)
-# which is per-tenant, NOT per-subscription. Each Azure AD tenant has one quota.
-#
-# - To monitor DIFFERENT Azure AD tenants: Add an entry for each tenant
-#   Example: RedHat0 tenant + Microsoft tenant (each has separate quota)
-# - Multiple SPs from the SAME tenant would return identical data (not useful)
-#
-# SECRET RENEWAL:
-# When SP secrets expire, use the renewal script:
-#   cd dev-infrastructure/ops-tools/tenant-quota
-#   ./scripts/renew-sp-secret.sh --list                 # Check expiry dates
-#   ./scripts/renew-sp-secret.sh --tenant <name>        # Renew specific SP
-#
-# Example Prometheus metrics output:
-#   tenant_quota_usage_percentage{tenant_id="abc...",tenant_name="RedHat0"} 64
-#   tenant_quota_usage_percentage{tenant_id="xyz...",tenant_name="Microsoft"} 45
-#
 tenants:
-# -------------------------------------------------------------------------
-# RedHat0 Tenant
-# -------------------------------------------------------------------------
-- tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408" # Azure AD tenant ID
-  tenantName: "RedHat0" # Display name (appears in metrics/alerts)
-  servicePrincipalClientId: "1ef710d1-afd7-4bf3-8095-e8126650607f" # SP app ID
-  keyVaultSecretName: "custom-metrics-collector-redhat0-client-secret" # Secret in Key Vault
-  directoryQuota: true
+{{- range .opstool.tenantQuota.tenants }}
+- tenantId: "{{ .tenantId }}"
+  tenantName: "{{ .tenantName }}"
+  servicePrincipalClientId: "{{ .servicePrincipalClientId }}"
+  keyVaultSecretName: "{{ .keyVaultSecretName }}"
+  directoryQuota: {{ .directoryQuota }}
   subscriptions:
-    - name: "ARO Hosted Control Planes (EA Subscription 1)"
-      subscriptionId: "1d3378d3-5a3f-4712-85a1-2485495dfc4b"
-      roleAssignmentLimit: 8000
+{{- range .subscriptions }}
+    - name: "{{ .name }}"
+      subscriptionId: "{{ .subscriptionId }}"
+      roleAssignmentLimit: {{ .roleAssignmentLimit }}
       regions:
-        - westus3
-    - name: "ARO SRE Team - INT (EA Subscription 3)"
-      subscriptionId: "64f0619f-ebc2-4156-9d91-c4c781de7e54"
-      roleAssignmentLimit: 4000
-      regions:
-        - uksouth
-    - name: "E2E Testing"
-      subscriptionId: "974ebd46-8ad3-41e3-afef-7ef25fd5c371"
-      roleAssignmentLimit: 4000
-      regions:
-        - westus3
-
-# -------------------------------------------------------------------------
-# Example: Add another Tenant (uncomment and fill in values)
-# -------------------------------------------------------------------------
-# - tenantId: "<test-tenant-id>"
-#   tenantName: "TestTenant"
-#   servicePrincipalClientId: "<sp-app-id>"
-#   keyVaultSecretName: "custom-metrics-collector-test-tenant-client-secret"
-#   directoryQuota: false
-#   subscriptions:
-#     - name: "Test Subscription"
-#       subscriptionId: "<subscription-id>"
-#       roleAssignmentLimit: 4000
-#       regions:
-#         - westus3
-#         - uksouth
+{{- range .regions }}
+        - "{{ . }}"
+{{- end }}
+{{- end }}
+{{- end }}

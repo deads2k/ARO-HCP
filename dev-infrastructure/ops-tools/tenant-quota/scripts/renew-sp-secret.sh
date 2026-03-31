@@ -176,8 +176,8 @@ usage() {
 #
 TENANTS=(
     "RedHat0:64dc69e4-d083-49fc-9569-ebece1dd1408:1ef710d1-afd7-4bf3-8095-e8126650607f:custom-metrics-collector-redhat0-client-secret"
-    # Add more tenants as needed (each Azure AD tenant has its own directory quota):
-    # "Microsoft:72f988bf-86f1-41af-91ab-2d7cd011db47:<client-id>:<secret-name>"
+    # TODO: Uncomment after creating the Test Tenant SP with manage-service-principals.sh
+    # "TestTenant:93b21e64-4824-439a-b893-46c9b2a51082:<client-id>:custom-metrics-collector-test-tenant-client-secret"
 )
 
 get_tenant_config() {
