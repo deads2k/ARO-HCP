@@ -117,4 +117,88 @@ resource tenantQuotaAlerts 'Microsoft.AlertsManagement/prometheusRuleGroups@2023
   }
 }
 
+resource subscriptionQuotaAlerts 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'subscription-quota-alerts'
+  location: resourceGroup().location
+  properties: {
+    enabled: alertingEnabled
+    interval: 'PT1M'
+    scopes: [
+      azureMonitorWorkspaceId
+    ]
+    rules: [
+      {
+        alert: 'AzureQuotaCritical'
+        enabled: true
+        expression: 'azure_quota_usage / azure_quota_limit > 0.95'
+        for: 'PT5M'
+        severity: 2
+        labels: {
+          severity: 'critical'
+        }
+        annotations: {
+          summary: 'Azure quota critical: {{ $labels.source }}/{{ $labels.quota_name }}'
+          description: '{{ $labels.quota_name }} at {{ $value | humanizePercentage }} in {{ $labels.subscription_name }}/{{ $labels.region }}'
+        }
+        actions: [
+          {
+            actionGroupId: sharedActionGroupId
+          }
+        ]
+        resolveConfiguration: {
+          autoResolved: true
+          timeToResolve: 'PT10M'
+        }
+      }
+      {
+        alert: 'AzureQuotaWarning'
+        enabled: true
+        expression: 'azure_quota_usage / azure_quota_limit > 0.80 and azure_quota_usage / azure_quota_limit <= 0.95'
+        for: 'PT10M'
+        severity: 3
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          summary: 'Azure quota warning: {{ $labels.source }}/{{ $labels.quota_name }}'
+          description: '{{ $labels.quota_name }} at {{ $value | humanizePercentage }} in {{ $labels.subscription_name }}/{{ $labels.region }}'
+        }
+        actions: [
+          {
+            actionGroupId: sharedActionGroupId
+          }
+        ]
+        resolveConfiguration: {
+          autoResolved: true
+          timeToResolve: 'PT10M'
+        }
+      }
+      {
+        alert: 'AzureQuotaMetricsStale'
+        enabled: true
+        expression: 'absent(azure_quota_usage{source="rbac"})'
+        for: 'PT30M'
+        severity: 2
+        labels: {
+          severity: 'critical'
+        }
+        annotations: {
+          summary: 'Subscription quota metrics are stale'
+          description: 'No azure_quota_usage metrics received for 30 minutes. Check tenant-quota-collector pod status and service principal credentials.'
+        }
+        actions: [
+          {
+            actionGroupId: sharedActionGroupId
+          }
+        ]
+        resolveConfiguration: {
+          autoResolved: true
+          timeToResolve: 'PT1H'
+        }
+      }
+    ]
+  }
+}
+
 output alertRuleGroupId string = tenantQuotaAlerts.id
+output subscriptionAlertRuleGroupId string = subscriptionQuotaAlerts.id

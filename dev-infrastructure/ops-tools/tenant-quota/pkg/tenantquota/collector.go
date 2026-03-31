@@ -25,10 +25,9 @@ import (
 )
 
 type Collector struct {
-	config   *config.Config
-	logger   *slog.Logger
-	registry *prometheus.Registry
-	client   *QuotaClient
+	config *config.Config
+	logger *slog.Logger
+	client *QuotaClient
 
 	usagePercentage   *prometheus.GaugeVec
 	quotaTotal        *prometheus.GaugeVec
@@ -36,44 +35,30 @@ type Collector struct {
 	remainingCapacity *prometheus.GaugeVec
 }
 
-func NewCollector(cfg *config.Config, logger *slog.Logger) *Collector {
-	c := &Collector{
-		config:   cfg,
-		logger:   logger,
-		registry: prometheus.NewRegistry(),
-		client:   NewQuotaClient(cfg.GetTimeout(), logger),
-	}
-
+func NewCollector(cfg *config.Config, logger *slog.Logger, credProvider *CredentialProvider) *Collector {
 	labels := []string{"tenant_id", "tenant_name"}
 
-	c.usagePercentage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "tenant_quota_usage_percentage",
-		Help: "Tenant quota usage percentage (0-100)",
-	}, labels)
-
-	c.quotaTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "tenant_quota_total",
-		Help: "Total tenant quota limit",
-	}, labels)
-
-	c.quotaUsed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "tenant_quota_used",
-		Help: "Current tenant quota usage",
-	}, labels)
-
-	c.remainingCapacity = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "tenant_remaining_capacity",
-		Help: "Remaining tenant capacity",
-	}, labels)
-
-	c.registry.MustRegister(
-		c.usagePercentage,
-		c.quotaTotal,
-		c.quotaUsed,
-		c.remainingCapacity,
-	)
-
-	return c
+	return &Collector{
+		config: cfg,
+		logger: logger,
+		client: NewQuotaClient(cfg.GetTimeout(), logger, credProvider),
+		usagePercentage: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "tenant_quota_usage_percentage",
+			Help: "Tenant quota usage percentage (0-100)",
+		}, labels),
+		quotaTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "tenant_quota_total",
+			Help: "Total tenant quota limit",
+		}, labels),
+		quotaUsed: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "tenant_quota_used",
+			Help: "Current tenant quota usage",
+		}, labels),
+		remainingCapacity: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "tenant_remaining_capacity",
+			Help: "Remaining tenant capacity",
+		}, labels),
+	}
 }
 
 func (c *Collector) Start(ctx context.Context) {
@@ -101,6 +86,9 @@ func (c *Collector) Start(ctx context.Context) {
 
 func (c *Collector) collectAll(ctx context.Context) {
 	for _, tenant := range c.config.Tenants {
+		if !tenant.IsDirectoryQuotaEnabled() {
+			continue
+		}
 		c.collectForTenant(ctx, tenant)
 	}
 }
@@ -131,6 +119,13 @@ func (c *Collector) collectForTenant(ctx context.Context, tenant config.TenantCo
 		"total", data.QuotaTotal)
 }
 
-func (c *Collector) Gatherer() prometheus.Gatherer {
-	return c.registry
+// GaugeCollectors returns all gauge collectors for registration on a shared
+// prometheus.Registry.
+func (c *Collector) GaugeCollectors() []prometheus.Collector {
+	return []prometheus.Collector{
+		c.usagePercentage,
+		c.quotaTotal,
+		c.quotaUsed,
+		c.remainingCapacity,
+	}
 }

@@ -34,3 +34,29 @@ spec:
       annotations:
         summary: "Tenant quota usage is elevated"
         description: 'Tenant {{ print "{{" }} $labels.tenant_name {{ print "}}" }} is at {{ print "{{" }} $value {{ print "}}" }}% capacity'
+  - name: subscription-quota
+    rules:
+    - alert: AzureQuotaCritical
+      expr: azure_quota_usage / azure_quota_limit > 0.95
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: 'Azure quota critical: {{ print "{{" }} $labels.source {{ print "}}" }}/{{ print "{{" }} $labels.quota_name {{ print "}}" }}'
+        description: '{{ print "{{" }} $labels.quota_name {{ print "}}" }} at {{ print "{{" }} $value | humanizePercentage {{ print "}}" }} in {{ print "{{" }} $labels.subscription_name {{ print "}}" }}/{{ print "{{" }} $labels.region {{ print "}}" }}'
+    - alert: AzureQuotaWarning
+      expr: azure_quota_usage / azure_quota_limit > 0.80 and azure_quota_usage / azure_quota_limit <= 0.95
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: 'Azure quota warning: {{ print "{{" }} $labels.source {{ print "}}" }}/{{ print "{{" }} $labels.quota_name {{ print "}}" }}'
+        description: '{{ print "{{" }} $labels.quota_name {{ print "}}" }} at {{ print "{{" }} $value | humanizePercentage {{ print "}}" }} in {{ print "{{" }} $labels.subscription_name {{ print "}}" }}/{{ print "{{" }} $labels.region {{ print "}}" }}'
+    - alert: AzureQuotaMetricsStale
+      expr: absent(azure_quota_usage{source="rbac"})
+      for: 30m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Subscription quota metrics are stale"
+        description: "No azure_quota_usage metrics received for 30 minutes. Check tenant-quota-collector pod status and service principal credentials."

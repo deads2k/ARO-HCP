@@ -6,17 +6,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   config.yaml: |
-    # Tenant Quota Collector Configuration
-    # This collector runs in the opstool environment and collects quota from configured tenants.
-    #
-    # Configuration is synced from Helm values. To add a new tenant:
-    # 1. Create a service principal in that tenant with Microsoft Graph API permissions
-    # 2. Store the service principal secret in the dev Key Vault (aro-hcp-dev-svc-kv)
-    # 3. Update the Helm values (values.yaml) to include the new tenant
-    # 4. Redeploy: templatize using the tenantQuota pipeline
-    #
-    interval: "15m"
+    interval: "5m"
     timeout: "30s"
+    cacheTTL: "24h"
     tenants:
       {{- range .Values.tenants }}
       - tenantId: "{{ .tenantId }}"
@@ -24,4 +16,17 @@ data:
         servicePrincipalClientId: "{{ .servicePrincipalClientId }}"
         keyVaultSecretName: "{{ .keyVaultSecretName }}"
         scope: "https://graph.microsoft.com/.default"
+        directoryQuota: {{ .directoryQuota | default true }}
+        {{- if .subscriptions }}
+        subscriptions:
+          {{- range .subscriptions }}
+          - name: "{{ .name }}"
+            subscriptionId: "{{ .subscriptionId }}"
+            roleAssignmentLimit: {{ .roleAssignmentLimit | default 4000 }}
+            regions:
+              {{- range .regions }}
+              - "{{ . }}"
+              {{- end }}
+          {{- end }}
+        {{- end }}
       {{- end }}

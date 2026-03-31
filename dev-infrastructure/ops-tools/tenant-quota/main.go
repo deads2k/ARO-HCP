@@ -24,9 +24,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/subscriptionquota"
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/tenantquota"
 	"github.com/Azure/ARO-HCP/internal/version"
 )
@@ -50,17 +52,29 @@ func run(logger *slog.Logger) error {
 	logger.Info("Loaded configuration",
 		"path", configPath,
 		"tenants", len(cfg.Tenants),
-		"interval", cfg.GetInterval())
+		"interval", cfg.GetInterval(),
+		"hasSubscriptions", cfg.HasSubscriptions())
 
-	collector := tenantquota.NewCollector(cfg, logger)
+	credProvider := tenantquota.NewCredentialProvider(logger)
+
+	dirCollector := tenantquota.NewCollector(cfg, logger, credProvider)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go collector.Start(ctx)
+	go dirCollector.Start(ctx)
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(dirCollector.GaugeCollectors()...)
+
+	if cfg.HasSubscriptions() {
+		subCollector := subscriptionquota.NewCollector(cfg, logger, credProvider, cfg.GetCacheTTL())
+		registry.MustRegister(subCollector)
+		go subCollector.Start(ctx)
+	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.HandlerFor(collector.Gatherer(), promhttp.HandlerOpts{}))
+	mux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/readyz", healthHandler)
 	mux.HandleFunc("/version", versionHandler)

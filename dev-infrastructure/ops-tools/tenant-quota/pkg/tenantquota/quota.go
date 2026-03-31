@@ -48,46 +48,31 @@ type QuotaData struct {
 	Timestamp         time.Time
 }
 
-type QuotaClient struct {
-	httpClient *http.Client
-	logger     *slog.Logger
-	credCache  map[string]*azidentity.ClientSecretCredential
-	credMu     sync.RWMutex
+// CredentialProvider caches ClientSecretCredential instances per tenant.
+// It is shared between the directory quota collector and the subscription
+// quota collector so that both reuse the same credentials.
+type CredentialProvider struct {
+	logger    *slog.Logger
+	credCache map[string]*azidentity.ClientSecretCredential
+	credMu    sync.RWMutex
 }
 
-func NewQuotaClient(timeout time.Duration, logger *slog.Logger) *QuotaClient {
-	return &QuotaClient{
-		httpClient: &http.Client{Timeout: timeout},
-		logger:     logger,
-		credCache:  make(map[string]*azidentity.ClientSecretCredential),
+func NewCredentialProvider(logger *slog.Logger) *CredentialProvider {
+	return &CredentialProvider{
+		logger:    logger,
+		credCache: make(map[string]*azidentity.ClientSecretCredential),
 	}
 }
 
-func (c *QuotaClient) GetQuota(ctx context.Context, tenant config.TenantConfig) (*QuotaData, error) {
-	cred, err := c.getCredential(tenant)
-	if err != nil {
-		return nil, fmt.Errorf("get credential: %w", err)
-	}
-
-	token, err := cred.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{tenant.GetScope()},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("get token: %w", err)
-	}
-
-	return c.fetchQuotaFromAPI(ctx, token.Token, tenant)
-}
-
-func (c *QuotaClient) getCredential(tenant config.TenantConfig) (*azidentity.ClientSecretCredential, error) {
+func (p *CredentialProvider) GetCredential(tenant config.TenantConfig) (*azidentity.ClientSecretCredential, error) {
 	cacheKey := tenant.TenantID + ":" + tenant.ServicePrincipalClientId
 
-	c.credMu.RLock()
-	if cred, ok := c.credCache[cacheKey]; ok {
-		c.credMu.RUnlock()
+	p.credMu.RLock()
+	if cred, ok := p.credCache[cacheKey]; ok {
+		p.credMu.RUnlock()
 		return cred, nil
 	}
-	c.credMu.RUnlock()
+	p.credMu.RUnlock()
 
 	secret, err := readSecret(tenant.KeyVaultSecretName)
 	if err != nil {
@@ -104,12 +89,42 @@ func (c *QuotaClient) getCredential(tenant config.TenantConfig) (*azidentity.Cli
 		return nil, fmt.Errorf("create credential: %w", err)
 	}
 
-	c.credMu.Lock()
-	c.credCache[cacheKey] = cred
-	c.credMu.Unlock()
+	p.credMu.Lock()
+	p.credCache[cacheKey] = cred
+	p.credMu.Unlock()
 
-	c.logger.Debug("Created credential for tenant", "tenant", tenant.GetDisplayName())
+	p.logger.Debug("Created credential for tenant", "tenant", tenant.GetDisplayName())
 	return cred, nil
+}
+
+type QuotaClient struct {
+	httpClient *http.Client
+	logger     *slog.Logger
+	credProvider *CredentialProvider
+}
+
+func NewQuotaClient(timeout time.Duration, logger *slog.Logger, credProvider *CredentialProvider) *QuotaClient {
+	return &QuotaClient{
+		httpClient:   &http.Client{Timeout: timeout},
+		logger:       logger,
+		credProvider: credProvider,
+	}
+}
+
+func (c *QuotaClient) GetQuota(ctx context.Context, tenant config.TenantConfig) (*QuotaData, error) {
+	cred, err := c.credProvider.GetCredential(tenant)
+	if err != nil {
+		return nil, fmt.Errorf("get credential: %w", err)
+	}
+
+	token, err := cred.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{tenant.GetScope()},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get token: %w", err)
+	}
+
+	return c.fetchQuotaFromAPI(ctx, token.Token, tenant)
 }
 
 func (c *QuotaClient) fetchQuotaFromAPI(ctx context.Context, token string, tenant config.TenantConfig) (*QuotaData, error) {

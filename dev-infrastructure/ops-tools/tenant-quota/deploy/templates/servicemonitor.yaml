@@ -16,5 +16,5 @@ spec:
     - {{ .Release.Namespace }}
   endpoints:
   - port: metrics
-    interval: 15m
+    interval: 5m
     path: /metrics

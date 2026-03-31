@@ -105,22 +105,36 @@ tenants:
   tenantName: "RedHat0" # Display name (appears in metrics/alerts)
   servicePrincipalClientId: "1ef710d1-afd7-4bf3-8095-e8126650607f" # SP app ID
   keyVaultSecretName: "custom-metrics-collector-redhat0-client-secret" # Secret in Key Vault
+  directoryQuota: true
+  subscriptions:
+    - name: "ARO Hosted Control Planes (EA Subscription 1)"
+      subscriptionId: "1d3378d3-5a3f-4712-85a1-2485495dfc4b"
+      roleAssignmentLimit: 8000
+      regions:
+        - westus3
+    - name: "ARO SRE Team - INT (EA Subscription 3)"
+      subscriptionId: "64f0619f-ebc2-4156-9d91-c4c781de7e54"
+      roleAssignmentLimit: 4000
+      regions:
+        - uksouth
+    - name: "E2E Testing"
+      subscriptionId: "974ebd46-8ad3-41e3-afef-7ef25fd5c371"
+      roleAssignmentLimit: 4000
+      regions:
+        - westus3
 
 # -------------------------------------------------------------------------
 # Example: Add another Tenant (uncomment and fill in values)
 # -------------------------------------------------------------------------
-# - tenantId: "72f988bf-86f1-41af-91ab-2d7cd011db47"    # Microsoft tenant
-#   tenantName: "Microsoft"
+# - tenantId: "<test-tenant-id>"
+#   tenantName: "TestTenant"
 #   servicePrincipalClientId: "<sp-app-id>"
-#   keyVaultSecretName: "custom-metrics-collector-microsoft-client-secret"
-
-# -------------------------------------------------------------------------
-# Example: Add SP from DIFFERENT Azure AD Tenant
-# -------------------------------------------------------------------------
-# Each Azure AD tenant has its own directory quota. To monitor multiple
-# tenants, add an entry for each one with its own SP credentials.
-#
-# - tenantId: "<different-azure-ad-tenant-id>"
-#   tenantName: "<friendly-display-name>"
-#   servicePrincipalClientId: "<service-principal-app-id>"
-#   keyVaultSecretName: "<key-vault-secret-name>"
+#   keyVaultSecretName: "custom-metrics-collector-test-tenant-client-secret"
+#   directoryQuota: false
+#   subscriptions:
+#     - name: "Test Subscription"
+#       subscriptionId: "<subscription-id>"
+#       roleAssignmentLimit: 4000
+#       regions:
+#         - westus3
+#         - uksouth

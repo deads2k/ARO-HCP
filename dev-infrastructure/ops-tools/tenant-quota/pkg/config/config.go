@@ -23,26 +23,39 @@ import (
 )
 
 const (
-	DefaultTimeout  = 30 * time.Second
-	DefaultInterval = 15 * time.Minute
-	DefaultScope    = "https://graph.microsoft.com/.default"
+	DefaultTimeout              = 30 * time.Second
+	DefaultInterval             = 15 * time.Minute
+	DefaultCacheTTL             = 24 * time.Hour
+	DefaultRoleAssignmentLimit  = 4000
+	DefaultScope                = "https://graph.microsoft.com/.default"
 )
 
 type Config struct {
 	Interval string         `yaml:"interval"`
 	Timeout  string         `yaml:"timeout"`
+	CacheTTL string         `yaml:"cacheTTL,omitempty"`
 	Tenants  []TenantConfig `yaml:"tenants"`
 
 	intervalDuration time.Duration
 	timeoutDuration  time.Duration
+	cacheTTLDuration time.Duration
 }
 
 type TenantConfig struct {
-	TenantID                 string `yaml:"tenantId"`
-	TenantName               string `yaml:"tenantName,omitempty"`
-	ServicePrincipalClientId string `yaml:"servicePrincipalClientId"`
-	KeyVaultSecretName       string `yaml:"keyVaultSecretName"`
-	Scope                    string `yaml:"scope,omitempty"`
+	TenantID                 string               `yaml:"tenantId"`
+	TenantName               string               `yaml:"tenantName,omitempty"`
+	ServicePrincipalClientId string               `yaml:"servicePrincipalClientId"`
+	KeyVaultSecretName       string               `yaml:"keyVaultSecretName"`
+	Scope                    string               `yaml:"scope,omitempty"`
+	DirectoryQuota           *bool                `yaml:"directoryQuota,omitempty"`
+	Subscriptions            []SubscriptionConfig `yaml:"subscriptions,omitempty"`
+}
+
+type SubscriptionConfig struct {
+	Name                string   `yaml:"name"`
+	SubscriptionID      string   `yaml:"subscriptionId"`
+	RoleAssignmentLimit int      `yaml:"roleAssignmentLimit,omitempty"`
+	Regions             []string `yaml:"regions"`
 }
 
 func LoadFromFile(path string) (*Config, error) {
@@ -64,30 +77,14 @@ func LoadFromFile(path string) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
-	if c.Interval == "" {
-		c.intervalDuration = DefaultInterval
-	} else {
-		d, err := time.ParseDuration(c.Interval)
-		if err != nil {
-			return fmt.Errorf("invalid interval %q: %w", c.Interval, err)
-		}
-		if d <= 0 {
-			return fmt.Errorf("interval must be positive, got %v", d)
-		}
-		c.intervalDuration = d
+	if err := parseDuration(c.Interval, DefaultInterval, &c.intervalDuration, "interval"); err != nil {
+		return err
 	}
-
-	if c.Timeout == "" {
-		c.timeoutDuration = DefaultTimeout
-	} else {
-		d, err := time.ParseDuration(c.Timeout)
-		if err != nil {
-			return fmt.Errorf("invalid timeout %q: %w", c.Timeout, err)
-		}
-		if d <= 0 {
-			return fmt.Errorf("timeout must be positive, got %v", d)
-		}
-		c.timeoutDuration = d
+	if err := parseDuration(c.Timeout, DefaultTimeout, &c.timeoutDuration, "timeout"); err != nil {
+		return err
+	}
+	if err := parseDuration(c.CacheTTL, DefaultCacheTTL, &c.cacheTTLDuration, "cacheTTL"); err != nil {
+		return err
 	}
 
 	if len(c.Tenants) == 0 {
@@ -109,8 +106,36 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("tenant[%d]: duplicate tenantId %q", i, t.TenantID)
 		}
 		seen[t.TenantID] = true
+
+		for j, s := range t.Subscriptions {
+			if s.SubscriptionID == "" {
+				return fmt.Errorf("tenant[%d].subscriptions[%d]: subscriptionId is required", i, j)
+			}
+			if s.Name == "" {
+				return fmt.Errorf("tenant[%d].subscriptions[%d]: name is required", i, j)
+			}
+			if len(s.Regions) == 0 {
+				return fmt.Errorf("tenant[%d].subscriptions[%d]: at least one region is required", i, j)
+			}
+		}
 	}
 
+	return nil
+}
+
+func parseDuration(raw string, defaultVal time.Duration, dst *time.Duration, name string) error {
+	if raw == "" {
+		*dst = defaultVal
+		return nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return fmt.Errorf("invalid %s %q: %w", name, raw, err)
+	}
+	if d <= 0 {
+		return fmt.Errorf("%s must be positive, got %v", name, d)
+	}
+	*dst = d
 	return nil
 }
 
@@ -120,6 +145,20 @@ func (c *Config) GetInterval() time.Duration {
 
 func (c *Config) GetTimeout() time.Duration {
 	return c.timeoutDuration
+}
+
+func (c *Config) GetCacheTTL() time.Duration {
+	return c.cacheTTLDuration
+}
+
+// HasSubscriptions returns true if any tenant has subscription quota monitoring configured.
+func (c *Config) HasSubscriptions() bool {
+	for _, t := range c.Tenants {
+		if len(t.Subscriptions) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *TenantConfig) GetScope() string {
@@ -134,4 +173,20 @@ func (t *TenantConfig) GetDisplayName() string {
 		return t.TenantName
 	}
 	return t.TenantID
+}
+
+// IsDirectoryQuotaEnabled returns true if directory quota collection is enabled.
+// Defaults to true when not explicitly set, for backward compatibility.
+func (t *TenantConfig) IsDirectoryQuotaEnabled() bool {
+	if t.DirectoryQuota == nil {
+		return true
+	}
+	return *t.DirectoryQuota
+}
+
+func (s *SubscriptionConfig) GetRoleAssignmentLimit() int {
+	if s.RoleAssignmentLimit > 0 {
+		return s.RoleAssignmentLimit
+	}
+	return DefaultRoleAssignmentLimit
 }
