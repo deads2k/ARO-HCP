@@ -44,6 +44,7 @@ type QuotaSource interface {
 	IsRegional() bool
 
 	// Collect gathers quota data for a single subscription and region.
+	// Implementations may return both results and errors for partial success.
 	Collect(ctx context.Context, cred *azidentity.ClientSecretCredential,
-		subscriptionID string, region string) ([]QuotaResult, error)
+		subscriptionID string, region string) ([]QuotaResult, []error)
 }

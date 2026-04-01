@@ -198,16 +198,12 @@ func TestValidate_SubscriptionMissingFields(t *testing.T) {
 		sub  SubscriptionConfig
 	}{
 		{
-			name: "missing subscriptionId",
-			sub:  SubscriptionConfig{Name: "sub", Regions: []string{"eastus"}},
-		},
-		{
 			name: "missing name",
-			sub:  SubscriptionConfig{SubscriptionID: "sid", Regions: []string{"eastus"}},
+			sub:  SubscriptionConfig{Regions: []string{"eastus"}},
 		},
 		{
 			name: "missing regions",
-			sub:  SubscriptionConfig{SubscriptionID: "sid", Name: "sub"},
+			sub:  SubscriptionConfig{Name: "sub"},
 		},
 	}
 	for _, tc := range cases {
@@ -225,7 +221,7 @@ func TestValidate_SubscriptionMissingFields(t *testing.T) {
 func TestValidate_ValidSubscriptions(t *testing.T) {
 	tenant := minimalValidTenant()
 	tenant.Subscriptions = []SubscriptionConfig{
-		{SubscriptionID: "sub-1", Name: "prod", Regions: []string{"eastus", "westus"}},
+		{Name: "prod", Regions: []string{"eastus", "westus"}},
 	}
 	cfg := Config{Tenants: []TenantConfig{tenant}}
 	if err := cfg.Validate(); err != nil {
@@ -242,8 +238,7 @@ tenants:
     servicePrincipalClientId: "sp-id"
     keyVaultSecretName: "kv-secret"
     subscriptions:
-      - subscriptionId: "sub-1"
-        name: "prod"
+      - name: "prod"
         regions:
           - eastus
 `
@@ -257,6 +252,15 @@ tenants:
 	}
 	if cfg.Tenants[0].TenantID != "tid-1" {
 		t.Errorf("tenantId: got %q, want %q", cfg.Tenants[0].TenantID, "tid-1")
+	}
+	if len(cfg.Tenants[0].Subscriptions) != 1 {
+		t.Fatalf("subscriptions: got %d, want 1", len(cfg.Tenants[0].Subscriptions))
+	}
+	if cfg.Tenants[0].Subscriptions[0].Name != "prod" {
+		t.Errorf("subscription name: got %q, want %q", cfg.Tenants[0].Subscriptions[0].Name, "prod")
+	}
+	if cfg.Tenants[0].Subscriptions[0].SubscriptionID != "" {
+		t.Errorf("subscriptionId: got %q, want empty runtime-resolved value", cfg.Tenants[0].Subscriptions[0].SubscriptionID)
 	}
 }
 
@@ -288,7 +292,7 @@ func TestLoadFromFile_FailsValidation(t *testing.T) {
 func TestHasSubscriptions(t *testing.T) {
 	withSubs := minimalValidTenant()
 	withSubs.Subscriptions = []SubscriptionConfig{
-		{SubscriptionID: "sid", Name: "s", Regions: []string{"eastus"}},
+		{Name: "s", Regions: []string{"eastus"}},
 	}
 
 	cases := []struct {

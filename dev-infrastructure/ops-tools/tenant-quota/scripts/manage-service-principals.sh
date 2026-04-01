@@ -9,9 +9,11 @@
 # Each tenant needs its own service principal with:
 # - Directory.Read.All (Graph API) for directory quota monitoring
 # - Reader role on each target subscription for compute/network quota monitoring
-#   and role assignment counting via Resource Graph
+#   and role assignment counting via the ARM authorization API
 #
-# The script is idempotent: it skips creation/assignment if already present.
+# The script reuses existing apps, permissions, role assignments, and Key Vault
+# secrets when Azure lookups succeed. Lookup failures are treated as errors so
+# only an explicit Key Vault "not found" result creates a new client secret.
 #
 # Prerequisites:
 # - Azure CLI logged into the TARGET tenant where the SP should be created
@@ -44,6 +46,33 @@ print_success() { echo -e "${GREEN}[OK]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 print_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 header()        { echo ""; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo -e "${BLUE}$1${NC}"; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo ""; }
+
+print_error_details() {
+    local details="$1"
+    local shown=0
+
+    while IFS= read -r line; do
+        [[ -z "${line}" ]] && continue
+        echo "  ${line}"
+        shown=$((shown + 1))
+        if [[ "${shown}" -ge 3 ]]; then
+            break
+        fi
+    done <<< "${details}"
+}
+
+is_secret_not_found_error() {
+    local details="$1"
+
+    case "${details}" in
+        *SecretNotFound*|*"was not found in this key vault"*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
 
 # =============================================================================
 # TENANT DEFINITIONS
@@ -90,8 +119,20 @@ setup_test_tenant() {
 
 create_or_get_sp() {
     local app_name="$1"
+    local error_file
+    local lookup_error
 
-    APP_ID=$(az ad app list --display-name "${app_name}" --query '[0].appId' -o tsv 2>/dev/null || true)
+    error_file=$(mktemp)
+    if APP_ID=$(az ad app list --display-name "${app_name}" --query '[0].appId' -o tsv 2>"${error_file}"); then
+        :
+    else
+        lookup_error=$(<"${error_file}")
+        rm -f "${error_file}"
+        print_error "Failed to look up application '${app_name}'"
+        print_error_details "${lookup_error}"
+        exit 1
+    fi
+    rm -f "${error_file}"
 
     if [[ -n "${APP_ID}" ]]; then
         print_info "Application '${app_name}' already exists: ${APP_ID}"
@@ -120,9 +161,22 @@ grant_graph_permissions() {
     header "Granting Graph API permissions"
 
     local existing
-    existing=$(az rest --method GET \
+    local error_file
+    local permission_error
+
+    error_file=$(mktemp)
+    if existing=$(az rest --method GET \
         --url "https://graph.microsoft.com/v1.0/servicePrincipals(appId='${app_id}')/appRoleAssignments" \
-        --query "value[].appRoleId" -o tsv 2>/dev/null || true)
+        --query "value[].appRoleId" -o tsv 2>"${error_file}"); then
+        :
+    else
+        permission_error=$(<"${error_file}")
+        rm -f "${error_file}"
+        print_error "Failed to query existing Graph API permissions for '${app_id}'"
+        print_error_details "${permission_error}"
+        exit 1
+    fi
+    rm -f "${error_file}"
 
     if echo "${existing}" | grep -q "${ORGANIZATION_READ_ALL}"; then
         print_info "Organization.Read.All already granted"
@@ -148,13 +202,26 @@ grant_subscription_reader() {
 
     for sub_name in "${subscriptions[@]}"; do
         local sub_id
-        sub_id=$(az account list --query "[?name=='${sub_name}'].id" -o tsv 2>/dev/null || true)
+        local error_file
+        local lookup_error
+
+        error_file=$(mktemp)
+        if sub_id=$(az account list --query "[?name=='${sub_name}'].id" -o tsv 2>"${error_file}"); then
+            :
+        else
+            lookup_error=$(<"${error_file}")
+            rm -f "${error_file}"
+            print_error "Failed to resolve subscription '${sub_name}'"
+            print_error_details "${lookup_error}"
+            exit 1
+        fi
+        rm -f "${error_file}"
 
         if [[ -z "${sub_id}" ]]; then
-            print_warning "Could not find subscription '${sub_name}' — skipping"
+            print_error "Could not find subscription '${sub_name}'"
             print_info "Make sure you have access to this subscription. You may need to:"
             echo "  az login --tenant <tenant-id>"
-            continue
+            exit 1
         fi
 
         print_info "Assigning Reader on '${sub_name}' (${sub_id})..."
@@ -167,8 +234,9 @@ grant_subscription_reader() {
         elif echo "${output}" | grep -qi "conflict\|already exists"; then
             print_info "Reader already assigned"
         else
-            print_error "Failed to assign Reader role:"
-            echo "  ${output}" | head -3
+            print_error "Failed to assign Reader role on '${sub_name}'"
+            print_error_details "${output}"
+            exit 1
         fi
     done
 }
@@ -176,14 +244,32 @@ grant_subscription_reader() {
 store_secret() {
     local app_id="$1"
     local secret_name="$2"
+    local existing_secret
+    local error_file
+    local secret_error
 
     header "Checking Key Vault secret"
 
-    local existing_secret
-    existing_secret=$(az keyvault secret show \
+    error_file=$(mktemp)
+    if existing_secret=$(az keyvault secret show \
         --vault-name "${KEYVAULT_NAME}" \
         --name "${secret_name}" \
-        --query "value" -o tsv 2>/dev/null || true)
+        --query "value" -o tsv 2>"${error_file}"); then
+        rm -f "${error_file}"
+        if [[ -z "${existing_secret}" ]]; then
+            print_error "Key Vault secret '${secret_name}' exists but returned an empty value"
+            exit 1
+        fi
+    else
+        secret_error=$(<"${error_file}")
+        rm -f "${error_file}"
+        if ! is_secret_not_found_error "${secret_error}"; then
+            print_error "Failed to query Key Vault secret '${secret_name}'"
+            print_error_details "${secret_error}"
+            exit 1
+        fi
+        existing_secret=""
+    fi
 
     if [[ -n "${existing_secret}" ]]; then
         print_info "Key Vault secret '${secret_name}' already exists"
@@ -191,6 +277,7 @@ store_secret() {
         return 0
     fi
 
+    print_info "Key Vault secret '${secret_name}' was not found"
     print_info "Creating new client secret and storing in Key Vault..."
     local new_secret
     new_secret=$(az ad sp credential reset \

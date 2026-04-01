@@ -16,6 +16,7 @@ package subscriptionquota
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -143,18 +144,30 @@ func (c *Collector) collectSource(ctx context.Context, source QuotaSource,
 	}
 
 	for _, region := range regions {
-		results, err := source.Collect(ctx, cred, sub.SubscriptionID, region)
-		if err != nil {
+		results, errs := source.Collect(ctx, cred, sub.SubscriptionID, region)
+		if len(results) == 0 && len(errs) > 0 {
 			c.logger.Error("Failed to collect subscription quota",
 				"source", source.Name(),
 				"subscription", sub.Name,
 				"region", region,
-				"error", err)
+				"errorCount", len(errs),
+				"error", errors.Join(errs...))
 			continue
 		}
 
 		for _, r := range results {
 			c.cacheResult(source.Name(), sub.Name, r)
+		}
+
+		if len(errs) > 0 {
+			c.logger.Warn("Collected subscription quota metrics with partial errors",
+				"source", source.Name(),
+				"subscription", sub.Name,
+				"region", region,
+				"count", len(results),
+				"errorCount", len(errs),
+				"error", errors.Join(errs...))
+			continue
 		}
 
 		c.logger.Info("Collected subscription quota metrics",

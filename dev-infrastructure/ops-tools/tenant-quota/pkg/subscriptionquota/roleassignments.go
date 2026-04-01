@@ -43,15 +43,15 @@ func NewRoleAssignmentSource(tenants []config.TenantConfig) *RoleAssignmentSourc
 	return &RoleAssignmentSource{limits: limits}
 }
 
-func (s *RoleAssignmentSource) Name() string    { return "rbac" }
+func (s *RoleAssignmentSource) Name() string     { return "rbac" }
 func (s *RoleAssignmentSource) IsRegional() bool { return false }
 
 func (s *RoleAssignmentSource) Collect(ctx context.Context, cred *azidentity.ClientSecretCredential,
-	subscriptionID string, _ string) ([]QuotaResult, error) {
+	subscriptionID string, _ string) ([]QuotaResult, []error) {
 
 	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, cred, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create role assignments client: %w", err)
+		return nil, []error{fmt.Errorf("create role assignments client: %w", err)}
 	}
 
 	var count int64
@@ -59,7 +59,7 @@ func (s *RoleAssignmentSource) Collect(ctx context.Context, cred *azidentity.Cli
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("list role assignments: %w", err)
+			return nil, []error{fmt.Errorf("list role assignments: %w", err)}
 		}
 		count += int64(len(page.Value))
 	}

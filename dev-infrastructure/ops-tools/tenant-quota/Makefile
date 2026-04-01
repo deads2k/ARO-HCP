@@ -73,20 +73,6 @@ run: export GOWORK=off
 run: _output/config.yaml fetch-secrets
 	SECRETS_STORE_PATH=$(SECRETS_DIR) CONFIG_PATH=_output/config.yaml go run main.go
 
-# ---------------------------------------------------------------------------
-# Setup service principal
-# ---------------------------------------------------------------------------
-# Usage: make setup-sp TENANT=RedHat0
-TENANT ?=
-setup-sp: tenant-quota-collector _output/config.yaml
-ifndef TENANT
-	$(error TENANT is required, e.g. make setup-sp TENANT=RedHat0)
-endif
-	./tenant-quota-collector setup service-principal \
-		--config _output/config.yaml \
-		--tenant $(TENANT)
-.PHONY: setup-sp
-
 clean:
 	rm -rf tenant-quota-collector _output/
 .PHONY: clean

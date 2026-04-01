@@ -27,41 +27,37 @@ import (
 // Only quotas with currentValue > 0 are emitted (auto-discovery).
 type ComputeQuotaSource struct{}
 
-func (s *ComputeQuotaSource) Name() string    { return "compute" }
+func (s *ComputeQuotaSource) Name() string     { return "compute" }
 func (s *ComputeQuotaSource) IsRegional() bool { return true }
 
 func (s *ComputeQuotaSource) Collect(ctx context.Context, cred *azidentity.ClientSecretCredential,
-	subscriptionID string, region string) ([]QuotaResult, error) {
+	subscriptionID string, region string) ([]QuotaResult, []error) {
 
 	client, err := armcompute.NewUsageClient(subscriptionID, cred, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create compute usage client: %w", err)
+		return nil, []error{fmt.Errorf("create compute usage client: %w", err)}
 	}
 
 	var results []QuotaResult
+	var errs []error
 	pager := client.NewListPager(region, nil)
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("list compute usage for %s/%s: %w", subscriptionID, region, err)
+			errs = append(errs, fmt.Errorf("list compute usage for %s/%s: %w", subscriptionID, region, err))
+			break
 		}
-		for _, usage := range page.Value {
-			if usage.CurrentValue == nil || *usage.CurrentValue <= 0 {
+		for i, usage := range page.Value {
+			result, ok, err := buildComputeQuotaResult(subscriptionID, region, usage)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("invalid compute usage item %d: %w", i, err))
 				continue
 			}
-			var limit float64
-			if usage.Limit != nil {
-				limit = float64(*usage.Limit)
+			if !ok {
+				continue
 			}
-			results = append(results, QuotaResult{
-				QuotaName:      *usage.Name.Value,
-				LocalizedName:  *usage.Name.LocalizedValue,
-				CurrentValue:   float64(*usage.CurrentValue),
-				Limit:          limit,
-				SubscriptionID: subscriptionID,
-				Region:         region,
-			})
+			results = append(results, result)
 		}
 	}
-	return results, nil
+	return results, errs
 }
