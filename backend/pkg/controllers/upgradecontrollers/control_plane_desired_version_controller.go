@@ -16,6 +16,7 @@ package upgradecontrollers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -26,16 +27,22 @@ import (
 	"github.com/golang/groupcache/lru"
 	"github.com/google/uuid"
 
+	"k8s.io/apimachinery/pkg/api/operation"
+
+	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+
 	"github.com/openshift/cluster-version-operator/pkg/cincinnati"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
+	"github.com/Azure/ARO-HCP/internal/admission"
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/cincinatti"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
 // controlPlaneDesiredVersionSyncer is a Cluster syncer that manages control plane desired version.
@@ -45,6 +52,7 @@ type controlPlaneDesiredVersionSyncer struct {
 	cooldownChecker      controllerutils.CooldownChecker
 	cosmosClient         database.DBClient
 	clusterServiceClient ocm.ClusterServiceClientSpec
+	subscriptionLister   listers.SubscriptionLister
 
 	cincinnatiClientLock      sync.RWMutex
 	clusterToCincinnatiClient *lru.Cache
@@ -61,6 +69,7 @@ func NewControlPlaneDesiredVersionController(
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	activeOperationLister listers.ActiveOperationLister,
 	informers informers.BackendInformers,
+	subscriptionLister listers.SubscriptionLister,
 ) controllerutils.Controller {
 
 	syncer := &controlPlaneDesiredVersionSyncer{
@@ -68,6 +77,7 @@ func NewControlPlaneDesiredVersionController(
 		cosmosClient:              cosmosClient,
 		clusterToCincinnatiClient: lru.New(100000),
 		clusterServiceClient:      clusterServiceClient,
+		subscriptionLister:        subscriptionLister,
 	}
 
 	controller := controllerutils.NewClusterWatchingController(
@@ -124,7 +134,16 @@ func (c *controlPlaneDesiredVersionSyncer) SyncOnce(ctx context.Context, key con
 	customerDesiredMinor := existingCluster.CustomerProperties.Version.ID
 	channelGroup := existingCluster.CustomerProperties.Version.ChannelGroup
 	activeVersions := existingServiceProviderCluster.Status.ControlPlaneVersion.ActiveVersions
-	desiredVersion, err := c.desiredControlPlaneZVersion(ctx, cincinnatiClient, customerDesiredMinor, channelGroup, activeVersions)
+	subscription, err := c.subscriptionLister.Get(ctx, key.SubscriptionID)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+	operation := operation.Operation{
+		Type:    operation.Update,
+		Options: validation.AFECsToValidationOptions(subscription.GetRegisteredFeatures()),
+	}
+	desiredVersion, err := c.desiredControlPlaneZVersion(ctx, cincinnatiClient, key.GetResourceID(), customerDesiredMinor, channelGroup, activeVersions,
+		operation.HasOption(api.FeatureExperimentalReleaseFeatures))
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to determine desired control plane version: %w", err))
 	}
@@ -192,11 +211,8 @@ func (c *controlPlaneDesiredVersionSyncer) getCincinnatiClient(key controlleruti
 //
 // customerDesiredMinor and channelGroup are required. If they are not specified, no version is returned.
 // Returns nil if no upgrade is needed.
-func (c *controlPlaneDesiredVersionSyncer) desiredControlPlaneZVersion(
-	ctx context.Context, cincinnatiClient cincinatti.Client,
-	customerDesiredMinor string, channelGroup string,
-	activeVersions []api.HCPClusterActiveVersion,
-) (*semver.Version, error) {
+func (c *controlPlaneDesiredVersionSyncer) desiredControlPlaneZVersion(ctx context.Context, cincinnatiClient cincinatti.Client, clusterResourceID *azcorearm.ResourceID,
+	customerDesiredMinor string, channelGroup string, activeVersions []api.HCPClusterActiveVersion, allowExperimentalReleaseFeatures bool) (*semver.Version, error) {
 	logger := utils.LoggerFromContext(ctx)
 
 	if len(customerDesiredMinor) == 0 {
@@ -237,62 +253,54 @@ func (c *controlPlaneDesiredVersionSyncer) desiredControlPlaneZVersion(
 	// Use the most recent version to determine the minor version
 	actualLatestVersion := activeVersions[0].Version
 
-	actualMinorVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", actualLatestVersion.Major, actualLatestVersion.Minor))
+	actualLatestMinorVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", actualLatestVersion.Major, actualLatestVersion.Minor))
 
 	// ParseTolerant handles both "4.19", "4.19.0" and full versions like "4.20.15". Normalize to major.minor.0
 	// so that same-minor z-stream (e.g. 4.20.0 -> 4.20.15) is not mistaken for a y-stream upgrade.
 	parsedDesired := api.Must(semver.ParseTolerant(customerDesiredMinor))
 	desiredMinorVersion := semver.MustParse(fmt.Sprintf("%d.%d.0", parsedDesired.Major, parsedDesired.Minor))
 
-	if desiredMinorVersion.LT(actualMinorVersion) {
+	if desiredMinorVersion.LT(actualLatestMinorVersion) {
 		return nil, utils.TrackError(fmt.Errorf(
 			"invalid next y-stream upgrade path from %s to %s: only upgrades to the next minor version are allowed, no downgrades",
-			actualMinorVersion.String(), desiredMinorVersion.String(),
+			actualLatestMinorVersion.String(), desiredMinorVersion.String(),
 		))
 	}
 
-	if desiredMinorVersion.GT(actualMinorVersion) {
-		// TODO: Add support for major version upgrades (e.g., 4.20 → 5.0) when needed
-		if desiredMinorVersion.Major != actualMinorVersion.Major {
-			return nil, utils.TrackError(fmt.Errorf(
-				"invalid next y-stream upgrade path from %s to %s: major version changes are not supported",
-				actualMinorVersion.String(), desiredMinorVersion.String(),
-			))
+	if desiredMinorVersion.GT(actualLatestMinorVersion) {
+		if desiredMinorVersion.Major >= 5 && !allowExperimentalReleaseFeatures {
+			return nil, utils.TrackError(errors.New("OpenShift v5 and above is not supported"))
 		}
-		if desiredMinorVersion.Minor != actualMinorVersion.Minor+1 {
-			return nil, utils.TrackError(fmt.Errorf(
-				"invalid next y-stream upgrade path from %s to %s: only upgrades to the next minor version are allowed, no skipping minor versions",
-				actualMinorVersion.String(), desiredMinorVersion.String(),
-			))
+		if err := validation.OpenshiftVersionAtMostOneMinorSkew(actualLatestMinorVersion.String(), desiredMinorVersion.String()); err != nil {
+			return nil, utils.TrackError(err)
+		}
+		if err := admission.ValidateClusterNodePoolsMinorVersionSkew(ctx, c.cosmosClient, clusterResourceID, desiredMinorVersion); err != nil {
+			return nil, utils.TrackError(err)
 		}
 	}
-
-	targetMinorVersion := desiredMinorVersion
 
 	activeVersionList := make([]semver.Version, 0, len(activeVersions))
 	for _, av := range activeVersions {
 		activeVersionList = append(activeVersionList, *av.Version)
 	}
 
-	if desiredMinorVersion.Minor == actualMinorVersion.Minor+1 {
-		logger.Info("Resolving next Y-stream upgrade", "actualMinor", actualMinorVersion.String(), "activeVersions", activeVersions, "channelGroup", channelGroup,
-			"targetMinor", desiredMinorVersion.String())
-
-		latestVersion, err := c.findLatestVersionInMinor(ctx, cincinnatiClient, channelGroup, desiredMinorVersion, activeVersionList)
-		if err != nil {
-			return nil, utils.TrackError(err)
-		}
-
-		if latestVersion != nil {
-			return latestVersion, nil
-		}
-
-		// If no upgrade path to target minor, fall back to Z-stream upgrade in current minor
-		// This helps the cluster reach a gateway version that may enable the Y-stream upgrade later
-		targetMinorVersion = actualMinorVersion
+	if desiredMinorVersion.EQ(actualLatestMinorVersion) {
+		return c.findLatestVersionInMinor(ctx, cincinnatiClient, channelGroup, desiredMinorVersion, activeVersionList)
 	}
 
-	return c.findLatestVersionInMinor(ctx, cincinnatiClient, channelGroup, targetMinorVersion, activeVersionList)
+	logger.Info("Resolving user-initiated upgrade desired version", "actualMinor", actualLatestMinorVersion.String(), "activeVersions", activeVersions,
+		"channelGroup", channelGroup, "targetMinor", desiredMinorVersion.String())
+
+	latestVersion, err := c.findLatestVersionInMinor(ctx, cincinnatiClient, channelGroup, desiredMinorVersion, activeVersionList)
+	if err != nil {
+		return nil, utils.TrackError(err)
+	}
+	if latestVersion != nil {
+		return latestVersion, nil
+	}
+
+	// User-requested control plane minor has no path yet; advance to latest patch on the current minor toward a gateway for a later user-initiated upgrade.
+	return c.findLatestVersionInMinor(ctx, cincinnatiClient, channelGroup, actualLatestMinorVersion, activeVersionList)
 }
 
 // findLatestVersionInMinor queries Cincinnati and finds the latest version within the specified target minor.

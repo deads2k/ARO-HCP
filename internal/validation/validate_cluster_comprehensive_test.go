@@ -68,6 +68,27 @@ func TestValidateClusterCreate(t *testing.T) {
 			expectErrors: []expectedError{},
 		},
 		{
+			name: "OpenShift 5 rejected on create without experimental release features (no prior version id)",
+			cluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			expectErrors: []expectedError{
+				{message: "OpenShift v5 and above is not supported", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "OpenShift 5 allowed with experimental release features - create",
+			cluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			opOptions:    testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{},
+		},
+		{
 			name: "invalid DNS prefix - create",
 			cluster: func() *api.HCPOpenShiftCluster {
 				c := createValidCluster()
@@ -2087,6 +2108,138 @@ func TestValidateClusterUpdate(t *testing.T) {
 			}(),
 			opOptions:    testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
 			expectErrors: []expectedError{},
+		},
+		{
+			name: "update: version may not skip minor within same major (4.20 to 4.22)",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.22"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.20"
+				return c
+			}(),
+			opOptions: testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{
+				{message: "only upgrade to the next minor is allowed", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "update: cross-major 4.22 to 5.0 rejected without experimental release features",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.22"
+				return c
+			}(),
+			expectErrors: []expectedError{
+				{message: "OpenShift v5 and above is not supported", fieldPath: "customerProperties.version.id"},
+				{message: "field is immutable", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "update: cross-major 4.20 to 5.0 rejected (4.20 not in 4→5 pairing map)",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.20"
+				return c
+			}(),
+			opOptions: testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{
+				{message: "cross-major upgrade from 4.20 is only allowed to", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "update: cross-major 4.22 to 5.0 allowed",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.22"
+				return c
+			}(),
+			opOptions:    testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{},
+		},
+		{
+			name: "update: cross-major 4.23 to 5.1 allowed",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.1"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.23"
+				return c
+			}(),
+			opOptions:    testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{},
+		},
+		{
+			name: "update: cross-major 4.22 to 5.1 rejected (wrong paired minor)",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.1"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.22"
+				return c
+			}(),
+			opOptions: testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{
+				{message: "cross-major upgrade from 4.22 is only allowed to 5.0", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "update: cross-major 4.23 to 5.0 rejected (wrong paired minor)",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "5.0"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.23"
+				return c
+			}(),
+			opOptions: testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{
+				{message: "cross-major upgrade from 4.23 is only allowed to 5.1", fieldPath: "customerProperties.version.id"},
+			},
+		},
+		{
+			name: "update: upgrade 4 to 6 major rejected (unsupported cross-major skew)",
+			newCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "6.0"
+				return c
+			}(),
+			oldCluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.CustomerProperties.Version.ID = "4.22"
+				return c
+			}(),
+			opOptions: testFeatureOptions(api.FeatureExperimentalReleaseFeatures),
+			expectErrors: []expectedError{
+				{message: "skipping major versions is not allowed", fieldPath: "customerProperties.version.id"},
+			},
 		},
 		{
 			name: "update: version must still be at least 4.20 even if old cluster had lower version without experimental flag",
