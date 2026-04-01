@@ -76,7 +76,6 @@ func NewCreateClusterScopedMaestroReadonlyBundlesController(
 	informers informers.BackendInformers,
 	maestroSourceEnvironmentIdentifier string,
 	maestroClientBuilder maestro.MaestroClientBuilder,
-	maestroAPIMaestroBundleNameGenerator maestro.MaestroAPIMaestroBundleNameGenerator,
 ) controllerutils.Controller {
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
@@ -86,7 +85,7 @@ func NewCreateClusterScopedMaestroReadonlyBundlesController(
 		activeOperationLister:                activeOperationLister,
 		maestroSourceEnvironmentIdentifier:   maestroSourceEnvironmentIdentifier,
 		maestroClientBuilder:                 maestroClientBuilder,
-		maestroAPIMaestroBundleNameGenerator: maestroAPIMaestroBundleNameGenerator,
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	controller := controllerutils.NewClusterWatchingController(

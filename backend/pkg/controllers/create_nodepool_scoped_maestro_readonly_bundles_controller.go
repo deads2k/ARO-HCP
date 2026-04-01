@@ -76,7 +76,6 @@ func NewCreateNodePoolScopedMaestroReadonlyBundlesController(
 	informers informers.BackendInformers,
 	maestroSourceEnvironmentIdentifier string,
 	maestroClientBuilder maestro.MaestroClientBuilder,
-	maestroAPIMaestroBundleNameGenerator maestro.MaestroAPIMaestroBundleNameGenerator,
 ) controllerutils.Controller {
 
 	syncer := &createNodePoolScopedMaestroReadonlyBundlesSyncer{
@@ -86,7 +85,7 @@ func NewCreateNodePoolScopedMaestroReadonlyBundlesController(
 		activeOperationLister:                activeOperationLister,
 		maestroSourceEnvironmentIdentifier:   maestroSourceEnvironmentIdentifier,
 		maestroClientBuilder:                 maestroClientBuilder,
-		maestroAPIMaestroBundleNameGenerator: maestroAPIMaestroBundleNameGenerator,
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	controller := controllerutils.NewNodePoolWatchingController(
