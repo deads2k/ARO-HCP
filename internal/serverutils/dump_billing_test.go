@@ -23,8 +23,6 @@ import (
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
-	"github.com/Azure/ARO-HCP/internal/api"
-	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/databasetesting"
 )
@@ -70,46 +68,6 @@ func TestDumpBillingToLogger(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDumpClusterAndBillingToLogger(t *testing.T) {
-	ctx := context.Background()
-
-	clusterResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-1")
-	require.NoError(t, err)
-
-	// Create mock DB with cluster and billing document
-	mockDB := databasetesting.NewMockDBClient()
-
-	// Create a minimal cluster document (DumpDataToLogger needs this)
-	clusterCRUD := mockDB.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName)
-	internalID, err := api.NewInternalID("/api/clusters_mgmt/v1/clusters/" + clusterResourceID.Name)
-	require.NoError(t, err)
-	cluster := &api.HCPOpenShiftCluster{
-		TrackedResource: arm.TrackedResource{
-			Resource: arm.Resource{
-				ID:   clusterResourceID,
-				Name: clusterResourceID.Name,
-				Type: api.ClusterResourceType.String(),
-			},
-			Location: "eastus",
-		},
-		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: internalID,
-		},
-	}
-	_, err = clusterCRUD.Create(ctx, cluster, nil)
-	require.NoError(t, err)
-
-	// Create billing document
-	billingDoc := database.NewBillingDocument(clusterResourceID)
-	billingDoc.CreationTime = time.Now().UTC()
-	err = mockDB.CreateBillingDoc(ctx, billingDoc)
-	require.NoError(t, err)
-
-	// Test: DumpClusterAndBillingToLogger should call both DumpDataToLogger and DumpBillingToLogger
-	err = DumpClusterAndBillingToLogger(ctx, mockDB, clusterResourceID)
-	require.NoError(t, err)
-}
-
 func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 	ctx := context.Background()
 
@@ -137,20 +95,4 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 	// This verifies partition-scoped query works correctly
 	err = DumpBillingToLogger(ctx, mockDB, cluster1ResourceID)
 	require.NoError(t, err)
-}
-
-func TestDumpClusterAndBillingToLogger_ErrorAggregation(t *testing.T) {
-	ctx := context.Background()
-
-	// Use a non-existent cluster to trigger DumpDataToLogger error
-	nonExistentResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/non-existent")
-	require.NoError(t, err)
-
-	mockDB := databasetesting.NewMockDBClient()
-
-	// DumpDataToLogger will fail (no cluster), DumpBillingToLogger succeeds (no billing doc)
-	// Both errors should be aggregated
-	err = DumpClusterAndBillingToLogger(ctx, mockDB, nonExistentResourceID)
-	// Should return an error (from DumpDataToLogger failure)
-	require.Error(t, err)
 }

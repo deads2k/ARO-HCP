@@ -72,28 +72,3 @@ func (h *BillingDumpHandler) ServeHTTP(w http.ResponseWriter, request *http.Requ
 	_, err = arm.WriteJSONResponse(w, http.StatusOK, map[string]any{})
 	return err
 }
-
-type DumpClusterAndBillingHandler struct {
-	cosmosClient database.DBClient
-}
-
-func NewDumpClusterAndBillingHandler(cosmosClient database.DBClient) *DumpClusterAndBillingHandler {
-	return &DumpClusterAndBillingHandler{cosmosClient: cosmosClient}
-}
-
-func (h *DumpClusterAndBillingHandler) ServeHTTP(w http.ResponseWriter, request *http.Request) error {
-	ctx := request.Context()
-
-	// get the azure resource ID for this HCP
-	resourceID, err := utils.ResourceIDFromContext(ctx)
-	if err != nil {
-		return utils.TrackError(err)
-	}
-
-	if err := serverutils.DumpClusterAndBillingToLogger(ctx, h.cosmosClient, resourceID); err != nil {
-		return utils.TrackError(err)
-	}
-
-	_, err = arm.WriteJSONResponse(w, http.StatusOK, map[string]any{})
-	return err
-}

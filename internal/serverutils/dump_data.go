@@ -118,22 +118,3 @@ func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, re
 
 	return nil
 }
-
-// DumpClusterAndBillingToLogger dumps both cluster data and billing documents for the given cluster resource ID.
-// This aggregates errors from both DumpDataToLogger and DumpBillingToLogger.
-// Follows best-effort semantics - errors are returned but should not fail critical operations.
-func DumpClusterAndBillingToLogger(ctx context.Context, cosmosClient database.DBClient, resourceID *azcorearm.ResourceID) error {
-	var errs []error
-
-	// Dump cluster data (cluster + nodepools + externalauth + operations)
-	if err := DumpDataToLogger(ctx, cosmosClient, resourceID); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Dump billing documents
-	if err := DumpBillingToLogger(ctx, cosmosClient, resourceID); err != nil {
-		errs = append(errs, err)
-	}
-
-	return utils.TrackError(errors.Join(errs...))
-}

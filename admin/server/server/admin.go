@@ -105,18 +105,15 @@ func NewAdminAPI(
 		middleware.V1HCPResourcePattern("GET", "/breakglass/{sessionName}/kubeconfig"),
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(breakglasshandlers.NewHCPBreakglassSessionKubeconfigHandler(sessionLister, sessionClient).ServeHTTP)),
 	)
+	// Dumps cluster data (cluster, nodepools, operations). Requires active cluster - fails if deleted (404).
 	middlewareMux.Handle(
 		middleware.V1HCPResourcePattern("GET", "/cosmosdump"),
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewCosmosDumpHandler(dbClient).ServeHTTP)),
 	)
+	// Dumps billing documents. Works for deleted clusters - billing docs are soft-deleted.
 	middlewareMux.Handle(
 		middleware.V1HCPResourcePattern("GET", "/billingdump"),
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewBillingDumpHandler(dbClient).ServeHTTP)),
-	)
-	// clusterbillingdump combines both cosmosdump and billingdump (cluster + nodepools + externalauth + operations + billing)
-	middlewareMux.Handle(
-		middleware.V1HCPResourcePattern("GET", "/clusterbillingdump"),
-		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewDumpClusterAndBillingHandler(dbClient).ServeHTTP)),
 	)
 
 	// Non-HCP admin routes
