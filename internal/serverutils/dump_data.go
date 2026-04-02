@@ -80,3 +80,55 @@ func DumpDataToLogger(ctx context.Context, cosmosClient database.DBClient, resou
 
 	return utils.TrackError(errors.Join(errs...))
 }
+
+// DumpBillingToLogger dumps billing documents for the given cluster resource ID to the logger.
+// Uses in-memory filtering for simplicity (one billing doc per cluster, low volume).
+// This includes both active and deleted billing documents for the cluster.
+// Follows best-effort semantics - errors are returned but should not fail critical operations.
+func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, resourceID *azcorearm.ResourceID) error {
+	logger := utils.LoggerFromContext(ctx)
+
+	// List all billing documents across all partitions
+	billingLister := cosmosClient.GlobalListers().BillingDocs()
+	iter, err := billingLister.List(ctx, nil)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	// Find and dump billing documents for this cluster
+	resourceIDString := strings.ToLower(resourceID.String())
+	for _, doc := range iter.Items(ctx) {
+		// Check if this billing document belongs to the requested cluster
+		if doc.ResourceID != nil && strings.ToLower(doc.ResourceID.String()) == resourceIDString {
+			logger.Info(fmt.Sprintf("dumping billing document for resourceID %v", doc.ResourceID),
+				"currentResourceID", doc.ResourceID.String(),
+				"content", doc,
+			)
+		}
+	}
+
+	if err := iter.GetError(); err != nil {
+		return utils.TrackError(err)
+	}
+
+	return nil
+}
+
+// DumpClusterAndBillingToLogger dumps both cluster data and billing documents for the given cluster resource ID.
+// This aggregates errors from both DumpDataToLogger and DumpBillingToLogger.
+// Follows best-effort semantics - errors are returned but should not fail critical operations.
+func DumpClusterAndBillingToLogger(ctx context.Context, cosmosClient database.DBClient, resourceID *azcorearm.ResourceID) error {
+	var errs []error
+
+	// Dump cluster data (cluster + nodepools + externalauth + operations)
+	if err := DumpDataToLogger(ctx, cosmosClient, resourceID); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Dump billing documents
+	if err := DumpBillingToLogger(ctx, cosmosClient, resourceID); err != nil {
+		errs = append(errs, err)
+	}
+
+	return utils.TrackError(errors.Join(errs...))
+}

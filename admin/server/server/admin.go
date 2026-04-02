@@ -109,6 +109,15 @@ func NewAdminAPI(
 		middleware.V1HCPResourcePattern("GET", "/cosmosdump"),
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewCosmosDumpHandler(dbClient).ServeHTTP)),
 	)
+	middlewareMux.Handle(
+		middleware.V1HCPResourcePattern("GET", "/billingdump"),
+		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewBillingDumpHandler(dbClient).ServeHTTP)),
+	)
+	// clusterbillingdump combines both cosmosdump and billingdump (cluster + nodepools + externalauth + operations + billing)
+	middlewareMux.Handle(
+		middleware.V1HCPResourcePattern("GET", "/clusterbillingdump"),
+		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewDumpClusterAndBillingHandler(dbClient).ServeHTTP)),
+	)
 
 	// Non-HCP admin routes
 	middlewareMux.Handle("GET /admin/helloworld", handlers.HelloWorldHandler())
