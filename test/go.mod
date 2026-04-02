@@ -64,7 +64,7 @@ require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/ARO-Tools/pipelines v0.0.0-20260324125451-f78af490048c // indirect
 	github.com/Azure/ARO-Tools/tools/cmdutils v0.0.0-20260324125451-f78af490048c // indirect
-	github.com/Azure/ARO-Tools/tools/grafanactl v0.0.0-20260324125451-f78af490048c // indirect
+	github.com/Azure/ARO-Tools/tools/grafanactl v0.0.0-20260407133258-b4710bb65119 // indirect
 	github.com/Azure/ARO-Tools/tools/helm v0.0.0-20260324125451-f78af490048c // indirect
 	github.com/Azure/ARO-Tools/tools/registration v0.0.0-20260324125451-f78af490048c // indirect
 	github.com/Azure/ARO-Tools/tools/secret-sync v0.0.0-20260324125451-f78af490048c // indirect
