@@ -164,6 +164,35 @@ func (k *SubscriptionKey) AddLoggerValues(logger logr.Logger) logr.Logger {
 			AddLogValuesForResourceID(k.GetResourceID())...)
 }
 
+type HCPExternalAuthKey struct {
+	SubscriptionID      string `json:"subscriptionID"`
+	ResourceGroupName   string `json:"resourceGroupName"`
+	HCPClusterName      string `json:"hcpClusterName"`
+	HCPExternalAuthName string `json:"hcpExternalAuthName"`
+}
+
+func (k *HCPExternalAuthKey) GetResourceID() *azcorearm.ResourceID {
+	return api.Must(api.ToExternalAuthResourceID(k.SubscriptionID, k.ResourceGroupName, k.HCPClusterName, k.HCPExternalAuthName))
+}
+
+func (k *HCPExternalAuthKey) AddLoggerValues(logger logr.Logger) logr.Logger {
+	return logger.WithValues(utils.LogValues{}.AddLogValuesForResourceID(k.GetResourceID())...)
+}
+
+func (k *HCPExternalAuthKey) InitialController(controllerName string) *api.Controller {
+	resourceID := api.Must(azcorearm.ParseResourceID(k.GetResourceID().String() + "/" + api.ControllerResourceTypeName + "/" + controllerName))
+	return &api.Controller{
+		CosmosMetadata: api.CosmosMetadata{
+			ResourceID: resourceID,
+		},
+		ResourceID: resourceID,
+		ExternalID: k.GetResourceID(),
+		Status: api.ControllerStatus{
+			Conditions: []api.Condition{},
+		},
+	}
+}
+
 // clock is used by helper functions for setting last transition time.  It is injectable for unit testing.
 var clock utilsclock.Clock = utilsclock.RealClock{}
 
