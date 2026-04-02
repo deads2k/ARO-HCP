@@ -121,6 +121,11 @@ func (m *MockDBClient) Operations(subscriptionID string) database.OperationCRUD 
 	return newMockOperationCRUD(m, parentResourceID)
 }
 
+// Billing returns a partition-scoped interface for querying billing documents.
+func (m *MockDBClient) Billing(subscriptionID string) database.BillingCRUD {
+	return newMockBillingCRUD(m, subscriptionID)
+}
+
 // Subscriptions returns a CRUD interface for subscription resources.
 func (m *MockDBClient) Subscriptions() database.SubscriptionCRUD {
 	return newMockSubscriptionCRUD(m)
@@ -511,6 +516,39 @@ func (c *MockLockClient) TryAcquireLock(ctx context.Context, id string) (*azcosm
 	c.locks[id] = true
 	return &azcosmos.ItemResponse{}, nil
 }
+
+// mockBillingCRUD implements database.BillingCRUD for testing.
+type mockBillingCRUD struct {
+	client         *MockDBClient
+	subscriptionID string
+}
+
+func newMockBillingCRUD(client *MockDBClient, subscriptionID string) database.BillingCRUD {
+	return &mockBillingCRUD{
+		client:         client,
+		subscriptionID: strings.ToLower(subscriptionID),
+	}
+}
+
+func (c *mockBillingCRUD) List(ctx context.Context) (database.DBClientIterator[database.BillingDocument], error) {
+	c.client.mu.RLock()
+	defer c.client.mu.RUnlock()
+
+	var ids []string
+	var items []*database.BillingDocument
+
+	// Filter billing documents by subscription ID (partition key)
+	for id, doc := range c.client.billing {
+		if strings.ToLower(doc.SubscriptionID) == c.subscriptionID {
+			ids = append(ids, id)
+			items = append(items, doc)
+		}
+	}
+
+	return newMockIterator(ids, items), nil
+}
+
+var _ database.BillingCRUD = &mockBillingCRUD{}
 
 func (c *MockLockClient) HoldLock(ctx context.Context, item *azcosmos.ItemResponse) (context.Context, database.StopHoldLock) {
 	cancelCtx, cancel := context.WithCancel(ctx)

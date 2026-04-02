@@ -1,4 +1,4 @@
-// Copyright 2025 Microsoft Corporation
+// Copyright 2026 Microsoft Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 )
 
+// BillingCRUD provides partition-scoped access to billing documents.
+type BillingCRUD interface {
+	// List returns an iterator for all billing documents in the given subscription partition.
+	List(ctx context.Context) (DBClientIterator[BillingDocument], error)
+}
+
 // BillingDocCRUD provides a CRUD interface for managing billing documents
 // within a subscription partition.
 type BillingDocCRUD interface {
@@ -46,12 +52,32 @@ type BillingDocCRUD interface {
 	PatchByClusterID(ctx context.Context, resourceID *azcorearm.ResourceID, ops BillingDocumentPatchOperations) error
 }
 
+type billingCRUD struct {
+	containerClient *azcosmos.ContainerClient
+	subscriptionID  string
+}
+
 type billingDocCRUD struct {
 	containerClient *azcosmos.ContainerClient
 	subscriptionID  string
 }
 
-var _ BillingDocCRUD = &billingDocCRUD{}
+// NewBillingCRUD creates a partition-scoped interface for querying billing documents.
+func NewBillingCRUD(containerClient *azcosmos.ContainerClient, subscriptionID string) BillingCRUD {
+	return &billingCRUD{
+		containerClient: containerClient,
+		subscriptionID:  subscriptionID,
+	}
+}
+
+func (c *billingCRUD) List(ctx context.Context) (DBClientIterator[BillingDocument], error) {
+	pk := NewPartitionKey(c.subscriptionID)
+	query := "SELECT * FROM c"
+	pager := c.containerClient.NewQueryItemsPager(query, pk, nil)
+	return newQueryBillingIterator(pager), nil
+}
+
+var _ BillingCRUD = &billingCRUD{}
 
 // NewBillingDocCRUD creates a new BillingDocCRUD instance for a subscription
 func NewBillingDocCRUD(containerClient *azcosmos.ContainerClient, subscriptionID string) BillingDocCRUD {
@@ -60,6 +86,8 @@ func NewBillingDocCRUD(containerClient *azcosmos.ContainerClient, subscriptionID
 		subscriptionID:  subscriptionID,
 	}
 }
+
+var _ BillingDocCRUD = &billingDocCRUD{}
 
 func (b *billingDocCRUD) Create(ctx context.Context, doc *BillingDocument) error {
 	if doc.ResourceID == nil {

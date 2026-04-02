@@ -60,7 +60,7 @@ func (h *BillingDumpHandler) ServeHTTP(w http.ResponseWriter, request *http.Requ
 	ctx := request.Context()
 
 	// get the azure resource ID for this HCP
-	resourceID, err := utils.ResourceIDFromContext(request.Context())
+	resourceID, err := utils.ResourceIDFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -85,7 +85,7 @@ func (h *DumpClusterAndBillingHandler) ServeHTTP(w http.ResponseWriter, request 
 	ctx := request.Context()
 
 	// get the azure resource ID for this HCP
-	resourceID, err := utils.ResourceIDFromContext(request.Context())
+	resourceID, err := utils.ResourceIDFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}

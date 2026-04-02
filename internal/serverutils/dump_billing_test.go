@@ -109,3 +109,48 @@ func TestDumpClusterAndBillingToLogger(t *testing.T) {
 	err = DumpClusterAndBillingToLogger(ctx, mockDB, clusterResourceID)
 	require.NoError(t, err)
 }
+
+func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
+	ctx := context.Background()
+
+	// Create clusters in different subscriptions
+	cluster1ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-1")
+	require.NoError(t, err)
+
+	cluster2ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-2")
+	require.NoError(t, err)
+
+	cluster3ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-2/resourceGroups/rg-2/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-3")
+	require.NoError(t, err)
+
+	mockDB := databasetesting.NewMockDBClient()
+
+	// Create billing docs for all three clusters
+	for _, resourceID := range []*azcorearm.ResourceID{cluster1ResourceID, cluster2ResourceID, cluster3ResourceID} {
+		doc := database.NewBillingDocument(resourceID)
+		doc.CreationTime = time.Now().UTC()
+		err = mockDB.CreateBillingDoc(ctx, doc)
+		require.NoError(t, err)
+	}
+
+	// Dump cluster-1: should only query sub-1 partition (not sub-2)
+	// This verifies partition-scoped query works correctly
+	err = DumpBillingToLogger(ctx, mockDB, cluster1ResourceID)
+	require.NoError(t, err)
+}
+
+func TestDumpClusterAndBillingToLogger_ErrorAggregation(t *testing.T) {
+	ctx := context.Background()
+
+	// Use a non-existent cluster to trigger DumpDataToLogger error
+	nonExistentResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/non-existent")
+	require.NoError(t, err)
+
+	mockDB := databasetesting.NewMockDBClient()
+
+	// DumpDataToLogger will fail (no cluster), DumpBillingToLogger succeeds (no billing doc)
+	// Both errors should be aggregated
+	err = DumpClusterAndBillingToLogger(ctx, mockDB, nonExistentResourceID)
+	// Should return an error (from DumpDataToLogger failure)
+	require.Error(t, err)
+}

@@ -18,30 +18,32 @@ import (
 	"context"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/listers"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/serverutils"
 	"github.com/Azure/ARO-HCP/internal/utils"
 )
 
 type billingDump struct {
-	cosmosClient database.DBClient
-}
-
-// noCooldownChecker is a simple cooldown checker that always allows syncing.
-type noCooldownChecker struct{}
-
-func (n *noCooldownChecker) CanSync(ctx context.Context, key any) bool {
-	return true
+	cooldownChecker        controllerutils.CooldownChecker
+	cosmosClient           database.DBClient
+	nextBillingDumpChecker controllerutils.CooldownChecker
 }
 
 // NewBillingDumpController periodically dumps billing documents for each cluster.
-func NewBillingDumpController(cosmosClient database.DBClient) controllerutils.ClusterSyncer {
+func NewBillingDumpController(activeOperationLister listers.ActiveOperationLister, cosmosClient database.DBClient) controllerutils.ClusterSyncer {
 	return &billingDump{
-		cosmosClient: cosmosClient,
+		cooldownChecker:        controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
+		cosmosClient:           cosmosClient,
+		nextBillingDumpChecker: controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
 	}
 }
 
 func (c *billingDump) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {
+	if !c.nextBillingDumpChecker.CanSync(ctx, key) {
+		return nil
+	}
+
 	logger := utils.LoggerFromContext(ctx)
 
 	if err := serverutils.DumpBillingToLogger(ctx, c.cosmosClient, key.GetResourceID()); err != nil {
@@ -53,5 +55,5 @@ func (c *billingDump) SyncOnce(ctx context.Context, key controllerutils.HCPClust
 }
 
 func (c *billingDump) CooldownChecker() controllerutils.CooldownChecker {
-	return &noCooldownChecker{}
+	return c.cooldownChecker
 }

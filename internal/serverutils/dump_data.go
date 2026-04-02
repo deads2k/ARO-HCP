@@ -82,21 +82,21 @@ func DumpDataToLogger(ctx context.Context, cosmosClient database.DBClient, resou
 }
 
 // DumpBillingToLogger dumps billing documents for the given cluster resource ID to the logger.
-// Uses in-memory filtering for simplicity (one billing doc per cluster, low volume).
+// Queries the subscription partition and filters in-memory for the specific cluster.
 // This includes both active and deleted billing documents for the cluster.
 // Follows best-effort semantics - errors are returned but should not fail critical operations.
 func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, resourceID *azcorearm.ResourceID) error {
 	logger := utils.LoggerFromContext(ctx)
 
-	// List all billing documents across all partitions
-	billingLister := cosmosClient.GlobalListers().BillingDocs()
-	iter, err := billingLister.List(ctx, nil)
+	// Query billing documents for this subscription (partition-scoped, not cross-partition)
+	iter, err := cosmosClient.Billing(resourceID.SubscriptionID).List(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}
 
 	// Find and dump billing documents for this cluster
 	resourceIDString := strings.ToLower(resourceID.String())
+	found := false
 	for _, doc := range iter.Items(ctx) {
 		// Check if this billing document belongs to the requested cluster
 		if doc.ResourceID != nil && strings.ToLower(doc.ResourceID.String()) == resourceIDString {
@@ -104,11 +104,16 @@ func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, re
 				"currentResourceID", doc.ResourceID.String(),
 				"content", doc,
 			)
+			found = true
 		}
 	}
 
 	if err := iter.GetError(); err != nil {
 		return utils.TrackError(err)
+	}
+
+	if !found {
+		logger.Info("no billing document found for cluster", "resourceID", resourceID.String())
 	}
 
 	return nil
