@@ -16,8 +16,10 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/serverutils"
@@ -25,22 +27,36 @@ import (
 )
 
 type billingDump struct {
-	cooldownChecker        controllerutils.CooldownChecker
-	cosmosClient           database.DBClient
-	nextBillingDumpChecker controllerutils.CooldownChecker
+	cooldownChecker controllerutils.CooldownChecker
+	cosmosClient    database.DBClient
+
+	// nextDumpChecker ensures we don't hotloop from any source.
+	nextDumpChecker controllerutils.CooldownChecker
 }
 
 // NewBillingDumpController periodically dumps billing documents for each cluster.
-func NewBillingDumpController(activeOperationLister listers.ActiveOperationLister, cosmosClient database.DBClient) controllerutils.ClusterSyncer {
-	return &billingDump{
-		cooldownChecker:        controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
-		cosmosClient:           cosmosClient,
-		nextBillingDumpChecker: controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
+func NewBillingDumpController(
+	cosmosClient database.DBClient,
+	activeOperationLister listers.ActiveOperationLister,
+	backendInformers informers.BackendInformers,
+) controllerutils.Controller {
+	syncer := &billingDump{
+		cooldownChecker: controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
+		cosmosClient:    cosmosClient,
+		nextDumpChecker: controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
 	}
+
+	return controllerutils.NewClusterWatchingController(
+		"BillingDump",
+		cosmosClient,
+		backendInformers,
+		1*time.Minute,
+		syncer,
+	)
 }
 
 func (c *billingDump) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {
-	if !c.nextBillingDumpChecker.CanSync(ctx, key) {
+	if !c.nextDumpChecker.CanSync(ctx, key) {
 		return nil
 	}
 
