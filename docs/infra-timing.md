@@ -10,7 +10,6 @@ tooling/templatize/templatize entrypoint run --config-file "config/config.yaml" 
                                  --dev-settings-file tooling/templatize/settings.yaml \
                                  --dev-environment pers \
                                  --entrypoint Microsoft.Azure.ARO.HCP.Region \
-                                 --dry-run="false" \
                                  --verbosity=3 \
                                  --timing-output=timing/steps.yaml
 $ # ...

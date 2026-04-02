@@ -107,10 +107,6 @@ resourceGroups:
     aksCluster: '{{ .mgmt.aks.name }}'
     action: Shell
     command: make -C ../mgmt-fixes deploy
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     variables:
     - name: APPLY_KUBELET_FIXES
       configRef: mgmt.applyKubeletFixes

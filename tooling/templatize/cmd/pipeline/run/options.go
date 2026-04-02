@@ -38,7 +38,6 @@ func BindOptions(opts *RawRunOptions, cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind options: %w", err)
 	}
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", opts.DryRun, "validate the pipeline without executing it")
 	cmd.Flags().BoolVar(&opts.NoPersist, "no-persist-tag", opts.NoPersist, "toggle if persist tag should not be set")
 	cmd.Flags().IntVar(&opts.DeploymentTimeoutSeconds, "deployment-timeout-seconds", pipeline.DefaultDeploymentTimeoutSeconds, "Timeout in Seconds to wait for previous deployments of the pipeline to finish")
 	return nil
@@ -46,7 +45,6 @@ func BindOptions(opts *RawRunOptions, cmd *cobra.Command) error {
 
 type RawRunOptions struct {
 	PipelineOptions          *options.RawPipelineOptions
-	DryRun                   bool
 	NoPersist                bool
 	DeploymentTimeoutSeconds int
 }
@@ -65,7 +63,6 @@ type ValidatedRunOptions struct {
 // completedRunOptions is a private wrapper that enforces a call of Complete() before config generation can be invoked.
 type completedRunOptions struct {
 	PipelineOptions          *options.PipelineOptions
-	DryRun                   bool
 	NoPersist                bool
 	DeploymentTimeoutSeconds int
 }
@@ -98,7 +95,6 @@ func (o *ValidatedRunOptions) Complete(ctx context.Context) (*RunOptions, error)
 	return &RunOptions{
 		completedRunOptions: &completedRunOptions{
 			PipelineOptions:          completed,
-			DryRun:                   o.DryRun,
 			NoPersist:                o.NoPersist,
 			DeploymentTimeoutSeconds: o.DeploymentTimeoutSeconds,
 		},
@@ -118,7 +114,6 @@ func (o *RunOptions) RunPipeline(ctx context.Context) error {
 
 	_, err = pipeline.RunPipeline(o.PipelineOptions.Service, o.PipelineOptions.Pipeline, ctx, &pipeline.PipelineRunOptions{
 		BaseRunOptions: pipeline.BaseRunOptions{
-			DryRun:                               o.DryRun,
 			Cloud:                                o.PipelineOptions.RolloutOptions.Cloud,
 			Configuration:                        o.PipelineOptions.RolloutOptions.Config,
 			NoPersist:                            o.NoPersist,

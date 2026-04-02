@@ -5,7 +5,6 @@ PROJECT_ROOT_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 
 EXTRA_ARGS=""
 PIPELINE_MODE="inspect"
-DRY_RUN=""
 LOG_LEVEL="${LOG_LEVEL:-5}"
 LOG_VERBOSITY_OPTION="-v ${LOG_LEVEL}"
 
@@ -15,7 +14,6 @@ usage() {
     echo "  deploy_env  Deployment environment"
     echo "  input       Optional input file"
     echo "  output      Optional output file"
-    echo "  -d          Dry run"
     echo "  -i          Set the input file same as second arg"
     echo "  -o          Set the output file same as third arg"
     echo "  -r          Override the region for an environment"
@@ -47,9 +45,6 @@ fi
 # Parse optional flags
 while getopts "c:dr:x:e:i:o:p:P:s:" opt; do
     case ${opt} in
-        d)
-            DRY_RUN="--dry-run"
-            ;;
         r)
             REGION=${OPTARG}
             ;;
@@ -116,8 +111,7 @@ elif [ $PIPELINE_MODE == "run" ] && [ -n "${SERVICE_GROUP+x}" ] && [ -n "${PIPEL
         --service-group="${SERVICE_GROUP}" \
         --step="${PIPELINE_STEP}" \
         ${PERSIST_FLAG} \
-        ${LOG_VERBOSITY_OPTION} \
-        ${DRY_RUN}
+        ${LOG_VERBOSITY_OPTION}
 elif [ $PIPELINE_MODE == "run" ] && [ -n "${SERVICE_GROUP+x}" ]; then
     $TEMPLATIZE pipeline run \
         --config-file="${CONFIG_FILE}" \
@@ -126,8 +120,7 @@ elif [ $PIPELINE_MODE == "run" ] && [ -n "${SERVICE_GROUP+x}" ]; then
         --topology-file="${PROJECT_ROOT_DIR}/topology.yaml" \
         --service-group="${SERVICE_GROUP}" \
         ${PERSIST_FLAG} \
-        ${LOG_VERBOSITY_OPTION} \
-        ${DRY_RUN}
+        ${LOG_VERBOSITY_OPTION}
 else
     $TEMPLATIZE inspect \
         --config-file="${CONFIG_FILE}" \

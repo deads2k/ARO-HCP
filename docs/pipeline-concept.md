@@ -116,25 +116,6 @@ Currently, the following list of tools can be used within shell scripts:
 
 See the [Shell extension](https://ev2docs.azure.net/features/service-artifacts/actions/shell-extensions/overview.html) documentation for more details.
 
-Shell steps also support dry-run testing, but such scripts need to explicitely implement it and mark support for it with the `dryRun` property.
-
-```yaml
-  ...
-  steps:
-  - ...
-    action: Shell
-    ...
-    dryRun:                                          (1)
-      variables:
-      - name: DRY_RUN                                (2)
-        value: "true"
-```
-
-1. `dryRun`: Marks the step as supporting dry-run testing.
-2. `variables`: A list of environment variables that are set before executing the script.
-
-It is the scripts responsibility to react to the `DRY_RUN` environment variable correctly and not perform any real update actions on the target subscription/resourcegroup/AKS cluster.
-
 >[!WARNING]
 > TODO: we need to align and document the tool versions between the EV2 execution context and the Red Hat pipeline runner.
 

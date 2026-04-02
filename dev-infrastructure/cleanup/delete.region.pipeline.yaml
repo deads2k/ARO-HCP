@@ -46,10 +46,6 @@ resourceGroups:
   - name: delete-region
     action: Shell
     command: ./delete.sh
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     variables:
     - name: RESOURCE_GROUP
       configRef: regionRG

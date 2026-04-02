@@ -5,7 +5,7 @@ This chapter outlines
 - the proposed structure for a service directory
 - how to use Helm charts and pipelines together
 - how to inject configuration into Helm charts
-- how to test Helm charts with pipeline dry-runs
+- how to test Helm charts
 
 ## Service artifacts
 

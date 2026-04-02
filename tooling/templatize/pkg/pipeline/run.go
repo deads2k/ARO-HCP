@@ -74,7 +74,6 @@ type PipelineRunOptions struct {
 }
 
 type BaseRunOptions struct {
-	DryRun                   bool
 	Cloud                    string
 	Configuration            configtypes.Configuration
 	NoPersist                bool
@@ -739,9 +738,6 @@ func shouldRetryError(logger logr.Logger, step types.Step, err error) bool {
 
 func RunStep(id graph.Identifier, s types.Step, ctx context.Context, executionTarget ExecutionTarget, options *StepRunOptions, state *ExecutionState) (Output, DetailsProducer, error) {
 	logger := logr.FromContextOrDiscard(ctx)
-	if options.DryRun {
-		logger.Info("This is a dry run!")
-	}
 	logger.Info("Running step.", "description", s.Description())
 
 	switch step := s.(type) {

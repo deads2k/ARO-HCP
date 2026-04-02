@@ -38,18 +38,6 @@ func modeFromString(mode string) armresources.DeploymentMode {
 	}
 }
 
-func transformBicepToARMWhatIfDeployment(ctx context.Context, bicepClient *bicep.LSPClient, bicepParameterTemplateFile, deploymentMode, pipelineWorkingDir string, cfg types.Configuration, inputs map[string]any) (*armresources.DeploymentWhatIfProperties, error) {
-	template, params, err := transformParameters(ctx, bicepClient, cfg, inputs, bicepParameterTemplateFile, pipelineWorkingDir)
-	if err != nil {
-		return nil, err
-	}
-	return &armresources.DeploymentWhatIfProperties{
-		Mode:       to.Ptr(modeFromString(deploymentMode)),
-		Template:   template,
-		Parameters: params,
-	}, nil
-}
-
 func transformBicepToARMDeployment(ctx context.Context, bicepClient *bicep.LSPClient, bicepParameterTemplateFile, deploymentMode, pipelineWorkingDir string, cfg types.Configuration, inputs map[string]any) (*armresources.DeploymentProperties, error) {
 	template, params, err := transformParameters(ctx, bicepClient, cfg, inputs, bicepParameterTemplateFile, pipelineWorkingDir)
 	if err != nil {

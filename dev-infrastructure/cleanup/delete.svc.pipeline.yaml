@@ -35,10 +35,6 @@ resourceGroups:
   - name: delete-svc
     action: Shell
     command: ./delete.sh
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     variables:
     - name: RESOURCE_GROUP
       configRef: svc.rg

@@ -39,10 +39,6 @@ resourceGroups:
   - name: delete-kusto-instance
     action: Shell
     command: ./delete.kusto.instance.sh
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     variables:
     - name: RESOURCE_GROUP
       configRef: kusto.rg

@@ -15,20 +15,6 @@ resourceGroups:
     variables:
     - name: MAESTRO_IMAGE
       configRef: maestro_image
-  - name: dry-run
-    aksCluster: '{{ .aksName }}'
-    action: Shell
-    command: make deploy
-    shellIdentity:
-      configRef: globalMSIId
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "A very dry one"
-      - name: FROM_EV2_REGION
-        value: '{{ .availabilityZoneCount }}'
-      - name: FROM_EV2_CORE
-        value: '{{ .vaultDomainSuffix }}'
   {{- if .enableOptionalStep }}
   - name: optionalStep
     action: Shell

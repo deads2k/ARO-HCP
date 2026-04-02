@@ -11,14 +11,6 @@ resourceGroups:
           variables:
             - name: MAESTRO_IMAGE
               configRef: maestro_image
-        - name: dry-run
-          aksCluster: aro-hcp-aks
-          action: Shell
-          command: make deploy
-          dryRun:
-            variables:
-                - name: DRY_RUN
-                  value: A very dry one
         - name: svc
           action: ARM
           template: templates/svc-cluster.bicep
