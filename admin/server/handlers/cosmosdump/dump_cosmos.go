@@ -35,7 +35,7 @@ func (h *CosmosDumpHandler) ServeHTTP(w http.ResponseWriter, request *http.Reque
 	ctx := request.Context()
 
 	// get the azure resource ID for this HCP
-	resourceID, err := utils.ResourceIDFromContext(request.Context())
+	resourceID, err := utils.ResourceIDFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}
