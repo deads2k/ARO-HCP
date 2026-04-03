@@ -48,6 +48,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
@@ -1028,7 +1029,7 @@ func (f *Frontend) OperationResult(writer http.ResponseWriter, request *http.Req
 			return utils.TrackError(err)
 		}
 
-	case operation.InternalID.Kind() == arohcpv1alpha1.ClusterKind:
+	case apihelpers.ResourceTypeEqual(operation.ExternalID.ResourceType, api.ClusterResourceType):
 		resultingInternalCluster, err := f.getInternalClusterFromStorage(ctx, operation.ExternalID)
 		if err != nil {
 			return utils.TrackError(err)

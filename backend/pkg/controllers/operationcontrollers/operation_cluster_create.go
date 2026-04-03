@@ -76,6 +76,12 @@ func (c *operationClusterCreate) SynchronizeOperation(ctx context.Context, key c
 		return nil // no work to do
 	}
 
+	if len(operation.InternalID.String()) == 0 {
+		// we cannot proceed: yet.
+		// TODO when we update to make clusterserice creation async, we need https://github.com/Azure/ARO-HCP/pull/4695 or similar
+		// and we need to wire up a fail-safe where if we have no ID and we time out, we report the best failure we can.
+		return nil
+	}
 	clusterStatus, err := c.clusterServiceClient.GetClusterStatus(ctx, operation.InternalID)
 	if err != nil {
 		return utils.TrackError(err)
