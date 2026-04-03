@@ -16,10 +16,9 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"os"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,11 +29,9 @@ import (
 	"helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/kube"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -126,9 +123,6 @@ var _ = Describe("Customer", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("disabling kube-proxy via networks.operator.openshift.io patch")
-			kubeClient, err := kubernetes.NewForConfig(adminRESTConfig)
-			Expect(err).NotTo(HaveOccurred())
-
 			opClient, err := operatorclient.NewForConfig(adminRESTConfig)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -174,7 +168,7 @@ var _ = Describe("Customer", func() {
 				},
 			}
 
-			_, err = framework.CreateNodePoolAndWait20251223(
+			_, nodePoolErr := framework.CreateNodePoolAndWait20251223(
 				ctx,
 				tc.Get20251223ClientFactoryOrDie(ctx).NewNodePoolsClient(),
 				*resourceGroup.Name,
@@ -183,85 +177,16 @@ var _ = Describe("Customer", func() {
 				nodePool,
 				45*time.Minute,
 			)
-			Expect(err).NotTo(HaveOccurred())
+			// We delay checking the error on purpose to get more details
+			// about the issue by running the verifiers.
 
 			By("verifying nodes become Ready with Cilium CNI")
-			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady())
+			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady(), verifiers.VerifyCiliumOperational("kube-system", "k8s-app=cilium"))
+			Expect(errors.Join(err, nodePoolErr)).NotTo(HaveOccurred())
+
+			By("verifying a simple web app can run with cilium")
+			err = verifiers.VerifySimpleWebApp().Verify(ctx, adminRESTConfig)
 			Expect(err).NotTo(HaveOccurred())
-
-			By("waiting for Cilium pods to be running")
-			Eventually(func() error {
-				pods, err := kubeClient.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
-					LabelSelector: "k8s-app=cilium",
-				})
-				if err != nil {
-					return fmt.Errorf("failed to list cilium pods: %w", err)
-				}
-				if len(pods.Items) == 0 {
-					return fmt.Errorf("no cilium pods found")
-				}
-				for _, pod := range pods.Items {
-					if pod.Status.Phase != "Running" {
-						return fmt.Errorf("cilium pod %s is in phase %s", pod.Name, pod.Status.Phase)
-					}
-				}
-				return nil
-			}, 10*time.Minute, 30*time.Second).Should(Succeed(), "cilium pods should be running")
-
-			By("creating a test pod that logs a known message")
-			const (
-				testNamespace = "default"
-				testPodName   = "cilium-log-test"
-				testMessage   = "cilium-e2e-smoke-test-ok"
-			)
-			testPod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testPodName,
-					Namespace: testNamespace,
-				},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					Containers: []corev1.Container{
-						{
-							Name:    "logger",
-							Image:   "registry.access.redhat.com/ubi9-micro:latest",
-							Command: []string{"sh", "-c", fmt.Sprintf("echo '%s' && sleep 300", testMessage)},
-						},
-					},
-				},
-			}
-			_, err = kubeClient.CoreV1().Pods(testNamespace).Create(ctx, testPod, metav1.CreateOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("waiting for the test pod to be running and verifying its logs")
-			Eventually(func() error {
-				pod, err := kubeClient.CoreV1().Pods(testNamespace).Get(ctx, testPodName, metav1.GetOptions{})
-				if err != nil {
-					return fmt.Errorf("failed to get test pod: %w", err)
-				}
-				if pod.Status.Phase != corev1.PodRunning {
-					return fmt.Errorf("test pod is in phase %s, waiting for Running", pod.Status.Phase)
-				}
-
-				logStream, err := kubeClient.CoreV1().Pods(testNamespace).GetLogs(testPodName, &corev1.PodLogOptions{}).Stream(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to get pod logs: %w", err)
-				}
-				defer logStream.Close()
-
-				logBytes, err := io.ReadAll(logStream)
-				if err != nil {
-					return fmt.Errorf("failed to read pod logs: %w", err)
-				}
-
-				if !strings.Contains(string(logBytes), testMessage) {
-					return fmt.Errorf("expected log message %q not found in pod logs: %s", testMessage, string(logBytes))
-				}
-				return nil
-			}, 5*time.Minute, 15*time.Second).Should(Succeed(), "test pod should be running and log the expected message")
-
-			GinkgoLogr.Info("Cluster with Cilium CNI and private etcd created and verified successfully",
-				"clusterName", customerClusterName)
 		},
 	)
 })

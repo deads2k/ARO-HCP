@@ -51,7 +51,7 @@ func (v verifyCiliumOperational) Verify(ctx context.Context, adminRESTConfig *re
 		return fmt.Errorf("failed to get cilium namespace: %w", err)
 	}
 
-	// Wait for all pods in cilium namespace to be running
+	// Wait for all cilium pods to be running
 	var lastErr error
 	err = wait.PollUntilContextTimeout(ctx, 30*time.Second, 10*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 		listOptions := metav1.ListOptions{}
@@ -66,8 +66,8 @@ func (v verifyCiliumOperational) Verify(ctx context.Context, adminRESTConfig *re
 		}
 
 		if len(pods.Items) == 0 {
-			lastErr = fmt.Errorf("no pods found in %s namespace", v.ciliumNamespace)
-			logger.Info("no pods found yet in namespace", "namespace", v.ciliumNamespace)
+			lastErr = fmt.Errorf("no cilium pods found in %s namespace", v.ciliumNamespace)
+			logger.Info("no cilium pods found yet in namespace", "namespace", v.ciliumNamespace)
 			return false, nil
 		}
 
@@ -79,8 +79,8 @@ func (v verifyCiliumOperational) Verify(ctx context.Context, adminRESTConfig *re
 		}
 
 		if len(notRunningPods) > 0 {
-			lastErr = fmt.Errorf("pods not yet running: %v", notRunningPods)
-			logger.Info("waiting for pods to be running", "notRunning", notRunningPods)
+			lastErr = fmt.Errorf("cilium pods not yet running: %v", notRunningPods)
+			logger.Info("waiting for cilium pods to be running", "notRunning", notRunningPods)
 			return false, nil
 		}
 
