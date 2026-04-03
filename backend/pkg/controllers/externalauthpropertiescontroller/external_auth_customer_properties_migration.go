@@ -17,7 +17,6 @@ package externalauthpropertiescontroller
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -93,7 +92,7 @@ func (c *externalAuthCustomerPropertiesMigrationController) SyncOnce(ctx context
 
 	// do the super cheap cache check first
 	cachedExternalAuth, err := c.externalAuthLister.Get(ctx, key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName, key.HCPExternalAuthName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// we'll be re-fired if it is created again
 		return nil
 	}
@@ -109,7 +108,7 @@ func (c *externalAuthCustomerPropertiesMigrationController) SyncOnce(ctx context
 	// Get the externalAuth from Cosmos
 	externalAuthCRUD := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).ExternalAuth(key.HCPClusterName)
 	existingExternalAuth, err := externalAuthCRUD.Get(ctx, key.HCPExternalAuthName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // externalAuth doesn't exist, no work to do
 	}
 	if err != nil {

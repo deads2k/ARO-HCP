@@ -184,7 +184,7 @@ func (m *mockResourceCRUD[InternalAPIType, CosmosAPIType]) Get(ctx context.Conte
 	if newCosmosIDErr == nil {
 		return ret, nil
 	}
-	if !database.IsResponseError(newCosmosIDErr, http.StatusNotFound) {
+	if !database.IsNotFoundError(newCosmosIDErr) {
 		return nil, newCosmosIDErr
 	}
 
@@ -843,7 +843,7 @@ func (m *mockUntypedCRUD) listInternal(ctx context.Context, opts *database.DBCli
 
 func (m *mockUntypedCRUD) Delete(ctx context.Context, resourceID *azcorearm.ResourceID) error {
 	curr, err := m.Get(ctx, resourceID)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// Match real implementation: return success if resource doesn't exist
 		return nil
 	}

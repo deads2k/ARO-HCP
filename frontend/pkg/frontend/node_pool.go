@@ -171,7 +171,7 @@ func (f *Frontend) CreateOrUpdateNodePool(writer http.ResponseWriter, request *h
 
 	nodePoolCosmosClient := f.dbClient.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(resourceID.Parent.Name)
 	oldInternalNodePool, err := nodePoolCosmosClient.Get(ctx, resourceID.Name)
-	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+	if err != nil && !database.IsNotFoundError(err) {
 		return utils.TrackError(err)
 	}
 
@@ -678,7 +678,7 @@ func (f *Frontend) DeleteNodePool(writer http.ResponseWriter, request *http.Requ
 	}
 
 	nodePool, err := f.dbClient.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(resourceID.Parent.Name).Get(ctx, resourceID.Name)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// For resource not found errors on deletion, ARM requires
 		writer.WriteHeader(http.StatusNoContent)
 		return nil
@@ -793,7 +793,7 @@ func mergeToInternalNodePool(clusterServiceNode *arohcpv1alpha1.NodePool, intern
 
 func (f *Frontend) getInternalNodePoolFromStorage(ctx context.Context, resourceID *azcorearm.ResourceID) (*api.HCPOpenShiftClusterNodePool, error) {
 	internalNodePool, err := f.dbClient.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(resourceID.Parent.Name).Get(ctx, resourceID.Name)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil, arm.NewResourceNotFoundError(resourceID)
 	}
 	if err != nil {

@@ -17,7 +17,6 @@ package mismatchcontrollers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -94,7 +93,7 @@ func (c *cosmosNodePoolMatching) synchronizeAllNodes(ctx context.Context, keyObj
 	logger := utils.LoggerFromContext(ctx)
 
 	cluster, err := c.cosmosClient.HCPClusters(keyObj.SubscriptionID, keyObj.ResourceGroupName).Get(ctx, keyObj.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // no work to do
 	}
 	if err != nil {

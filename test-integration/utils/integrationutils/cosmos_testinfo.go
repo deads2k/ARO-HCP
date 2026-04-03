@@ -412,7 +412,7 @@ func initializeCosmosDBForFrontend(ctx context.Context, cosmosClient *azcosmos.C
 	// Create the database if it doesn't exist
 	databaseProperties := azcosmos.DatabaseProperties{ID: integrationTestCosmosDatabaseName}
 	_, err := cosmosClient.CreateDatabase(ctx, databaseProperties, nil)
-	if err != nil && !database.IsResponseError(err, http.StatusConflict) {
+	if err != nil && !database.IsConflictError(err) {
 		return nil, fmt.Errorf("failed to create database: %w", err)
 	}
 
@@ -447,7 +447,7 @@ func initializeCosmosDBForFrontend(ctx context.Context, cosmosClient *azcosmos.C
 
 		logger.Info("Creating container", "containerName", container.name)
 		_, err = cosmosDatabaseClient.CreateContainer(ctx, containerProperties, nil)
-		if err != nil && database.IsResponseError(err, http.StatusConflict) {
+		if err != nil && database.IsConflictError(err) {
 			logger.Info("Container already exists", "containerName", container.name)
 		} else if err != nil {
 			return nil, utils.TrackError(err)

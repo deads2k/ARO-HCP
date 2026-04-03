@@ -66,7 +66,7 @@ func (c *operationClusterUpdate) SynchronizeOperation(ctx context.Context, key c
 	logger.Info("checking operation")
 
 	operation, err := c.cosmosClient.Operations(key.SubscriptionID).Get(ctx, key.OperationName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // no work to do
 	}
 	if err != nil {

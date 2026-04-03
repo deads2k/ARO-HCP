@@ -17,7 +17,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
@@ -61,7 +60,7 @@ func GetOrCreateServiceProviderCluster(
 		return existingServiceProviderCluster, nil
 	}
 
-	if !IsResponseError(err, http.StatusNotFound) {
+	if !IsNotFoundError(err) {
 		return nil, utils.TrackError(fmt.Errorf("failed to get ServiceProviderCluster: %w", err))
 	}
 
@@ -75,7 +74,7 @@ func GetOrCreateServiceProviderCluster(
 	// to get again one last time.
 	// According to the Cosmos DB API documentation, a HTTP 409 Conflict error
 	// is returned when the item already exists: https://learn.microsoft.com/en-us/rest/api/cosmos-db/create-a-document#status-codes
-	if !IsResponseError(err, http.StatusConflict) {
+	if !IsConflictError(err) {
 		return nil, utils.TrackError(fmt.Errorf("failed to create ServiceProviderCluster: %w", err))
 	}
 

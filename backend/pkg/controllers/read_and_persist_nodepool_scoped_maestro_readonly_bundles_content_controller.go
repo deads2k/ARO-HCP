@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -84,7 +83,7 @@ func NewReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentController(
 
 func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPNodePoolKey) error {
 	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).Get(ctx, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // nodepool doesn't exist, no work to do
 	}
 	if err != nil {

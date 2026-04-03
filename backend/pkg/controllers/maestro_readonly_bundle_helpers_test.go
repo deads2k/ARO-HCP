@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -572,7 +571,7 @@ func TestMaestroReadonlyBundleHelpers_readAndPersistMaestroReadonlyBundleContent
 		err := readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mockDB.mccCRUD)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to replace ManagementClusterContent")
-		assert.True(t, database.IsResponseError(err, http.StatusPreconditionFailed), "expected 412 Precondition Failed")
+		assert.True(t, database.IsPreconditionFailedError(err), "expected 412 Precondition Failed")
 	})
 
 	t.Run("error occurs when managementClusterContentsDBClient.Get fails", func(t *testing.T) {

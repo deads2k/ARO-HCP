@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -65,7 +64,7 @@ func (c *doNothingExample) synchronizeHCPCluster(ctx context.Context, key contro
 	logger := utils.LoggerFromContext(ctx)
 
 	cosmosHCPCluster, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Get(ctx, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // no work to do
 	}
 	if err != nil {
@@ -76,7 +75,7 @@ func (c *doNothingExample) synchronizeHCPCluster(ctx context.Context, key contro
 	// but this is slightly less desireable and you should always force a recheck of the actual state of the world after
 	// a certain staleness.
 	existingController, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Controllers(key.HCPClusterName).Get(ctx, c.name)
-	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+	if err != nil && !database.IsNotFoundError(err) {
 		return fmt.Errorf("failed to get existing controller state: %w", err)
 	}
 

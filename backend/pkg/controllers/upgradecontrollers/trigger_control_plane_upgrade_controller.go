@@ -17,7 +17,6 @@ package upgradecontrollers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -85,7 +84,7 @@ func (c *triggerControlPlaneUpgradeSyncer) CooldownChecker() controllerutils.Coo
 //  4. The version service API is idempotent and handles the actual upgrade orchestration
 func (c *triggerControlPlaneUpgradeSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {
 	existingCluster, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Get(ctx, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // cluster doesn't exist, no work to do
 	}
 	if err != nil {

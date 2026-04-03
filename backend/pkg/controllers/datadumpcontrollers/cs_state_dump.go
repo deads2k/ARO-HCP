@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -74,7 +73,7 @@ func (c *csStateDump) SyncOnce(ctx context.Context, key controllerutils.HCPClust
 
 	// Get the cluster from cosmos to retrieve the ClusterServiceID
 	cluster, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Get(ctx, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// Cluster doesn't exist in cosmos, nothing to dump
 		return nil
 	}

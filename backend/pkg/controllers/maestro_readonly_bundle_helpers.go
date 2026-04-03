@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	workv1 "open-cluster-management.io/api/work/v1"
 
@@ -276,10 +275,10 @@ func readAndPersistMaestroReadonlyBundleContent(
 	}
 
 	existing, err := managementClusterContentsDBClient.Get(ctx, desired.CosmosMetadata.ResourceID.Name)
-	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+	if err != nil && !database.IsNotFoundError(err) {
 		return utils.TrackError(fmt.Errorf("failed to get ManagementClusterContent: %w", err))
 	}
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		_, err := managementClusterContentsDBClient.Create(ctx, desired, nil)
 		if err != nil {
 			return utils.TrackError(fmt.Errorf("failed to create ManagementClusterContent: %w", err))

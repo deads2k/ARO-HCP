@@ -17,7 +17,6 @@ package controllerutils
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"runtime/debug"
 	"slices"
 
@@ -243,7 +242,7 @@ func WriteController(ctx context.Context, controllerCRUD database.ResourceCRUD[a
 	logger := utils.LoggerFromContext(ctx)
 
 	existingController, err := controllerCRUD.Get(ctx, controllerName)
-	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+	if err != nil && !database.IsNotFoundError(err) {
 		return fmt.Errorf("failed to get existing controller state: %w", err)
 	}
 

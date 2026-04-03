@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"net/http"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -40,12 +41,31 @@ const (
 // to yield a single item unexpectedly yields multiple items.
 var ErrAmbiguousResult = errors.New("ambiguous result")
 
-func IsResponseError(err error, statusCode int) bool {
+func isResponseError(err error, statusCode int) bool {
 	if err == nil {
 		return false
 	}
 	var responseError *azcore.ResponseError
 	return errors.As(err, &responseError) && responseError.StatusCode == statusCode
+}
+
+// IsNotFoundError returns true if err represents an HTTP 404 Not Found response.
+func IsNotFoundError(err error) bool {
+	return isResponseError(err, http.StatusNotFound)
+}
+
+// IsConflictError returns true if err represents an HTTP 409 Conflict response.
+func IsConflictError(err error) bool {
+	return isResponseError(err, http.StatusConflict)
+}
+
+// IsPreconditionFailedError returns true if err represents an HTTP 412 Precondition Failed response.
+func IsPreconditionFailedError(err error) bool {
+	return isResponseError(err, http.StatusPreconditionFailed)
+}
+
+func IsBadRequestError(err error) bool {
+	return isResponseError(err, http.StatusBadRequest)
 }
 
 // NewPartitionKey creates a partition key from an Azure subscription ID.

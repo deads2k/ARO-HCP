@@ -17,7 +17,6 @@ package nodepoolpropertiescontroller
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -83,7 +82,7 @@ func (c *nodePoolPropertiesSyncer) SyncOnce(ctx context.Context, key controlleru
 	logger := utils.LoggerFromContext(ctx)
 
 	cachedNodePool, err := c.nodePoolLister.Get(ctx, key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -100,7 +99,7 @@ func (c *nodePoolPropertiesSyncer) SyncOnce(ctx context.Context, key controlleru
 
 	nodePoolCRUD := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName)
 	existingNodePool, err := nodePoolCRUD.Get(ctx, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {

@@ -17,7 +17,6 @@ package upgradecontrollers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -81,7 +80,7 @@ func (c *triggerNodePoolUpgradeSyncer) CooldownChecker() controllerutils.Cooldow
 func (c *triggerNodePoolUpgradeSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPNodePoolKey) error {
 	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).
 		NodePools(key.HCPClusterName).Get(ctx, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // node pool doesn't exist, no work to do
 	}
 	if err != nil {

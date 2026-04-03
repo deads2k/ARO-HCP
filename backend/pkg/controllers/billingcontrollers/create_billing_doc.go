@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	utilsclock "k8s.io/utils/clock"
@@ -78,7 +77,7 @@ func (c *createBillingDoc) SyncOnce(ctx context.Context, keyObj controllerutils.
 	logger := keyObj.AddLoggerValues(utils.LoggerFromContext(ctx))
 
 	cachedCluster, err := c.clusterLister.Get(ctx, keyObj.SubscriptionID, keyObj.ResourceGroupName, keyObj.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -92,7 +91,7 @@ func (c *createBillingDoc) SyncOnce(ctx context.Context, keyObj controllerutils.
 
 	clusterCRUD := c.cosmosClient.HCPClusters(keyObj.SubscriptionID, keyObj.ResourceGroupName)
 	existingCluster, err := clusterCRUD.Get(ctx, keyObj.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -112,14 +111,14 @@ func (c *createBillingDoc) SyncOnce(ctx context.Context, keyObj controllerutils.
 
 	// Try cache first
 	doc, err := c.billingLister.GetByID(ctx, clusterUID)
-	if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+	if err != nil && !database.IsNotFoundError(err) {
 		return utils.TrackError(fmt.Errorf("failed to get billing document from cache: %w", err))
 	}
 
 	// If not in cache, check database
 	if doc == nil {
 		doc, err = billingDocCRUD.GetByID(ctx, clusterUID)
-		if err != nil && !database.IsResponseError(err, http.StatusNotFound) {
+		if err != nil && !database.IsNotFoundError(err) {
 			return utils.TrackError(fmt.Errorf("failed to get billing document from database: %w", err))
 		}
 	}

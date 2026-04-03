@@ -156,7 +156,7 @@ func (c *LockClient) TryAcquireLock(ctx context.Context, id string) (*azcosmos.I
 		EnableContentResponseOnWrite: true,
 	}
 	response, err := c.containerClient.CreateItem(ctx, pk, data, options)
-	if IsResponseError(err, http.StatusConflict) {
+	if IsConflictError(err) {
 		return nil, nil // lock already acquired by someone else
 	} else if err != nil {
 		return nil, err
@@ -236,7 +236,7 @@ func (c *LockClient) RenewLock(ctx context.Context, item *azcosmos.ItemResponse)
 		IfMatchEtag:                  &item.ETag,
 	}
 	response, err := c.containerClient.UpsertItem(ctx, pk, item.Value, options)
-	if IsResponseError(err, http.StatusPreconditionFailed) {
+	if IsPreconditionFailedError(err) {
 		return nil, nil // lock already acquired by someone else
 	} else if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (c *LockClient) ReleaseLock(ctx context.Context, item *azcosmos.ItemRespons
 		IfMatchEtag: &item.ETag,
 	}
 	_, err = c.containerClient.DeleteItem(ctx, pk, doc.ID, options)
-	if IsResponseError(err, http.StatusPreconditionFailed) {
+	if IsPreconditionFailedError(err) {
 		return nil // lock already acquired by someone else
 	}
 

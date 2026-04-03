@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -88,7 +87,7 @@ func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, re
 
 	clusterCRUD := cosmosClient.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName)
 	existingCluster, err := clusterCRUD.Get(ctx, resourceID.Name)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -101,7 +100,7 @@ func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, re
 	}
 
 	billingDoc, err := cosmosClient.BillingDocs(resourceID.SubscriptionID).GetByID(ctx, clusterUID)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {

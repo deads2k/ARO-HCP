@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"slices"
 	"time"
 
@@ -78,7 +77,7 @@ func (c *controlPlaneActiveVersionSyncer) CooldownChecker() controllerutils.Cool
 // includes Version and State (Completed or Partial) and is persisted on replace.
 func (c *controlPlaneActiveVersionSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {
 	_, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Get(ctx, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -87,7 +86,7 @@ func (c *controlPlaneActiveVersionSyncer) SyncOnce(ctx context.Context, key cont
 
 	managementClusterContentClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).ManagementClusterContents(key.HCPClusterName)
 	managementClusterContent, err := managementClusterContentClient.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {

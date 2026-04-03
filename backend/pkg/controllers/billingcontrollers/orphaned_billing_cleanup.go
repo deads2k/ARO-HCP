@@ -17,7 +17,6 @@ package billingcontrollers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -90,7 +89,7 @@ func (c *orphanedBillingCleanup) synchronizeAllBillingDocs(ctx context.Context) 
 
 		clusterExists := true
 		_, err := c.clusterLister.Get(ctx, resourceID.SubscriptionID, resourceID.ResourceGroupName, resourceID.Name)
-		if database.IsResponseError(err, http.StatusNotFound) {
+		if database.IsNotFoundError(err) {
 			clusterExists = false
 		} else if err != nil {
 			return utils.TrackError(fmt.Errorf("failed to get cluster from cache: %w", err))

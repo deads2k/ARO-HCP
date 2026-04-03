@@ -16,7 +16,6 @@ package databasemutationhelpers
 
 import (
 	"context"
-	"net/http"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
@@ -46,7 +45,7 @@ func (c operationAccessor) CompleteOperation(ctx context.Context, resourceIDStri
 	}
 
 	if err := integrationutils.MarkOperationsCompleteForName(ctx, c.dbClient, resourceID.SubscriptionID, resourceID.Name); err != nil {
-		if database.IsResponseError(err, http.StatusPreconditionFailed) {
+		if database.IsPreconditionFailedError(err) {
 			// to handle the migration case, we need to retry like a controller will.  We only retry once though.
 			err = integrationutils.MarkOperationsCompleteForName(ctx, c.dbClient, resourceID.SubscriptionID, resourceID.Name)
 		}
