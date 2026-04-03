@@ -449,7 +449,7 @@ func (in *HCPOpenShiftCluster) DeepCopyInto(out *HCPOpenShiftCluster) {
 	*out = *in
 	in.TrackedResource.DeepCopyInto(&out.TrackedResource)
 	in.CustomerProperties.DeepCopyInto(&out.CustomerProperties)
-	out.ServiceProviderProperties = in.ServiceProviderProperties
+	in.ServiceProviderProperties.DeepCopyInto(&out.ServiceProviderProperties)
 	if in.Identity != nil {
 		in, out := &in.Identity, &out.Identity
 		*out = new(arm.ManagedServiceIdentity)

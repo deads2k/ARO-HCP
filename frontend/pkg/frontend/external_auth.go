@@ -86,6 +86,9 @@ func (f *Frontend) ArmResourceListExternalAuths(writer http.ResponseWriter, requ
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if internalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", internalCluster.ID))
+	}
 
 	pagedResponse := arm.NewPagedResponse()
 
@@ -285,6 +288,10 @@ func (f *Frontend) createExternalAuth(writer http.ResponseWriter, request *http.
 	if err := checkForProvisioningStateConflict(ctx, f.dbClient, database.OperationRequestCreate, newInternalExternalAuth.ID, newInternalExternalAuth.Properties.ProvisioningState); err != nil {
 		return utils.TrackError(err)
 	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
+	}
+
 	csExternalAuthBuilder, err := ocm.BuildCSExternalAuth(ctx, newInternalExternalAuth, false)
 	if err != nil {
 		return utils.TrackError(err)

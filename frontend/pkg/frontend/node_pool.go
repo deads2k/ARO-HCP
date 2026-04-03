@@ -89,6 +89,9 @@ func (f *Frontend) ArmResourceListNodePools(writer http.ResponseWriter, request 
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if internalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", internalCluster.ID))
+	}
 
 	pagedResponse := arm.NewPagedResponse()
 
@@ -283,6 +286,9 @@ func (f *Frontend) createNodePool(writer http.ResponseWriter, request *http.Requ
 	cluster, err := f.getInternalClusterFromStorage(ctx, resourceID.Parent)
 	if err != nil {
 		return utils.TrackError(err)
+	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
 	}
 
 	validationOp := operation.Operation{

@@ -83,12 +83,11 @@ func (c *csStateDump) SyncOnce(ctx context.Context, key controllerutils.HCPClust
 		return nil // best effort, don't fail
 	}
 
-	csIDPtr := cluster.ServiceProviderProperties.ClusterServiceID
-	if csIDPtr == nil || len(csIDPtr.String()) == 0 {
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil || len(cluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
 		// No ClusterServiceID yet, cluster hasn't been registered with CS
 		return nil
 	}
-	csID := *csIDPtr
+	csID := *cluster.ServiceProviderProperties.ClusterServiceID
 
 	// Fetch cluster state from cluster-service
 	csCluster, err := c.csClient.GetCluster(ctx, csID)

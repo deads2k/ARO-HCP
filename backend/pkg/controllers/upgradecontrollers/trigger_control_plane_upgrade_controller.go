@@ -91,6 +91,10 @@ func (c *triggerControlPlaneUpgradeSyncer) SyncOnce(ctx context.Context, key con
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
 	}
+	if existingCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// if we have no clusterService cluster, we have nothing to trigger.
+		return nil
+	}
 
 	existingServiceProviderCluster, err := database.GetOrCreateServiceProviderCluster(ctx, c.cosmosClient, key.GetResourceID())
 	if err != nil {

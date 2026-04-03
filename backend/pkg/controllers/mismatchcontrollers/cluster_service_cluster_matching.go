@@ -80,6 +80,7 @@ func (c *clusterServiceClusterMatching) getAllCosmosObjs(ctx context.Context) (m
 
 		for _, cluster := range allHCPClusters.Items(ctx) {
 			ret = append(ret, cluster)
+			// we skip items without a clusterServiceID because they make be about to get them and shouldn't be deleted.
 			if cluster.ServiceProviderProperties.ClusterServiceID == nil {
 				continue
 			}

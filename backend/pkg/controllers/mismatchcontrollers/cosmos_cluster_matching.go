@@ -59,6 +59,10 @@ func (c *cosmosClusterMatching) synchronizeClusters(ctx context.Context, keyObj 
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if cosmosCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// no work to do because clusters start without clusterServiceIDs and that means we haven't got an orphan
+		return nil
+	}
 
 	_, err = c.clusterServiceClient.GetCluster(ctx, *cosmosCluster.ServiceProviderProperties.ClusterServiceID)
 	var ocmGetClusterError *ocmerrors.Error

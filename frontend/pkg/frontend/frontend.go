@@ -349,11 +349,13 @@ func (f *Frontend) ArmResourceActionRequestAdminCredential(writer http.ResponseW
 	if err != nil {
 		return utils.TrackError(err)
 	}
-
 	// CheckForProvisioningStateConflict does not log conflict errors
 	// but does log unexpected errors like database failures.
 	if err := checkForProvisioningStateConflict(ctx, f.dbClient, operationRequest, cluster.ID, cluster.ServiceProviderProperties.ProvisioningState); err != nil {
 		return utils.TrackError(err)
+	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
 	}
 
 	// New credential cannot be requested while credentials are being revoked.
@@ -420,11 +422,13 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	if err != nil {
 		return utils.TrackError(err)
 	}
-
 	// CheckForProvisioningStateConflict does not log conflict errors
 	// but does log unexpected errors like database failures.
 	if err := checkForProvisioningStateConflict(ctx, f.dbClient, operationRequest, cluster.ID, cluster.ServiceProviderProperties.ProvisioningState); err != nil {
 		return utils.TrackError(err)
+	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
 	}
 
 	subscription, err := f.dbClient.Subscriptions().Get(ctx, clusterResourceID.SubscriptionID)

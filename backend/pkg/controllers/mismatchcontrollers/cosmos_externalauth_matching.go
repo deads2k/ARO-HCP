@@ -100,6 +100,10 @@ func (c *cosmosExternalAuthMatching) synchronizeAllExternalAuths(ctx context.Con
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// no work to do because clusters start without clusterServiceIDs and that means we haven't got any child resources, so they haven't got an orphan.
+		return nil
+	}
 
 	clusterServiceIDToCosmosExternalAuths, allCosmosExternalAuths, err := c.getAllCosmosObjs(ctx, keyObj)
 	if err != nil {
