@@ -170,11 +170,7 @@ func MigrateCosmosOrDie(ctx context.Context, cosmosClient database.DBClient) {
 			panic(err)
 		}
 		for _, operation := range operationIterator.Items(ctx) {
-			currOperation, err := cosmosClient.Operations(operation.ResourceID.SubscriptionID).Get(ctx, operation.ResourceID.Name)
-			if err != nil {
-				panic(err)
-			}
-			_, err = cosmosClient.Operations(operation.ResourceID.SubscriptionID).Replace(ctx, currOperation, nil)
+			_, err := cosmosClient.Operations(operation.ResourceID.SubscriptionID).Get(ctx, operation.ResourceID.Name)
 			if err != nil {
 				panic(err)
 			}
