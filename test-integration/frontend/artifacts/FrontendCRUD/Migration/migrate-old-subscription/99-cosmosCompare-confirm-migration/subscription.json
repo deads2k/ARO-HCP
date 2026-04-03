@@ -1,10 +1,9 @@
 {
-	"_etag": "3a06e134-71ae-4a09-8e68-88f7a3cf9801",
+	"_etag": "6e1a8b97-d756-4467-9289-d59a45ef1301",
 	"id": "2f2d4ba3-1ee6-57b6-bde9-b61d09eaf989",
 	"partitionKey": "6b690bec-0c16-4ecb-8f67-781caf40bba7",
 	"properties": {
 		"cosmosMetadata": {
-			"etag": "\"00000000-0000-0000-7121-fcdc980501dc\"",
 			"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7"
 		},
 		"properties": null,

@@ -113,6 +113,7 @@ func ResourceInstanceEquals(t *testing.T, expected, actual any) (string, bool) {
 			unstructured.RemoveNestedField(currMap, prepend(possiblePrepend, "startTime")...)                                                               // operations
 			unstructured.RemoveNestedField(currMap, prepend(possiblePrepend, "operationId")...)                                                             // operations
 			unstructured.RemoveNestedField(currMap, prepend(possiblePrepend, "internalState", "internalAPI", "serviceProviderProperties", "clusterUID")...) // cluster - UUID generated
+			unstructured.RemoveNestedField(currMap, prepend(possiblePrepend, "cosmosMetadata", "etag")...)
 
 			for _, nestedPossiblePrepend := range []string{"", "intermediateResourceDoc"} {
 				unstructured.RemoveNestedField(currMap, prepend(possiblePrepend, prepend(nestedPossiblePrepend, "activeOperationId")...)...) // cluster, nodepool, externalauth

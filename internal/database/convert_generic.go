@@ -65,22 +65,29 @@ func CosmosGenericToInternal[InternalAPIType any](cosmosObj *GenericDocument[Int
 	if !ok {
 		return nil, fmt.Errorf("internalObj must be an arm.CosmosMetadataAccessor: %T", cosmosObj)
 	}
-	if ret.GetResourceID() == nil {
-		if cosmosObj.ResourceID != nil {
-			ret.(arm.CosmosPersistable).GetCosmosData().ResourceID = cosmosObj.ResourceID
-		} else {
-			return nil, fmt.Errorf("internalObj is missing a resourceID: %T: %q", cosmosObj, cosmosObj.ID)
-		}
-	}
 	ret.(arm.CosmosPersistable).GetCosmosData().ExistingCosmosUID = cosmosObj.ID
 	ret.SetEtag(cosmosObj.CosmosETag)
 
 	// this isn't pretty, but on balance it's a better choice so that we can share all the rest.
 	switch castObj := any(ret).(type) {
 	case *arm.Subscription:
+		if castObj.CosmosMetadata.ResourceID == nil && castObj.ResourceID != nil {
+			castObj.CosmosMetadata.ResourceID = castObj.ResourceID
+		}
+		if castObj.CosmosMetadata.ResourceID == nil && cosmosObj.ResourceID != nil {
+			castObj.CosmosMetadata.ResourceID = cosmosObj.ResourceID
+		}
 		castObj.LastUpdated = cosmosObj.CosmosTimestamp
 	case arm.Subscription:
 		castObj.LastUpdated = cosmosObj.CosmosTimestamp
+	}
+
+	if ret.GetResourceID() == nil {
+		if cosmosObj.ResourceID != nil {
+			ret.(arm.CosmosPersistable).GetCosmosData().ResourceID = cosmosObj.ResourceID
+		} else {
+			return nil, fmt.Errorf("internalObj is missing a resourceID: %T: %q", cosmosObj, cosmosObj.ID)
+		}
 	}
 
 	return &cosmosObj.Content, nil

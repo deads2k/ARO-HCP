@@ -267,8 +267,8 @@ func (m *MockDBClient) ListDocuments(resourceType *azcorearm.ResourceType, prefi
 			}
 		}
 
-		// Check prefix match if specified
-		if len(prefix) != 0 {
+		// Check prefix match if specified.  /subscriptions/ doesn't count because in real storage we pass no prefix for subscriptions
+		if len(prefix) != 0 && prefix != "/subscriptions/" {
 			if !strings.HasPrefix(strings.ToLower(typedDoc.ResourceID.String()), strings.ToLower(prefix)) {
 				continue
 			}
