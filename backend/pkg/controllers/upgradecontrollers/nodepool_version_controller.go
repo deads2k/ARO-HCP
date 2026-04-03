@@ -140,7 +140,7 @@ func (c *nodePoolVersionSyncer) SyncOnce(ctx context.Context, key controllerutil
 	}
 
 	// Get the cluster from Cluster Service to obtain the cluster UUID for Cincinnati
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

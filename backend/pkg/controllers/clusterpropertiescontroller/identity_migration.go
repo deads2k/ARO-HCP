@@ -79,7 +79,7 @@ func (c *identityMigrationSyncer) CooldownChecker() controllerutils.CooldownChec
 
 func (c *identityMigrationSyncer) NeedsWork(ctx context.Context, existingCluster *api.HCPOpenShiftCluster) bool {
 	// Check if we have a cluster service ID to query
-	if len(existingCluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+	if existingCluster.ServiceProviderProperties.ClusterServiceID == nil || len(existingCluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
 		return false
 	}
 
@@ -134,7 +134,7 @@ func (c *identityMigrationSyncer) SyncOnce(ctx context.Context, key controllerut
 	}
 
 	// Fetch the cluster from Cluster Service
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

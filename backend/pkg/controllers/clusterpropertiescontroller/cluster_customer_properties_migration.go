@@ -124,7 +124,7 @@ func (c *clusterCustomerPropertiesMigrationController) SyncOnce(ctx context.Cont
 	}
 
 	// Fetch the cluster from Cluster Service
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

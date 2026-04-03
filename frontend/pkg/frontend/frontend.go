@@ -362,7 +362,7 @@ func (f *Frontend) ArmResourceActionRequestAdminCredential(writer http.ResponseW
 		return arm.NewConflictError(clusterResourceID, "Cannot request credential while credentials are being revoked")
 	}
 
-	csCredential, err := f.clusterServiceClient.PostBreakGlassCredential(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	csCredential, err := f.clusterServiceClient.PostBreakGlassCredential(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -453,7 +453,7 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 		return arm.NewConflictError(clusterResourceID, "Credentials are already being revoked")
 	}
 
-	err = f.clusterServiceClient.DeleteBreakGlassCredentials(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	err = f.clusterServiceClient.DeleteBreakGlassCredentials(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -473,7 +473,7 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	operationDoc := database.NewOperation(
 		operationRequest,
 		clusterResourceID,
-		cluster.ServiceProviderProperties.ClusterServiceID,
+		*cluster.ServiceProviderProperties.ClusterServiceID,
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),

@@ -68,7 +68,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 	cluster := &api.HCPOpenShiftCluster{
 		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 
@@ -114,7 +114,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 	cluster := &api.HCPOpenShiftCluster{
 		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 	clustersCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
@@ -157,7 +157,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 	cluster := &api.HCPOpenShiftCluster{
 		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 	clustersCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
@@ -179,7 +179,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 	require.NoError(t, err)
 
 	mockClusterService.EXPECT().
-		GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetClusterProvisionShard(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(nil, fmt.Errorf("provision shard error"))
 
 	err = syncer.SyncOnce(ctx, key)
@@ -214,7 +214,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 	cluster := &api.HCPOpenShiftCluster{
 		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 	clustersCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
@@ -237,7 +237,7 @@ func TestReadAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer_SyncOnce
 
 	provisionShard := buildTestProvisionShard("test-consumer")
 	mockClusterService.EXPECT().
-		GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetClusterProvisionShard(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(provisionShard, nil)
 
 	restEndpoint := provisionShard.MaestroConfig().RestApiConfig().Url()

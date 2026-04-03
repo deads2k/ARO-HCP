@@ -113,7 +113,7 @@ func (c *triggerControlPlaneUpgradeSyncer) SyncOnce(ctx context.Context, key con
 		return nil
 	}
 
-	return c.createUpgradePolicyIfNeeded(ctx, desiredVersion, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	return c.createUpgradePolicyIfNeeded(ctx, desiredVersion, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 }
 
 // createUpgradePolicyIfNeeded ensures a control plane upgrade policy exists for the desired version.

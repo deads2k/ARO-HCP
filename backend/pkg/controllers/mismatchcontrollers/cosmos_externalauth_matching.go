@@ -106,7 +106,7 @@ func (c *cosmosExternalAuthMatching) synchronizeAllExternalAuths(ctx context.Con
 		return utils.TrackError(err)
 	}
 
-	clusterServiceIDToClusterServiceExternalAuths, allClusterServiceExternalAuths, err := c.getAllClusterServiceObjs(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	clusterServiceIDToClusterServiceExternalAuths, allClusterServiceExternalAuths, err := c.getAllClusterServiceObjs(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}

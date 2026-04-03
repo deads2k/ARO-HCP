@@ -105,7 +105,7 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 	// we are guaranteed to have a shard allocated for the cluster. If this changes in the future
 	// we would need to change the logic in controllers to check that the retrieved cluster has a
 	// shard allocated.
-	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard from Cluster Service: %w", err))
 	}

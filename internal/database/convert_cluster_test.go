@@ -66,7 +66,7 @@ func TestRoundTripClusterInternalCosmosInternal(t *testing.T) {
 			}
 			// we must always have an internal ID
 			foo := api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/r" + strings.ReplaceAll(c.String(10), "/", "-")))
-			j.ClusterServiceID = foo
+			j.ClusterServiceID = &foo
 		},
 		func(j *api.HCPOpenShiftCluster, c randfill.Continue) {
 			c.FillNoCustom(j)

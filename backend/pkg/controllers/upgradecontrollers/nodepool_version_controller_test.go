@@ -105,7 +105,7 @@ func createTestNodePoolWithVersion(t *testing.T, ctx context.Context, mockDB *da
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  clusterInternalID,
+			ClusterServiceID:  &clusterInternalID,
 		},
 	}
 	_, err = mockDB.HCPClusters(testSubscriptionID, testResourceGroupName).Create(ctx, cluster, nil)

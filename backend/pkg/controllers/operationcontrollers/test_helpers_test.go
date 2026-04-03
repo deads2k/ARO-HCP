@@ -92,7 +92,7 @@ func (f *clusterTestFixture) newCluster(createdAt *time.Time) *api.HCPOpenShiftC
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID:  f.clusterInternalID,
+			ClusterServiceID:  &f.clusterInternalID,
 			ActiveOperationID: testOperationName,
 			ClusterUID:        testClusterUID,
 		},
@@ -168,7 +168,7 @@ func (f *nodePoolTestFixture) newCluster() *api.HCPOpenShiftCluster {
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: f.clusterInternalID,
+			ClusterServiceID: &f.clusterInternalID,
 		},
 	}
 }
@@ -261,7 +261,7 @@ func (f *externalAuthTestFixture) newCluster() *api.HCPOpenShiftCluster {
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: f.clusterInternalID,
+			ClusterServiceID: &f.clusterInternalID,
 		},
 	}
 }

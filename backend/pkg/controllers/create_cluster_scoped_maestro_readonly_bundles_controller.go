@@ -156,7 +156,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.C
 	// we are guaranteed to have a shard allocated for the cluster. If this changes in the future
 	// we would need to change the logic in controllers to check that the retrieved cluster has a
 	// shard allocated.
-	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard from Cluster Service: %w", err))
 	}
@@ -170,7 +170,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.C
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
 
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster from Cluster Service: %w", err))
 	}

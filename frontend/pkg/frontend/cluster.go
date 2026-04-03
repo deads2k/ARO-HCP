@@ -101,6 +101,9 @@ func (f *Frontend) ArmResourceListClusters(writer http.ResponseWriter, request *
 	}
 	clustersByClusterServiceID := make(map[string]*api.HCPOpenShiftCluster)
 	for _, internalCluster := range internalClusterIterator.Items(ctx) {
+		if internalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+			continue
+		}
 		clustersByClusterServiceID[internalCluster.ServiceProviderProperties.ClusterServiceID.ID()] = internalCluster
 	}
 	err = internalClusterIterator.GetError()
@@ -368,10 +371,11 @@ func (f *Frontend) createHCPCluster(writer http.ResponseWriter, request *http.Re
 		return utils.TrackError(err)
 	}
 
-	newInternalCluster.ServiceProviderProperties.ClusterServiceID, err = api.NewInternalID(resultingClusterServiceCluster.HREF())
+	csID, err := api.NewInternalID(resultingClusterServiceCluster.HREF())
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	newInternalCluster.ServiceProviderProperties.ClusterServiceID = &csID
 
 	transaction := f.dbClient.NewTransaction(newInternalCluster.ID.SubscriptionID)
 
@@ -379,7 +383,7 @@ func (f *Frontend) createHCPCluster(writer http.ResponseWriter, request *http.Re
 	clusterCreateOperation := database.NewOperation(
 		database.OperationRequestCreate,
 		newInternalCluster.ID,
-		newInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		*newInternalCluster.ServiceProviderProperties.ClusterServiceID,
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -635,7 +639,7 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 		tenantID = *subscription.Properties.TenantId
 	}
 
-	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
+	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -645,11 +649,11 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 	}
 
 	logger.Info(fmt.Sprintf("updating resource %s", oldInternalCluster.ID))
-	resultingClusterServiceAutoscaler, err := f.clusterServiceClient.UpdateClusterAutoscaler(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceAutoscalerBuilder)
+	resultingClusterServiceAutoscaler, err := f.clusterServiceClient.UpdateClusterAutoscaler(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceAutoscalerBuilder)
 	if err != nil {
 		return utils.TrackError(err)
 	}
-	resultingClusterServiceCluster, err := f.clusterServiceClient.UpdateCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceClusterBuilder)
+	resultingClusterServiceCluster, err := f.clusterServiceClient.UpdateCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceClusterBuilder)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -667,7 +671,7 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 	clusterUpdateOperation := database.NewOperation(
 		database.OperationRequestUpdate,
 		oldInternalCluster.ID,
-		oldInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		*oldInternalCluster.ServiceProviderProperties.ClusterServiceID,
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -775,7 +779,7 @@ func (f *Frontend) addDeleteClusterToTransaction(ctx context.Context, writer htt
 		return utils.TrackError(err)
 	}
 
-	err = f.clusterServiceClient.DeleteCluster(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	err = f.clusterServiceClient.DeleteCluster(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	var ocmError *ocmerrors.Error
 	if errors.As(err, &ocmError) && ocmError.Status() == http.StatusNotFound {
 		// StatusNotFound means we have stale data in Cosmos DB.
@@ -807,7 +811,7 @@ func (f *Frontend) addDeleteClusterToTransaction(ctx context.Context, writer htt
 	operationDoc := database.NewOperation(
 		database.OperationRequestDelete,
 		cluster.ID,
-		cluster.ServiceProviderProperties.ClusterServiceID,
+		*cluster.ServiceProviderProperties.ClusterServiceID,
 		f.azureLocation,
 		"",
 		"",
@@ -905,7 +909,7 @@ func legacyMergeToInternalCluster(csCluster *arohcpv1alpha1.Cluster, internalClu
 // merges the states together, and returns the internal representation.
 // TODO remove the header it takes and collapse that to some general error handling.
 func (f *Frontend) readInternalClusterFromClusterService(ctx context.Context, oldInternalCluster *api.HCPOpenShiftCluster) (*api.HCPOpenShiftCluster, error) {
-	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
+	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return nil, utils.TrackError(err)
 	}

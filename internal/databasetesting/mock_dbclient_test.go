@@ -157,7 +157,7 @@ func TestMockDBClient_CRUD_Cluster(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  internalID,
+			ClusterServiceID:  &internalID,
 		},
 	}
 
@@ -395,7 +395,7 @@ func TestMockDBClient_Transaction(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  internalID,
+			ClusterServiceID:  &internalID,
 		},
 	}
 
@@ -453,7 +453,7 @@ func TestMockDBClient_UntypedCRUD(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  internalID,
+			ClusterServiceID:  &internalID,
 		},
 	}
 
@@ -808,7 +808,7 @@ func TestMockDBClient_addResource(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  internalID,
+			ClusterServiceID:  &internalID,
 		},
 	}
 
@@ -889,7 +889,7 @@ func TestNewMockDBClientWithResources(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  internalID,
+			ClusterServiceID:  &internalID,
 		},
 	}
 

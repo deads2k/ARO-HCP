@@ -117,7 +117,7 @@ func (f *Frontend) ArmResourceListExternalAuths(writer http.ResponseWriter, requ
 	query := fmt.Sprintf("id in (%s)", strings.Join(queryIDs, ", "))
 	logger.Info(fmt.Sprintf("Searching Cluster Service for %q", query))
 
-	csIterator := f.clusterServiceClient.ListExternalAuths(internalCluster.ServiceProviderProperties.ClusterServiceID, query)
+	csIterator := f.clusterServiceClient.ListExternalAuths(*internalCluster.ServiceProviderProperties.ClusterServiceID, query)
 	for csExternalAuth := range csIterator.Items(ctx) {
 		if internalExternalAuth, ok := externalAuthsByClusterServiceID[csExternalAuth.ID()]; ok {
 			internalExternalAuth, err = mergeToInternalExternalAuth(csExternalAuth, internalExternalAuth)
@@ -289,7 +289,7 @@ func (f *Frontend) createExternalAuth(writer http.ResponseWriter, request *http.
 	if err != nil {
 		return utils.TrackError(err)
 	}
-	csExternalAuth, err := f.clusterServiceClient.PostExternalAuth(ctx, cluster.ServiceProviderProperties.ClusterServiceID, csExternalAuthBuilder)
+	csExternalAuth, err := f.clusterServiceClient.PostExternalAuth(ctx, *cluster.ServiceProviderProperties.ClusterServiceID, csExternalAuthBuilder)
 	if err != nil {
 		return utils.TrackError(err)
 	}

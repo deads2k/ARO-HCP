@@ -130,7 +130,7 @@ func TestCheckForProvisioningStateConflict(t *testing.T) {
 						},
 						ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 							ProvisioningState: arm.ProvisioningStateSucceeded,
-							ClusterServiceID:  clusterInternalID,
+							ClusterServiceID:  &clusterInternalID,
 						},
 					}
 					_, _ = mockDBClient.HCPClusters(parentResourceID.SubscriptionID, parentResourceID.ResourceGroupName).Create(ctx, parentCluster, nil)
@@ -177,7 +177,7 @@ func TestCheckForProvisioningStateConflict(t *testing.T) {
 							},
 							ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 								ProvisioningState: provisioningState,
-								ClusterServiceID:  clusterInternalID,
+								ClusterServiceID:  &clusterInternalID,
 							},
 						}
 						_, _ = mockDBClient.HCPClusters(parentResourceID.SubscriptionID, parentResourceID.ResourceGroupName).Create(ctx, parentCluster, nil)
