@@ -84,7 +84,7 @@ func CosmosGenericToInternal[InternalAPIType any](cosmosObj *GenericDocument[Int
 
 	if ret.GetResourceID() == nil {
 		if cosmosObj.ResourceID != nil {
-			ret.(arm.CosmosPersistable).GetCosmosData().ResourceID = cosmosObj.ResourceID
+			ret.SetResourceID(cosmosObj.ResourceID)
 		} else {
 			return nil, fmt.Errorf("internalObj is missing a resourceID: %T: %q", cosmosObj, cosmosObj.ID)
 		}
