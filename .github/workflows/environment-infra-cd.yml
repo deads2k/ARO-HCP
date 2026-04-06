@@ -15,11 +15,6 @@ on:
         description: 'The deploy environment to use for service deployments'
         required: true
         type: string
-      deploy_cs_pr_check_deps:
-        description: 'Deploy PR check environment dependencies'
-        required: false
-        default: false
-        type: boolean
     secrets:
       AZURE_CLIENT_ID:
         description: 'Azure Client ID'
@@ -129,11 +124,6 @@ jobs:
       run: |
         cd dev-infrastructure/
         PRINCIPAL_ID=${{ secrets.GHA_PRINCIPAL_ID }} make svc.aks.admin-access
-    - name: 'CS PR check MSI'
-      if: inputs.deploy_cs_pr_check_deps
-      run: |
-        cd dev-infrastructure/
-        make svc.cs-pr-check-msi
   deploy_management_cluster_rg:
     needs:
     - deploy_region_rg

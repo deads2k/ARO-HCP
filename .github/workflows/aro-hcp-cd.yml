@@ -9,16 +9,14 @@ env:
   PRINCIPAL_ID: ${{ secrets.GHA_PRINCIPAL_ID }}
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Publish Service Images"]
-    types: [completed]
+  push:
     branches: [main]
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 jobs:
   preflight:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
     - name: No reruns please
@@ -51,28 +49,3 @@ jobs:
     uses: ./.github/workflows/services-cd.yml
     with:
       deploy_env: dev
-  # CS PR env deployment disabled during testing
-  deploy_cs_pr_environment_infra:
-    name: 'Deploy CS PR infrastructure'
-    needs:
-    - preflight
-    permissions:
-      id-token: 'write'
-      contents: 'read'
-    secrets: inherit
-    uses: ./.github/workflows/environment-infra-cd.yml
-    with:
-      deploy_env: cspr
-      deploy_cs_pr_check_deps: true
-  deploy_cs_pr_environment_services:
-    name: 'Deploy services to CS PR'
-    needs:
-    - deploy_cs_pr_environment_infra
-    permissions:
-      id-token: 'write'
-      contents: 'read'
-    secrets: inherit
-    uses: ./.github/workflows/services-cd.yml
-    with:
-      deploy_env: cspr
-      deploy_cs_pr_check_deps: true

@@ -14,11 +14,6 @@ on:
         description: 'The deploy environment to use for service deployments'
         required: true
         type: string
-      deploy_cs_pr_check_deps:
-        description: 'Deploy PR check environment dependencies'
-        required: false
-        default: false
-        type: boolean
     secrets:
       AZURE_CLIENT_ID:
         description: 'Azure Client ID'
@@ -96,7 +91,6 @@ jobs:
         make -C backend/ record-override OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" DETECT_DIRTY_GIT_WORKTREE=0
         make pipeline/RP.Backend OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}"
     - name: 'Deploy Cluster Service'
-      if: ${{ ! inputs.deploy_cs_pr_check_deps }}
       run: |
         make cluster-service.deploy_pipeline
     - name: 'Deploy Maestro'
@@ -105,10 +99,6 @@ jobs:
     - name: 'Deploy Observability/Tracing'
       run: |
         make observability.tracing.deploy_pipeline
-    - name: 'Deploy CS PR check environment dressup'
-      if: inputs.deploy_cs_pr_check_deps
-      run: |
-        ./svc-deploy.sh ${DEPLOY_ENV} cluster-service svc deploy-pr-env-deps
   deploy_to_management_cluster:
     permissions:
       id-token: 'write'
