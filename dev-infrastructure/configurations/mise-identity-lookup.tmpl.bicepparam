@@ -1,4 +1,4 @@
-using '../templates/mise-identity-lookup.bicep'
+using '../templates/entra-app-lookup.bicep'
 
-param miseApplicationName = '{{ .mise.applicationName }}'
-param miseApplicationDeploy = {{ .mise.deploy }}
+param applicationName = '{{ .mise.applicationName }}'
+param manage = {{ .mise.deploy }}

@@ -70,45 +70,37 @@ output PublicKey string = genevaCertificate.outputs.PublicKey
 
 // //   G E N E V A    A C T I O N S   A P P   R E G I S T R A T I O N
 
-extension microsoftGraphBeta
+var genevaKeyCredentials = !genevaActionApplicationUseSNI
+  ? [
+      {
+        type: 'AsymmetricX509Cert'
+        usage: 'Verify'
+        displayName: 'Geneva Action Login - ${genevaCertificate.outputs.Thumbprint}'
+        key: genevaCertificate.outputs.PublicKey
+        keyId: guid(genevaCertificate.outputs.Thumbprint)
+        customKeyIdentifier: genevaCertificate.outputs.KeyIdentifier
+        startDateTime: genevaCertificate.outputs.NotBefore
+        endDateTime: genevaCertificate.outputs.NotAfter
+      }
+    ]
+  : []
 
-resource genevaApp 'Microsoft.Graph/applications@beta' = if (genevaActionApplicationManage) {
-  displayName: genevaActionApplicationName
-  isFallbackPublicClient: true
-  signInAudience: 'AzureADMyOrg' // Single tenant applicaion
-  uniqueName: genevaActionApplicationName
-  requiredResourceAccess: []
-  serviceManagementReference: 'b8e9ef87-cd63-4085-ab14-1c637806568c'
-  trustedSubjectNameAndIssuers: genevaActionApplicationUseSNI
-    ? [
-        {
-          authorityId: '00000000-0000-0000-0000-000000000001'
-          subjectName: genevaActionsCertificateDomain
-        }
-      ]
-    : []
-  owners: {
-    relationships: [for ownerId in csvToArray(ownerIds): ownerId]
-  }
-  keyCredentials: !genevaActionApplicationUseSNI
-    ? [
-        {
-          type: 'AsymmetricX509Cert'
-          usage: 'Verify'
-          displayName: 'Geneva Action Login - ${genevaCertificate.outputs.Thumbprint}'
-          key: genevaCertificate.outputs.PublicKey
-          keyId: guid(genevaCertificate.outputs.Thumbprint)
-          customKeyIdentifier: genevaCertificate.outputs.KeyIdentifier
-          startDateTime: genevaCertificate.outputs.NotBefore
-          endDateTime: genevaCertificate.outputs.NotAfter
-        }
-      ]
-    : []
-}
-
-resource genevaSp 'Microsoft.Graph/servicePrincipals@beta' = if (genevaActionApplicationManage) {
-  appId: genevaApp.appId
-  owners: {
-    relationships: [for ownerId in csvToArray(ownerIds): ownerId]
+module entraApp '../modules/entra/app.bicep' = if (genevaActionApplicationManage) {
+  name: 'geneva-actions-entra-app'
+  params: {
+    applicationName: genevaActionApplicationName
+    ownerIds: ownerIds
+    isFallbackPublicClient: true
+    manageSp: true
+    trustedSubjectNameAndIssuers: genevaActionApplicationUseSNI
+      ? [
+          {
+            authorityId: '00000000-0000-0000-0000-000000000001'
+            subjectName: genevaActionsCertificateDomain
+          }
+        ]
+      : []
+    serviceManagementReference: 'b8e9ef87-cd63-4085-ab14-1c637806568c'
+    keyCredentials: genevaKeyCredentials
   }
 }

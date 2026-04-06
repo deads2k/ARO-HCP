@@ -1,4 +1,4 @@
-using '../templates/geneva-identities-lookup.bicep'
+using '../templates/entra-app-lookup.bicep'
 
-param genevaActionApplicationName = '{{ .geneva.actions.application.name }}'
-param genevaActionApplicationManage = {{ .geneva.actions.application.manage }}
+param applicationName = '{{ .geneva.actions.application.name }}'
+param manage = {{ .geneva.actions.application.manage }}
