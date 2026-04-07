@@ -73,6 +73,15 @@ run: export GOWORK=off
 run: _output/config.yaml fetch-secrets
 	SECRETS_STORE_PATH=$(SECRETS_DIR) CONFIG_PATH=_output/config.yaml go run main.go
 
+run-image: image _output/config.yaml fetch-secrets
+	docker run --rm -p 8080:8080 \
+		-e CONFIG_PATH=/config.yaml \
+		-e SECRETS_STORE_PATH=/secrets \
+		-v "$(abspath _output/config.yaml):/config.yaml:ro" \
+		-v "$(abspath $(SECRETS_DIR)):/secrets:ro" \
+		${TENANT_QUOTA_TAGGED_IMAGE}
+.PHONY: run-image
+
 clean:
 	rm -rf tenant-quota-collector _output/
 .PHONY: clean

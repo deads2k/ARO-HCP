@@ -24,6 +24,6 @@ WORKDIR /
 COPY --from=builder /app/dev-infrastructure/ops-tools/tenant-quota/tenant-quota-collector .
 ARG REVISION
 LABEL vcs-ref="${REVISION}"
-ENTRYPOINT ["/tenant-quota-collector", "run"]
+ENTRYPOINT ["/tenant-quota-collector"]
 
 
