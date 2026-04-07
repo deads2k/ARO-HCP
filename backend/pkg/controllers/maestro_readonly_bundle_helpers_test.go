@@ -15,20 +15,34 @@
 package controllers
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	workv1 "open-cluster-management.io/api/work/v1"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
+
 	hsv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/maestro"
 	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/api/arm"
+	"github.com/Azure/ARO-HCP/internal/database"
+	"github.com/Azure/ARO-HCP/internal/databasetesting"
 )
 
 // buildTestMaestroBundleWithStatusFeedback builds a ManifestWork with exactly one resource status manifest
@@ -226,4 +240,358 @@ func TestMaestroReadonlyBundleHelpers_getSingleResourceStatusFeedbackRawJSONFrom
 			}
 		})
 	}
+}
+
+// errorInjectingMCCCRUD wraps ManagementClusterContentCRUD to allow error injection for testing.
+type errorInjectingMCCCRUD struct {
+	database.ManagementClusterContentCRUD
+	getResult  *api.ManagementClusterContent
+	getErr     error
+	replaceErr error
+}
+
+func (e *errorInjectingMCCCRUD) Get(ctx context.Context, resourceID string) (*api.ManagementClusterContent, error) {
+	if e.getErr != nil {
+		return nil, e.getErr
+	}
+	if e.getResult != nil {
+		return e.getResult, nil
+	}
+	return e.ManagementClusterContentCRUD.Get(ctx, resourceID)
+}
+
+func (e *errorInjectingMCCCRUD) Replace(ctx context.Context, obj *api.ManagementClusterContent, opts *azcosmos.ItemOptions) (*api.ManagementClusterContent, error) {
+	if e.replaceErr != nil {
+		return nil, e.replaceErr
+	}
+	return e.ManagementClusterContentCRUD.Replace(ctx, obj, opts)
+}
+
+var _ database.ManagementClusterContentCRUD = &errorInjectingMCCCRUD{}
+
+// hcpClusterCRUDWithInjectedMCC wraps HCPClusterCRUD to return a fixed ManagementClusterContentCRUD (for tests).
+type hcpClusterCRUDWithInjectedMCC struct {
+	database.HCPClusterCRUD
+	mccCRUD database.ManagementClusterContentCRUD
+}
+
+func (e *hcpClusterCRUDWithInjectedMCC) ManagementClusterContents(hcpClusterName string) database.ManagementClusterContentCRUD {
+	return e.mccCRUD
+}
+
+var _ database.HCPClusterCRUD = &hcpClusterCRUDWithInjectedMCC{}
+
+// errorInjectingDBClient wraps MockDBClient to return error-injecting CRUDs.
+type errorInjectingDBClient struct {
+	*databasetesting.MockDBClient
+	mccCRUD      database.ManagementClusterContentCRUD
+	clustersCRUD database.HCPClusterCRUD
+	spcCRUD      database.ServiceProviderClusterCRUD
+}
+
+func (e *errorInjectingDBClient) HCPClusters(subscriptionID, resourceGroupName string) database.HCPClusterCRUD {
+	var base database.HCPClusterCRUD
+	if e.clustersCRUD != nil {
+		base = e.clustersCRUD
+	} else {
+		base = e.MockDBClient.HCPClusters(subscriptionID, resourceGroupName)
+	}
+	if e.mccCRUD != nil {
+		return &hcpClusterCRUDWithInjectedMCC{HCPClusterCRUD: base, mccCRUD: e.mccCRUD}
+	}
+	return base
+}
+
+func (e *errorInjectingDBClient) ServiceProviderClusters(subscriptionID, resourceGroupName, clusterName string) database.ServiceProviderClusterCRUD {
+	if e.spcCRUD != nil {
+		return e.spcCRUD
+	}
+	return e.MockDBClient.ServiceProviderClusters(subscriptionID, resourceGroupName, clusterName)
+}
+
+var _ database.DBClient = &errorInjectingDBClient{}
+
+// errorInjectingSPCCRUD wraps ServiceProviderClusterCRUD to allow error injection.
+type errorInjectingSPCCRUD struct {
+	database.ServiceProviderClusterCRUD
+	getErr error
+}
+
+func (e *errorInjectingSPCCRUD) Get(ctx context.Context, resourceID string) (*api.ServiceProviderCluster, error) {
+	if e.getErr != nil {
+		return nil, e.getErr
+	}
+	return e.ServiceProviderClusterCRUD.Get(ctx, resourceID)
+}
+
+var _ database.ServiceProviderClusterCRUD = &errorInjectingSPCCRUD{}
+
+func TestMaestroReadonlyBundleHelpers_calculateManagementClusterContentFromMaestroBundle(t *testing.T) {
+	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
+	cluster := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
+	}
+	ref := &api.MaestroBundleReference{
+		Name:                        api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster,
+		MaestroAPIMaestroBundleName: "bundle-name",
+	}
+
+	hc := hsv1beta1.HostedCluster{TypeMeta: metav1.TypeMeta{APIVersion: "hypershift.openshift.io/v1beta1", Kind: "HostedCluster"}, ObjectMeta: metav1.ObjectMeta{Name: "hc1", Namespace: "ns1"}}
+	hcJSONBytes, err := json.Marshal(hc)
+	require.NoError(t, err)
+	validHCJSON := string(hcJSONBytes)
+
+	tests := []struct {
+		name            string
+		maestroGet      func(*maestro.MockClient)
+		wantDegraded    bool
+		wantKubeContent bool
+		wantErr         bool
+		errSub          string
+	}{
+		{
+			name: "bundle not found - desired with degraded condition",
+			maestroGet: func(m *maestro.MockClient) {
+				m.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(nil, k8serrors.NewNotFound(schema.GroupResource{}, "bundle-name"))
+			},
+			wantDegraded:    true,
+			wantKubeContent: false,
+		},
+		{
+			name: "maestro api maestro bundleget error - returns error",
+			maestroGet: func(m *maestro.MockClient) {
+				m.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(nil, fmt.Errorf("connection error"))
+			},
+			wantErr: true,
+			errSub:  "failed to get Maestro Bundle",
+		},
+		{
+			name: "bundle has invalid status feedback - desired with degraded",
+			maestroGet: func(m *maestro.MockClient) {
+				// Bundle with no status feedback values
+				b := &workv1.ManifestWork{
+					Status: workv1.ManifestWorkStatus{
+						ResourceStatus: workv1.ManifestResourceStatus{
+							Manifests: []workv1.ManifestCondition{
+								{ResourceMeta: workv1.ManifestResourceMeta{}, StatusFeedbacks: workv1.StatusFeedbackResult{Values: []workv1.FeedbackValue{}}, Conditions: []metav1.Condition{}},
+							},
+						},
+					},
+				}
+				m.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+			},
+			wantDegraded:    true,
+			wantKubeContent: false,
+		},
+		{
+			name: "success - desired with kube content",
+			maestroGet: func(m *maestro.MockClient) {
+				b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+				m.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+			},
+			wantDegraded:    false,
+			wantKubeContent: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockMaestro := maestro.NewMockClient(ctrl)
+			tt.maestroGet(mockMaestro)
+
+			got, err := calculateManagementClusterContentFromMaestroBundle(context.Background(), cluster.ID, ref, mockMaestro)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errSub)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, got)
+				assert.Equal(t, tt.wantKubeContent, got.Status.KubeContent != nil && len(got.Status.KubeContent.Items) > 0)
+				hasDegradedTrue := controllerutils.IsConditionTrue(got.Status.Conditions, "Degraded")
+				assert.Equal(t, tt.wantDegraded, hasDegradedTrue)
+			}
+		})
+	}
+}
+
+func TestMaestroReadonlyBundleHelpers_readAndPersistMaestroReadonlyBundleContent(t *testing.T) {
+	ctx := context.Background()
+	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster"))
+	cluster := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
+	}
+	ref := &api.MaestroBundleReference{
+		Name:                        api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster,
+		MaestroAPIMaestroBundleName: "bundle-name",
+	}
+	hc := hsv1beta1.HostedCluster{TypeMeta: metav1.TypeMeta{APIVersion: "hypershift.openshift.io/v1beta1", Kind: "HostedCluster"}, ObjectMeta: metav1.ObjectMeta{Name: "hc1", Namespace: "ns1"}}
+	hcJSONBytes, err := json.Marshal(hc)
+	require.NoError(t, err)
+	validHCJSON := string(hcJSONBytes)
+
+	t.Run("creates new ManagementClusterContent when not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+
+		mockDB := databasetesting.NewMockDBClient()
+		mccCRUD := mockDB.HCPClusters("sub", "rg").ManagementClusterContents("cluster")
+
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mccCRUD)
+		require.NoError(t, err)
+
+		// Content should have been created (name = bundle internal name)
+		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		require.NotNil(t, got.Status.KubeContent)
+		require.Len(t, got.Status.KubeContent.Items, 1)
+	})
+
+	t.Run("replaces existing when content changed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+
+		mockDB := databasetesting.NewMockDBClient()
+		mccCRUD := mockDB.HCPClusters("sub", "rg").ManagementClusterContents("cluster")
+		// Pre-create existing content with different payload
+		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
+		existing := &api.ManagementClusterContent{
+			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
+			ResourceID:     *existingRID,
+			Status:         api.ManagementClusterContentStatus{KubeContent: &metav1.List{Items: []runtime.RawExtension{}}},
+		}
+		_, err := mccCRUD.Create(ctx, existing, nil)
+		require.NoError(t, err)
+
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mccCRUD)
+		require.NoError(t, err)
+
+		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+		require.NoError(t, err)
+		require.NotNil(t, got.Status.KubeContent)
+		require.Len(t, got.Status.KubeContent.Items, 1)
+	})
+
+	t.Run("keeps existing kube content when desired has no content (degraded)", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		// Return bundle that has no valid status feedback so desired has no KubeContent
+		b := &workv1.ManifestWork{
+			Status: workv1.ManifestWorkStatus{
+				ResourceStatus: workv1.ManifestResourceStatus{
+					Manifests: []workv1.ManifestCondition{
+						{ResourceMeta: workv1.ManifestResourceMeta{}, StatusFeedbacks: workv1.StatusFeedbackResult{Values: []workv1.FeedbackValue{}}, Conditions: []metav1.Condition{}},
+					},
+				},
+			},
+		}
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+
+		mockDB := databasetesting.NewMockDBClient()
+		mccCRUD := mockDB.HCPClusters("sub", "rg").ManagementClusterContents("cluster")
+		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
+		existingContent := &metav1.List{Items: []runtime.RawExtension{{Raw: []byte(`{}`)}}}
+		existing := &api.ManagementClusterContent{
+			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
+			ResourceID:     *existingRID,
+			Status:         api.ManagementClusterContentStatus{KubeContent: existingContent},
+		}
+		_, err := mccCRUD.Create(ctx, existing, nil)
+		require.NoError(t, err)
+
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mccCRUD)
+		require.NoError(t, err)
+
+		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+		require.NoError(t, err)
+		// Should have kept existing content
+		require.NotNil(t, got.Status.KubeContent)
+		assert.Equal(t, existingContent.Items[0].Raw, got.Status.KubeContent.Items[0].Raw)
+	})
+
+	t.Run("no replace occurs when content has not changed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		// Get is called once when building desired for pre-create, and once inside readAndPersistMaestroReadonlyBundleContent.
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil).Times(2)
+
+		mockDB := databasetesting.NewMockDBClient()
+		mccCRUD := mockDB.HCPClusters("sub", "rg").ManagementClusterContents("cluster")
+		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
+		// Pre-create content that matches exactly what the syncer would compute (same KubeContent and Degraded=False condition)
+		// so that DeepEqual(existing, desired) is true and Replace is not called.
+		desired, err := calculateManagementClusterContentFromMaestroBundle(ctx, cluster.ID, ref, mockMaestro)
+		require.NoError(t, err)
+		require.NotNil(t, desired)
+		existing := &api.ManagementClusterContent{
+			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
+			ResourceID:     *existingRID,
+			Status:         desired.Status,
+		}
+		_, err = mccCRUD.Create(ctx, existing, nil)
+		require.NoError(t, err)
+
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mccCRUD)
+		require.NoError(t, err)
+
+		// Document should still exist with same content (no Replace was needed)
+		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+		require.NoError(t, err)
+		require.NotNil(t, got.Status.KubeContent)
+		require.Len(t, got.Status.KubeContent.Items, 1)
+	})
+
+	t.Run("error occurs when object has been modified in Cosmos since we retrieved it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+
+		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
+		existingDoc := &api.ManagementClusterContent{
+			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
+			ResourceID:     *existingRID,
+			Status:         api.ManagementClusterContentStatus{KubeContent: &metav1.List{Items: []runtime.RawExtension{{Raw: []byte(validHCJSON)}}}},
+		}
+
+		// Use error-injecting wrapper to simulate 412 Precondition Failed on Replace
+		mockDB := &errorInjectingDBClient{
+			MockDBClient: databasetesting.NewMockDBClient(),
+			mccCRUD: &errorInjectingMCCCRUD{
+				getResult:  existingDoc,
+				replaceErr: databasetesting.NewPreconditionFailedError(),
+			},
+		}
+
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mockDB.mccCRUD)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to replace ManagementClusterContent")
+		assert.True(t, database.IsResponseError(err, http.StatusPreconditionFailed), "expected 412 Precondition Failed")
+	})
+
+	t.Run("error occurs when managementClusterContentsDBClient.Get fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil)
+
+		getErr := fmt.Errorf("cosmos connection error")
+		// Use error-injecting wrapper to simulate Get error
+		mockDB := &errorInjectingDBClient{
+			MockDBClient: databasetesting.NewMockDBClient(),
+			mccCRUD: &errorInjectingMCCCRUD{
+				getErr: getErr,
+			},
+		}
+
+		err := readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mockDB.mccCRUD)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get ManagementClusterContent")
+		assert.Contains(t, err.Error(), "cosmos connection error")
+	})
 }
