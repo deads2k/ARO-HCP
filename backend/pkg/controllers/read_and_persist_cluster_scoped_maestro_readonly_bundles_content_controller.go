@@ -89,6 +89,11 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
 	}
+	if existingCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// we don't have enough information to proceed.  We will retrigger once the information is present.
+		// TODO remove this once we have the information all in cosmos.
+		return nil
+	}
 
 	existingServiceProviderCluster, err := database.GetOrCreateServiceProviderCluster(ctx, c.cosmosClient, key.GetResourceID())
 	if err != nil {
