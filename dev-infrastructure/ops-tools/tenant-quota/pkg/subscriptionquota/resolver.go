@@ -23,7 +23,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/tenantquota"
+	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/credentials"
 )
 
 // ResolveSubscriptionIDs resolves subscription display names to Azure
@@ -33,7 +33,7 @@ import (
 //
 // This must be called at startup before collection begins.
 func ResolveSubscriptionIDs(ctx context.Context, cfg *config.Config,
-	credProvider *tenantquota.CredentialProvider, logger *slog.Logger) error {
+	credProvider *credentials.Provider, logger *slog.Logger) error {
 
 	for i := range cfg.Tenants {
 		tenant := &cfg.Tenants[i]

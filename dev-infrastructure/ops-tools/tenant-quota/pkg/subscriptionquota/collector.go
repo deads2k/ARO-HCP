@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/tenantquota"
+	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/credentials"
 )
 
 var (
@@ -52,11 +52,11 @@ type Collector struct {
 	logger       *slog.Logger
 	cache        *MetricsCache
 	sources      []QuotaSource
-	credProvider *tenantquota.CredentialProvider
+	credProvider *credentials.Provider
 }
 
 func NewCollector(cfg *config.Config, logger *slog.Logger,
-	credProvider *tenantquota.CredentialProvider, cacheTTL time.Duration) *Collector {
+	credProvider *credentials.Provider, cacheTTL time.Duration) *Collector {
 
 	sources := []QuotaSource{
 		NewRoleAssignmentSource(cfg.Tenants),

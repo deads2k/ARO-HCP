@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tenantquota
+package credentials
 
 import (
 	"context"
@@ -77,14 +77,14 @@ func waitForCondition(t *testing.T, timeout, interval time.Duration, cond func()
 	t.Fatal(message)
 }
 
-func TestCredentialProviderReloadsAfterSecretRotation(t *testing.T) {
+func TestProviderReloadsAfterSecretRotation(t *testing.T) {
 	mountDir := t.TempDir()
 	secretName := "tenant-secret"
 	atomicUpdateFile(t, mountDir, secretName, "v1", "initial-secret")
 	t.Setenv(secretsStoreEnvVar, mountDir)
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	provider := NewCredentialProvider(logger)
+	provider := NewProvider(logger)
 	provider.watchInterval = 50 * time.Millisecond
 
 	tenant := config.TenantConfig{

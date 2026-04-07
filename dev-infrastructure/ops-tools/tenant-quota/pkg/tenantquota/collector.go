@@ -22,6 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/credentials"
 )
 
 type Collector struct {
@@ -35,7 +36,7 @@ type Collector struct {
 	remainingCapacity *prometheus.GaugeVec
 }
 
-func NewCollector(cfg *config.Config, logger *slog.Logger, credProvider *CredentialProvider) *Collector {
+func NewCollector(cfg *config.Config, logger *slog.Logger, credProvider *credentials.Provider) *Collector {
 	labels := []string{"tenant_id", "tenant_name"}
 
 	return &Collector{

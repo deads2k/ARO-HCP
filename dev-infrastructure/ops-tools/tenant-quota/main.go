@@ -29,6 +29,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/credentials"
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/subscriptionquota"
 	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/tenantquota"
 	"github.com/Azure/ARO-HCP/internal/version"
@@ -57,7 +58,7 @@ func run(logger *slog.Logger) error {
 		"interval", cfg.GetInterval(),
 		"hasSubscriptions", cfg.HasSubscriptions())
 
-	credProvider := tenantquota.NewCredentialProvider(logger)
+	credProvider := credentials.NewProvider(logger)
 
 	if err := credProvider.ValidateCredentials(cfg.Tenants); err != nil {
 		return fmt.Errorf("credential validation failed: %w", err)
