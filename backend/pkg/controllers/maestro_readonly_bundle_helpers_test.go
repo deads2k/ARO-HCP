@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -594,4 +595,49 @@ func TestMaestroReadonlyBundleHelpers_readAndPersistMaestroReadonlyBundleContent
 		assert.Contains(t, err.Error(), "failed to get ManagementClusterContent")
 		assert.Contains(t, err.Error(), "cosmos connection error")
 	})
+
+	t.Run("preserves Degraded LastTransitionTime from Cosmos when status unchanged", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockMaestro := maestro.NewMockClient(ctrl)
+		b := buildTestMaestroBundleWithStatusFeedback("bundle-name", "ns", validHCJSON)
+		mockMaestro.EXPECT().Get(gomock.Any(), "bundle-name", gomock.Any()).Return(b, nil).Times(1)
+
+		mockDB := databasetesting.NewMockDBClient()
+		mccCRUD := mockDB.HCPClusters("sub", "rg").ManagementClusterContents("cluster")
+		existingRID := api.Must(azcorearm.ParseResourceID("/subscriptions/sub/resourceGroups/rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster/managementClusterContents/readonlyHypershiftHostedCluster"))
+
+		u := &unstructured.Unstructured{}
+		require.NoError(t, json.Unmarshal([]byte(validHCJSON), u))
+		historicLTT := time.Date(2020, 6, 15, 12, 0, 0, 0, time.UTC)
+		existing := &api.ManagementClusterContent{
+			CosmosMetadata: api.CosmosMetadata{ResourceID: existingRID},
+			ResourceID:     *existingRID,
+			Status: api.ManagementClusterContentStatus{
+				KubeContent: &metav1.List{
+					Items: []runtime.RawExtension{{Object: u}},
+				},
+				Conditions: []api.Condition{
+					{
+						Type:               "Degraded",
+						Status:             api.ConditionFalse,
+						Reason:             "NoErrors",
+						Message:            "As expected.",
+						LastTransitionTime: historicLTT,
+					},
+				},
+			},
+		}
+		_, err := mccCRUD.Create(ctx, existing, nil)
+		require.NoError(t, err)
+
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, cluster.ID, ref, mockMaestro, mccCRUD)
+		require.NoError(t, err)
+
+		got, err := mccCRUD.Get(ctx, string(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster))
+		require.NoError(t, err)
+		degraded := controllerutils.GetCondition(got.Status.Conditions, "Degraded")
+		require.NotNil(t, degraded)
+		assert.True(t, degraded.LastTransitionTime.Equal(historicLTT), "expected LastTransitionTime from Cosmos to be preserved, got %v", degraded.LastTransitionTime)
+	})
+
 }

@@ -297,6 +297,31 @@ func readAndPersistMaestroReadonlyBundleContent(
 		desired.Status.KubeContent = existing.Status.KubeContent
 	}
 
+	// The existing ManagementClusterContent in Cosmos might include conditions that already exist beforehand and that
+	// have been calculated in the new desired content. To preserve the LastTransitionTime of those conditions in the case
+	// where the status of them hasn't changed, what we do is:
+	// 1. Deep copy of the existing status from Cosmos, which includes the conditions
+	// 2. Iterate over the newly calculated desired conditions, and for each condition:
+	//   2.1. Check if the condition already exists in the existing status
+	//   2.2. If it does, update the condition in the existing status with the new values using SetCondition. This
+	//        will update the LastTransitionTime to the current time if there's been a change or keep the existing
+	//        LastTransitionTime if the condition hasn't changed its status. Then, use the newly updated condition as
+	//        the desired one.
+	//   2.3. If it does not, then keep the condition as is
+	// 3. Assign the merged conditions to the desired status.
+	tmpExistingStatus := existing.Status.DeepCopy()
+	mergedConditions := make([]api.Condition, 0, len(desired.Status.Conditions))
+	for _, desiredCondition := range desired.Status.Conditions {
+		if controllerutils.GetCondition(tmpExistingStatus.Conditions, desiredCondition.Type) != nil {
+			controllerutils.SetCondition(&tmpExistingStatus.Conditions, desiredCondition)
+			merged := controllerutils.GetCondition(tmpExistingStatus.Conditions, desiredCondition.Type)
+			mergedConditions = append(mergedConditions, *merged)
+			continue
+		}
+		mergedConditions = append(mergedConditions, desiredCondition)
+	}
+	desired.Status.Conditions = mergedConditions
+
 	if equality.Semantic.DeepEqual(existing, desired) {
 		return nil
 	}
