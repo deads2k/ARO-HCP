@@ -98,7 +98,7 @@ var _ = Describe("Customer", func() {
 			kubeconfigContent, err := framework.GenerateKubeconfig(adminRESTConfig)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating cilium configuration")
+			By("installing Cilium via Helm")
 			ciliumValues := map[string]any{
 				"debug": map[string]any{
 					"enabled": true,
@@ -144,9 +144,7 @@ var _ = Describe("Customer", func() {
 					},
 				},
 			}
-
-			By("installing Cilium via Helm")
-			err = framework.InstallCiliumChart(ctx, "1.19.2", ciliumValues, kubeconfigContent, ciliumNamespace, customerClusterName)
+			err = framework.InstallCiliumChart(ctx, "1.19.2", ciliumValues, kubeconfigContent, ciliumNamespace)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating the node pool")

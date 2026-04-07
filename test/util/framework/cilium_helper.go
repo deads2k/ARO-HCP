@@ -28,8 +28,9 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// Install Cilium helm chart using the helm Go SDK.
-func InstallCiliumChart(ctx context.Context, chartVersion string, values map[string]any, kubeconfigContent, ciliumNamespace, clusterName string) error {
+// Install Cilium helm chart using the helm Go SDK. Cilium configuration is
+// passed via values argument.
+func InstallCiliumChart(ctx context.Context, chartVersion string, values map[string]any, kubeconfigContent, ciliumNamespace string) error {
 	const (
 		releaseName   = "cilium"
 		ciliumRepoURL = "https://helm.cilium.io/"

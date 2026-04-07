@@ -17,22 +17,13 @@ package e2e
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"helm.sh/helm/v4/pkg/action"
-	"helm.sh/helm/v4/pkg/chart/v2/loader"
-	"helm.sh/helm/v4/pkg/cli"
-	"helm.sh/helm/v4/pkg/kube"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/utils/ptr"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 
@@ -136,15 +127,32 @@ var _ = Describe("Customer", func() {
 			By("installing Cilium via helm SDK")
 			kubeconfigContent, err := framework.GenerateKubeconfig(adminRESTConfig)
 			Expect(err).NotTo(HaveOccurred())
-
-			kubeconfigFile, err := os.CreateTemp("", "kubeconfig-cilium-*.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			defer os.Remove(kubeconfigFile.Name())
-			_, err = kubeconfigFile.WriteString(kubeconfigContent)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(kubeconfigFile.Close()).To(Succeed())
-
-			err = installCiliumChart(ctx, kubeconfigFile.Name(), customerClusterName)
+			ciliumValues := map[string]any{
+				"cni": map[string]any{
+					"uninstall": false,
+					"binPath":   "/var/lib/cni/bin",
+					"confPath":  "/var/run/multus/cni/net.d",
+				},
+				"kubeProxyReplacement": true,
+				"k8sServiceHost":       "172.20.0.1",
+				"k8sServicePort":       6443,
+				"ipam": map[string]any{
+					"mode": "cluster-pool",
+					"operator": map[string]any{
+						"clusterPoolIPv4PodCIDRList": "10.255.0.0/16",
+						"clusterPoolIPv4MaskSize":    23,
+					},
+				},
+				"cluster": map[string]any{
+					"name": customerClusterName,
+				},
+				"operator": map[string]any{
+					"replicas": 1,
+				},
+				"routingMode":    "tunnel",
+				"tunnelProtocol": "vxlan",
+			}
+			err = framework.InstallCiliumChart(ctx, "1.19.2", ciliumValues, kubeconfigContent, "kube-system")
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating the node pool via v20251223preview")
@@ -190,76 +198,3 @@ var _ = Describe("Customer", func() {
 		},
 	)
 })
-
-// installCiliumChart installs the Cilium helm chart using the helm Go SDK.
-func installCiliumChart(ctx context.Context, kubeconfigPath, clusterName string) error {
-	const (
-		releaseName      = "cilium"
-		releaseNamespace = "kube-system"
-		ciliumRepoURL    = "https://helm.cilium.io/"
-		chartName        = "cilium"
-		chartVersion     = "1.19.2"
-	)
-
-	// Initialize helm action configuration with the kubeconfig
-	actionCfg := &action.Configuration{}
-	cliOpts := &genericclioptions.ConfigFlags{
-		KubeConfig: ptr.To(kubeconfigPath),
-		Namespace:  ptr.To(releaseNamespace),
-	}
-	if err := actionCfg.Init(cliOpts, releaseNamespace, ""); err != nil {
-		return fmt.Errorf("failed to init helm action config: %w", err)
-	}
-
-	// Locate and download the chart from the Cilium repo
-	installClient := action.NewInstall(actionCfg)
-	installClient.ReleaseName = releaseName
-	installClient.Namespace = releaseNamespace
-	installClient.RepoURL = ciliumRepoURL
-	installClient.WaitStrategy = kube.HookOnlyStrategy
-	installClient.Version = chartVersion
-
-	settings := cli.New()
-	chartPath, err := installClient.LocateChart(chartName, settings)
-	if err != nil {
-		return fmt.Errorf("failed to locate cilium chart: %w", err)
-	}
-
-	chart, err := loader.Load(chartPath)
-	if err != nil {
-		return fmt.Errorf("failed to load cilium chart: %w", err)
-	}
-
-	values := map[string]any{
-		"cni": map[string]any{
-			"uninstall": false,
-			"binPath":   "/var/lib/cni/bin",
-			"confPath":  "/var/run/multus/cni/net.d",
-		},
-		"kubeProxyReplacement": true,
-		"k8sServiceHost":       "172.20.0.1",
-		"k8sServicePort":       6443,
-		"ipam": map[string]any{
-			"mode": "cluster-pool",
-			"operator": map[string]any{
-				"clusterPoolIPv4PodCIDRList": "10.255.0.0/16",
-				"clusterPoolIPv4MaskSize":    23,
-			},
-		},
-		"cluster": map[string]any{
-			"name": clusterName,
-		},
-		"operator": map[string]any{
-			"replicas": 1,
-		},
-		"routingMode":    "tunnel",
-		"tunnelProtocol": "vxlan",
-	}
-
-	_, err = installClient.RunWithContext(ctx, chart, values)
-	if err != nil {
-		return fmt.Errorf("failed to install cilium chart: %w", err)
-	}
-
-	return nil
-}
