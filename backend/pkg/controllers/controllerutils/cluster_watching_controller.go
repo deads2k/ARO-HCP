@@ -64,8 +64,13 @@ func NewClusterWatchingController(
 	if informers != nil {
 		clusterInformer, _ := informers.Clusters()
 		serviceProviderInformer, _ := informers.ServiceProviderClusters()
+		err := clusterController.QueueForInformers(resyncDuration, clusterInformer, serviceProviderInformer)
+		if err != nil {
+			panic(err) // coding error
+		}
 		managementClusterContentInformer, _ := informers.ManagementClusterContents()
-		err := clusterController.QueueForInformers(resyncDuration, clusterInformer, serviceProviderInformer, managementClusterContentInformer)
+		// Limit the max depth of ManagementClusterContent to 1 to only consider the cluster-scoped ManagementClusterContents
+		err = clusterController.QueueForInformersWithMaxDepth(resyncDuration, 1, managementClusterContentInformer)
 		if err != nil {
 			panic(err) // coding error
 		}
