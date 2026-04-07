@@ -19,7 +19,7 @@ use (
 	./tooling/pipeline-documentation
 	./tooling/prometheus-rules
 	./tooling/secret-sync
-	./tooling/tenant-quota
 	./tooling/templatize
+	./tooling/tenant-quota
 	./tooling/yamlwrap
 )

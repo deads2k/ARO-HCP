@@ -276,6 +276,7 @@ tenants:
 				}
 				if cfg == nil {
 					t.Fatal("expected config, got nil")
+					return
 				}
 				if len(cfg.Tenants) != 1 {
 					t.Fatalf("tenants: got %d, want 1", len(cfg.Tenants))

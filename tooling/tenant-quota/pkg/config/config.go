@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	DefaultTimeout              = 30 * time.Second
-	DefaultInterval             = 15 * time.Minute
-	DefaultCacheTTL             = 24 * time.Hour
-	DefaultRoleAssignmentLimit  = 4000
-	DefaultScope                = "https://graph.microsoft.com/.default"
+	DefaultTimeout             = 30 * time.Second
+	DefaultInterval            = 15 * time.Minute
+	DefaultCacheTTL            = 24 * time.Hour
+	DefaultRoleAssignmentLimit = 4000
+	DefaultScope               = "https://graph.microsoft.com/.default"
 )
 
 type Config struct {

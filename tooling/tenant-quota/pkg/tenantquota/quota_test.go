@@ -128,6 +128,7 @@ func TestParseOrganizationResponse(t *testing.T) {
 				}
 				if got == nil {
 					t.Fatal("expected quota data, got nil")
+					return
 				}
 				if got.TenantID != "tenant-id" {
 					t.Fatalf("TenantID = %q, want %q", got.TenantID, "tenant-id")
@@ -166,6 +167,7 @@ func TestParseOrganizationResponse(t *testing.T) {
 				}
 				if got == nil {
 					t.Fatal("expected quota data, got nil")
+					return
 				}
 				if got.TenantName != "Configured Tenant" {
 					t.Fatalf("TenantName = %q, want %q", got.TenantName, "Configured Tenant")
@@ -235,6 +237,7 @@ func TestFetchQuotaFromAPI(t *testing.T) {
 				}
 				if got == nil {
 					t.Fatal("expected quota data, got nil")
+					return
 				}
 				if got.TenantName != "Graph Tenant" {
 					t.Fatalf("TenantName = %q, want %q", got.TenantName, "Graph Tenant")

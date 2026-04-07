@@ -188,7 +188,7 @@ func TestBuildComputeQuotaResult(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		
+
 		t.Run(tc.name, func(t *testing.T) {
 			result, ok, err := buildComputeQuotaResult("sub-1", "eastus", tc.usage)
 			tc.assertions(t, result, ok, err)
@@ -378,7 +378,7 @@ func TestBuildNetworkQuotaResult(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		
+
 		t.Run(tc.name, func(t *testing.T) {
 			result, ok, err := buildNetworkQuotaResult("sub-1", "westus3", tc.usage)
 			tc.assertions(t, result, ok, err)
