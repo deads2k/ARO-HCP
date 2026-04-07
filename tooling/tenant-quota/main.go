@@ -28,11 +28,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/credentials"
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/subscriptionquota"
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/tenantquota"
 	"github.com/Azure/ARO-HCP/internal/version"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/credentials"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/subscriptionquota"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/tenantquota"
 )
 
 func main() {

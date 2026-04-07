@@ -124,7 +124,7 @@ resource tenantQuotaAlerts 'Microsoft.AlertsManagement/prometheusRuleGroups@2023
         }
         annotations: {
           summary: 'Tenant quota metrics are stale'
-          description: 'No tenant_quota_usage_percentage metrics received for 3 days. Possible causes: (1) Collector pod is down - check: kubectl get pods -n tenant-quota, (2) Service principal token expired - run: cd dev-infrastructure/ops-tools/tenant-quota && ./scripts/renew-sp-secret.sh --list to check expiry, then ./scripts/renew-sp-secret.sh --tenant <name> --restart to renew, (3) Prometheus not scraping - check ServiceMonitor in tenant-quota namespace. See dev-infrastructure/ops-tools/docs/tenant-quota-collector.md for full troubleshooting.'
+          description: 'No tenant_quota_usage_percentage metrics received for 3 days. Possible causes: (1) Collector pod is down - check: kubectl get pods -n tenant-quota, (2) Service principal token expired - run: cd tooling/tenant-quota && ./scripts/renew-sp-secret.sh --list to check expiry, then ./scripts/renew-sp-secret.sh --tenant <name> --restart to renew, (3) Prometheus not scraping - check ServiceMonitor in tenant-quota namespace. See docs/ops/tenant-quota-collector.md for full troubleshooting.'
         }
         actions: [
           {

@@ -98,7 +98,7 @@ output myNewAppUAMIId string = myNewAppUAMI.id
 Create the directory structure for your app:
 
 ```
-dev-infrastructure/ops-tools/my-new-app/
+tooling/my-new-app/
 ├── deploy/
 │   ├── Chart.yaml
 │   ├── values.yaml
@@ -300,7 +300,7 @@ spec:
 
 ## Step 4: Create Pipeline Configuration
 
-Create `dev-infrastructure/ops-tools/my-new-app/pipeline.yaml`:
+Create `tooling/my-new-app/pipeline.yaml`:
 
 ```yaml
 name: my-new-app
@@ -309,8 +309,8 @@ serviceGroup: Microsoft.Azure.ARO.HCP.Opstool.MyNewApp
 steps:
 - name: output
   type: ARM
-  template: ../../templates/output-opstool-cluster.bicep
-  parameters: ../../configurations/output-opstool-cluster.tmpl.bicepparam
+  template: ../../dev-infrastructure/templates/output-opstool-cluster.bicep
+  parameters: ../../dev-infrastructure/configurations/output-opstool-cluster.tmpl.bicepparam
 
 - name: deploy
   type: Helm
@@ -378,11 +378,11 @@ services:
   purpose: Deploy the opstool AKS cluster and Prometheus monitoring stack.
   children:
   - serviceGroup: Microsoft.Azure.ARO.HCP.Opstool.TenantQuota
-    pipelinePath: dev-infrastructure/ops-tools/tenant-quota/pipeline.yaml
+    pipelinePath: tooling/tenant-quota/pipeline.yaml
     purpose: Deploy the tenant-quota-collector.
   # Add your new app here
   - serviceGroup: Microsoft.Azure.ARO.HCP.Opstool.MyNewApp
-    pipelinePath: dev-infrastructure/ops-tools/my-new-app/pipeline.yaml
+    pipelinePath: tooling/my-new-app/pipeline.yaml
     purpose: Deploy my-new-app.
 ```
 
@@ -394,7 +394,7 @@ If your app has custom code:
 
 ```bash
 # Build the image
-cd dev-infrastructure/ops-tools/my-new-app
+cd tooling/my-new-app
 podman build -t my-new-app:latest .
 
 # Tag for ACR
@@ -424,7 +424,7 @@ If your app exposes Prometheus metrics, you can add alerts that use the **shared
 
 ### 8.1 Create alerting.bicep for your app
 
-Create `dev-infrastructure/ops-tools/my-new-app/alerting.bicep`:
+Create `tooling/my-new-app/alerting.bicep`:
 
 ```bicep
 // Prometheus alert rules for my-new-app
@@ -497,7 +497,7 @@ param alertingEnabled = {{ .opstool.alerting.enabled }}
 - name: alerting
   action: ARM
   template: alerting.bicep
-  parameters: ../../configurations/my-new-app-alerting.tmpl.bicepparam
+  parameters: ../../dev-infrastructure/configurations/my-new-app-alerting.tmpl.bicepparam
   deploymentLevel: ResourceGroup
   variables:
   - name: azureMonitorWorkspaceId
@@ -568,7 +568,7 @@ curl http://localhost:8080/metrics
 
 - [ ] Added UAMI to `opstool-cluster.bicep`
 - [ ] Added output to `output-opstool-cluster.bicep`
-- [ ] Created Helm chart in `dev-infrastructure/ops-tools/my-new-app/`
+- [ ] Created Helm chart in `tooling/my-new-app/`
 - [ ] Created `pipeline.yaml`
 - [ ] Added to `topology-opstool.yaml`
 - [ ] Built and pushed container image

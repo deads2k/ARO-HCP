@@ -105,7 +105,7 @@ clouds:
                 #   regions:
                 #     - uksouth
             # TODO: Uncomment after creating the Test Tenant SP with:
-            #   ./dev-infrastructure/ops-tools/tenant-quota/scripts/manage-service-principals.sh --tenant test-tenant
+            #   ./tooling/tenant-quota/scripts/manage-service-principals.sh --tenant test-tenant
             # - tenantId: "93b21e64-4824-439a-b893-46c9b2a51082"
             #   tenantName: "TestTenant"
             #   servicePrincipalClientId: "TODO"

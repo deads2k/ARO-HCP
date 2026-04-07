@@ -21,7 +21,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/config"
 )
 
 // RoleAssignmentSource counts role assignments per subscription using the ARM

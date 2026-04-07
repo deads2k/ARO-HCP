@@ -1,4 +1,4 @@
-module github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota
+module github.com/Azure/ARO-HCP/tooling/tenant-quota
 
 go 1.25.5
 
@@ -37,4 +37,4 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/Azure/ARO-HCP/internal => ../../../internal
+replace github.com/Azure/ARO-HCP/internal => ../../internal

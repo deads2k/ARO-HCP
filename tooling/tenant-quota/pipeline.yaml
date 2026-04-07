@@ -8,8 +8,8 @@ resourceGroups:
   steps:
   - name: output
     action: ARM
-    template: ../../templates/output-opstool-cluster.bicep
-    parameters: ../../configurations/output-opstool-cluster.tmpl.bicepparam
+    template: ../../dev-infrastructure/templates/output-opstool-cluster.bicep
+    parameters: ../../dev-infrastructure/configurations/output-opstool-cluster.tmpl.bicepparam
     deploymentLevel: ResourceGroup
     outputOnly: true
   - name: deploy
@@ -46,7 +46,7 @@ resourceGroups:
   - name: alerting
     action: ARM
     template: alerting.bicep
-    parameters: ../../configurations/tenant-quota-alerting.tmpl.bicepparam
+    parameters: ../../dev-infrastructure/configurations/tenant-quota-alerting.tmpl.bicepparam
     deploymentLevel: ResourceGroup
     variables:
     - name: azureMonitorWorkspaceId

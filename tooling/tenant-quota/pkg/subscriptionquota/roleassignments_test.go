@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/config"
 )
 
 func TestNewRoleAssignmentSource(t *testing.T) {

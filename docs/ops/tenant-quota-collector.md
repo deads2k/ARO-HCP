@@ -79,7 +79,7 @@ Tenants are configured in the Helm values file. To add a new tenant:
      --name my-tenant-client-secret \
      --value "<client-secret>"
    ```
-3. Update `dev-infrastructure/ops-tools/tenant-quota/deploy/values.yaml`:
+3. Update `tooling/tenant-quota/deploy/values.yaml`:
    ```yaml
    tenants:
    - tenantName: "MyTenant"
@@ -201,14 +201,14 @@ The tenant/SP info is hardcoded in the TENANTS array within the scrip and matche
 **Check current secret expiration:**
 
 ```bash
-cd dev-infrastructure/ops-tools/tenant-quota
+cd tooling/tenant-quota
 ./scripts/renew-sp-secret.sh --list
 ```
 
 **Renew the token using the script:**
 
 ```bash
-cd dev-infrastructure/ops-tools/tenant-quota
+cd tooling/tenant-quota
 
 # IMPORTANT: Login to the correct Azure AD tenant first!
 # The script will show you which tenant ID to use.
@@ -244,11 +244,11 @@ az login --tenant <azure-ad-tenant-id>
 
 | File | Purpose |
 |------|---------|
-| `dev-infrastructure/ops-tools/tenant-quota/main.go` | Go application entry point |
-| `dev-infrastructure/ops-tools/tenant-quota/pkg/` | Go packages (config, tenantquota) |
-| `dev-infrastructure/ops-tools/tenant-quota/pipeline.yaml` | TenantQuota deployment pipeline |
-| `dev-infrastructure/ops-tools/tenant-quota/alerting.bicep` | App-specific Prometheus alert rules |
-| `dev-infrastructure/ops-tools/tenant-quota/deploy/` | Helm chart (values.yaml has tenant config) |
-| `dev-infrastructure/ops-tools/tenant-quota/scripts/renew-sp-secret.sh` | Script to renew SP client secrets |
+| `tooling/tenant-quota/main.go` | Go application entry point |
+| `tooling/tenant-quota/pkg/` | Go packages (config, tenantquota) |
+| `tooling/tenant-quota/pipeline.yaml` | TenantQuota deployment pipeline |
+| `tooling/tenant-quota/alerting.bicep` | App-specific Prometheus alert rules |
+| `tooling/tenant-quota/deploy/` | Helm chart (values.yaml has tenant config) |
+| `tooling/tenant-quota/scripts/renew-sp-secret.sh` | Script to renew SP client secrets |
 | `dev-infrastructure/templates/opstool-alerting.bicep` | Shared Action Group (Infra pipeline) |
 | `config/config-opstool.yaml` | Environment configuration |

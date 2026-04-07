@@ -89,7 +89,11 @@ Welcome to the **ARO HCP** documentation. This guide provides an overview of the
   - How to bump service component image digests in RH and MSFT environments
 - [High Level HCP Creation Flow](ops/hcp-cluster-creation-flow.md)
   - Walkthrough of an HCP cluster creation process through all the service layers of ARO HCP
+- [Opstool Add New App Guide](ops/opstool-add-new-app-guide.md)
+  - Pattern for adding a new opstool workload with colocated code, deploy assets, and rollout wiring
 - [Postgres Breakglass](ops/postgres-breakglass.md)
   - How to access the Postgres database
+- [Tenant Quota Collector](ops/tenant-quota-collector.md)
+  - Deployment, troubleshooting, and operational reference for the tenant quota collector
 
 ### [Terminology](terminology.md)

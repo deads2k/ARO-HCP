@@ -5,7 +5,7 @@
 # projected here via templatize range loops. To add a new tenant:
 #
 #   1. Create/update the SP and RBAC:
-#      ./dev-infrastructure/ops-tools/tenant-quota/scripts/manage-service-principals.sh --tenant <name>
+#      ./tooling/tenant-quota/scripts/manage-service-principals.sh --tenant <name>
 #   2. Add config: config/config-opstool.yaml under opstool.tenantQuota.tenants
 #   3. Redeploy:   templatize pipeline run ... --step deploy
 #

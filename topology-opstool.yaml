@@ -8,5 +8,5 @@ services:
   purpose: Deploy the opstool AKS cluster and Prometheus monitoring stack.
   children:
   - serviceGroup: Microsoft.Azure.ARO.HCP.Opstool.TenantQuota
-    pipelinePath: dev-infrastructure/ops-tools/tenant-quota/pipeline.yaml
+    pipelinePath: tooling/tenant-quota/pipeline.yaml
     purpose: Deploy the tenant-quota-collector.

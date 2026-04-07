@@ -2,12 +2,12 @@ TENANT_QUOTA_COLLECTOR_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 DEPLOY_ENV ?= opstool
 
--include $(TENANT_QUOTA_COLLECTOR_DIR)/../../../setup-templatize-env.mk
--include $(TENANT_QUOTA_COLLECTOR_DIR)/../../../.bingo/Variables.mk
+-include $(TENANT_QUOTA_COLLECTOR_DIR)/../../setup-templatize-env.mk
+-include $(TENANT_QUOTA_COLLECTOR_DIR)/../../.bingo/Variables.mk
 
 # Opstool uses its own config file, not the main config.yaml
-OPSTOOL_CONFIG_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../../config/config-opstool.yaml
-DEV_SETTINGS_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../../tooling/templatize/settings.yaml
+OPSTOOL_CONFIG_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../config/config-opstool.yaml
+DEV_SETTINGS_FILE := $(TENANT_QUOTA_COLLECTOR_DIR)/../../tooling/templatize/settings.yaml
 
 ARO_HCP_REVISION ?= $(shell git rev-parse HEAD)
 ARO_HCP_IMAGE_ACR ?= arohcpsvcdev
@@ -15,7 +15,7 @@ ARO_HCP_IMAGE_REGISTRY ?= ${ARO_HCP_IMAGE_ACR}.azurecr.io
 TENANT_QUOTA_COLLECTOR_IMAGE_REPOSITORY ?= tenant-quota-collector
 
 # Tag defaults to 'latest' for opstool dev environment (matches config-opstool.yaml)
-TENANT_QUOTA_IMAGE_REPOSITORY ?= $(shell DEPLOY_ENV=${DEPLOY_ENV} BASELINE_REPO=${TENANT_QUOTA_COLLECTOR_IMAGE_REPOSITORY} $(TENANT_QUOTA_COLLECTOR_DIR)/../../../generate-repo.sh)
+TENANT_QUOTA_IMAGE_REPOSITORY ?= $(shell DEPLOY_ENV=${DEPLOY_ENV} BASELINE_REPO=${TENANT_QUOTA_COLLECTOR_IMAGE_REPOSITORY} $(TENANT_QUOTA_COLLECTOR_DIR)/../../generate-repo.sh)
 TENANT_QUOTA_IMAGE_TAG ?= latest
 TENANT_QUOTA_TAGGED_IMAGE ?= $(ARO_HCP_IMAGE_REGISTRY)/$(TENANT_QUOTA_IMAGE_REPOSITORY):$(TENANT_QUOTA_IMAGE_TAG)
 
@@ -26,7 +26,7 @@ endif
 .DEFAULT_GOAL := tenant-quota-collector
 
 tenant-quota-collector:
-	GOWORK=off go build -ldflags="-X github.com/Azure/ARO-HCP/internal/version.CommitSHA=${TENANT_QUOTA_IMAGE_TAG}" -o tenant-quota-collector .
+	go build -ldflags="-X github.com/Azure/ARO-HCP/internal/version.CommitSHA=${TENANT_QUOTA_IMAGE_TAG}" -o tenant-quota-collector .
 
 # ---------------------------------------------------------------------------
 # Local config rendering
@@ -69,7 +69,6 @@ fetch-secrets: _output/config.yaml
 # ---------------------------------------------------------------------------
 # Run locally
 # ---------------------------------------------------------------------------
-run: export GOWORK=off
 run: _output/config.yaml fetch-secrets
 	SECRETS_STORE_PATH=$(SECRETS_DIR) CONFIG_PATH=_output/config.yaml go run main.go
 
@@ -87,8 +86,8 @@ clean:
 .PHONY: clean
 
 image: Dockerfile $(shell find . -name '*.go' -o -name 'go.mod' -o -name 'go.sum') Makefile
-	cd $(TENANT_QUOTA_COLLECTOR_DIR)/../../.. && \
-	docker build . --file dev-infrastructure/ops-tools/tenant-quota/Dockerfile \
+	cd $(TENANT_QUOTA_COLLECTOR_DIR)/../.. && \
+	docker build . --file tooling/tenant-quota/Dockerfile \
 	               --build-arg PLATFORM=linux/amd64 \
 	               --build-arg REVISION=${ARO_HCP_REVISION} \
 	               --build-arg TAG=${TENANT_QUOTA_IMAGE_TAG} \

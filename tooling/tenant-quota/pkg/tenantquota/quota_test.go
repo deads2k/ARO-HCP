@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/ARO-HCP/dev-infrastructure/ops-tools/tenant-quota/pkg/config"
+	"github.com/Azure/ARO-HCP/tooling/tenant-quota/pkg/config"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

@@ -1,4 +1,4 @@
-using '../ops-tools/tenant-quota/alerting.bicep'
+using '../../tooling/tenant-quota/alerting.bicep'
 
 param azureMonitorWorkspaceId = '__azureMonitorWorkspaceId__'
 param sharedActionGroupId = '__sharedActionGroupId__'
