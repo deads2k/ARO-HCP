@@ -28,17 +28,17 @@
   {"column":"region","Properties":{"path":"$.log.region"}},
   {"column":"cluster","Properties":{"path":"$.log.cluster"}},
   {"column":"host","Properties":{"path":"$.log.kubernetes.host"}},
-  {"column":"container_name", "Properties": {"path": "$log.kubernetes.container_name"}},
+  {"column":"container_name", "Properties": {"path": "$.log.kubernetes.container_name"}},
   {"column":"container_image","Properties":{"path":"$.log.kubernetes.container_image"}},
   {"column":"namespace_name","Properties":{"path":"$.log.kubernetes.namespace_name"}},
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
   {"column":"pod_name","Properties":{"path":"$.log.kubernetes.pod_name"}},
   {"column":"tag","Properties":{"path":"$.tag"}},
-  {"column":"level", "Properties": {"path": "$log.level"}},
-  {"column":"caller","Properties": {"path": "$log.caller"}},
-  {"column":"msg",   "Properties": {"path": "$log.msg" }},
-  {"column":"resource_id", "Properties": {"path": "$log.aro_hcp_cluster_resource_id"}},
-  {"column":"opid",  "Properties": {"path": "$log.opid"}},
-  {"column":"cid",   "Properties": {"path": "$log.cid"}}
+  {"column":"level", "Properties": {"path": "$.log.level"}},
+  {"column":"caller","Properties": {"path": "$.log.caller"}},
+  {"column":"msg",   "Properties": {"path": "$.log.msg" }},
+  {"column":"resource_id", "Properties": {"path": "$.log.aro_hcp_cluster_resource_id"}},
+  {"column":"opid",  "Properties": {"path": "$.log.opid"}},
+  {"column":"cid",   "Properties": {"path": "$.log.cid"}}
 ]
 ```

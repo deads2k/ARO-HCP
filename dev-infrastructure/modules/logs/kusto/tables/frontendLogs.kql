@@ -43,7 +43,7 @@
   {"column":"region","Properties":{"path":"$.log.region"}},
   {"column":"cluster","Properties":{"path":"$.log.cluster"}},
   {"column":"namespace_name","Properties":{"path":"$.log.kubernetes.namespace_name"}},
-  {"column":"container_name", "Properties": {"path": "$log.kubernetes.container_name"}},
+  {"column":"container_name", "Properties": {"path": "$.log.kubernetes.container_name"}},
   {"column":"container_image","Properties":{"path":"$.log.kubernetes.container_image"}},
   {"column":"host","Properties":{"path":"$.log.kubernetes.host"}},
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
