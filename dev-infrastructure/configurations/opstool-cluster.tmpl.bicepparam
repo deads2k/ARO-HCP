@@ -21,4 +21,5 @@ param aksClusterOutboundIPAddressIPTags = '{{ .opstool.aks.clusterOutboundIPAddr
 param owningTeamTagValue = '{{ .monitoring.alertRuleOwningTeamTag }}'
 param azureMonitorWorkspaceName = '{{ .opstool.monitoring.workspaceName }}'
 param workloadKVName = '{{ .opstool.keyVault.name }}'
-param svcAcrResourceId = '{{ .svc.acr.id }}'
+param svcAcrName = '{{ .svc.acr.name }}'
+param svcAcrResourceGroupName = '{{ .svc.acr.resourceGroup }}'

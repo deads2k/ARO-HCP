@@ -84,8 +84,11 @@ param aksEtcdKVEnableSoftDelete bool = false
 @description('Name for the workload Key Vault')
 param workloadKVName string
 
-@description('The resource ID of the SVC ACR for image pulls')
-param svcAcrResourceId string = ''
+@description('The name of the shared SVC ACR for image pulls')
+param svcAcrName string = ''
+
+@description('The resource group containing the shared SVC ACR')
+param svcAcrResourceGroupName string = ''
 
 module managedIdentities '../modules/managed-identities.bicep' = {
   name: 'opstool-managed-identities'
@@ -100,6 +103,10 @@ module managedIdentities '../modules/managed-identities.bicep' = {
 }
 
 var nsgName = 'opstool-cluster-nsg'
+var systemAgentPoolName = 'system'
+var userAgentPoolName = 'user'
+var infraAgentPoolName = 'infra'
+
 resource opstoolClusterNSG 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
   name: nsgName
   location: location
@@ -168,6 +175,9 @@ module opstoolCluster '../modules/aks-cluster-base.bicep' = {
     ipResourceGroup: resourceGroup().name
     ipZones: locationAvailabilityZoneList
     aksClusterName: aksClusterName
+    systemAgentPoolName: systemAgentPoolName
+    userAgentPoolName: userAgentPoolName
+    infraAgentPoolName: infraAgentPoolName
     aksNodeResourceGroupName: aksNodeResourceGroupName
     aksEtcdKVEnableSoftDelete: aksEtcdKVEnableSoftDelete
     aksClusterOutboundIPAddressIPTags: aksClusterOutboundIPAddressIPTags
@@ -208,7 +218,7 @@ module opstoolCluster '../modules/aks-cluster-base.bicep' = {
     aksKeyVaultName: aksKeyVaultName
     aksKeyVaultTagName: aksKeyVaultTagName
     aksKeyVaultTagValue: aksKeyVaultTagValue
-    pullAcrResourceIds: empty(svcAcrResourceId) ? [] : [svcAcrResourceId]
+    pullAcrResourceIds: empty(svcAcrName) || empty(svcAcrResourceGroupName) ? [] : [resourceId(svcAcrResourceGroupName, 'Microsoft.ContainerRegistry/registries', svcAcrName)]
     deploymentMsiId: opstoolMI.uamiID
     enableSwiftV2Nodepools: false
     owningTeamTagValue: owningTeamTagValue

@@ -139,7 +139,7 @@ metadata:
 
 ```yaml
 # Image configuration
-imageRegistry: "arohcpsvcdev.azurecr.io"
+imageRegistry: "{{ .svc.acr.name }}.azurecr.io"
 imageRepository: "my-new-app"
 imageTag: "latest"
 

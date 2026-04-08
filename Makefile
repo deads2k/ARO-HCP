@@ -10,6 +10,7 @@ LINT_GOTAGS?='E2Etests'
 TOOLS_BIN_DIR := tooling/bin
 DEPLOY_ENV ?= pers
 CONFIG_FILE ?= config/config.yaml
+TOPOLOGY_FILE ?= topology.yaml
 export AZURE_TOKEN_CREDENTIALS ?= dev
 
 .DEFAULT_GOAL := all
@@ -365,6 +366,13 @@ endif
 .PHONY: personal-dev-env
 
 #
+# Opstool topology local run
+#
+opstool-local-run:
+	$(MAKE) local-run DEPLOY_ENV=opstool CONFIG_FILE=config/config-opstool.yaml TOPOLOGY_FILE=topology-opstool.yaml WHAT="--entrypoint Microsoft.Azure.ARO.HCP.Opstool.Infra"
+.PHONY: opstool-local-run
+
+#
 # Local Cluster Service Development Environment
 #
 ifeq ($(DEPLOY_ENV),$(filter $(DEPLOY_ENV),pers swft))
@@ -421,7 +429,7 @@ CONFIG_OUTPUT ?= _artifacts/config.yaml
 local-run: $(TEMPLATIZE)
 	$(TEMPLATIZE) entrypoint run --config-file "${CONFIG_FILE}" \
 								     --config-file-override "${OVERRIDE_CONFIG_FILE}" \
-	                                 --topology-config topology.yaml \
+	                                 --topology-config "$(TOPOLOGY_FILE)" \
 	                                 --dev-settings-file tooling/templatize/settings.yaml \
 	                                 --dev-environment $(DEPLOY_ENV) \
 	                                 $(WHAT) $(EXTRA_ARGS) \

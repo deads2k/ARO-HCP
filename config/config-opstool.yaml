@@ -20,11 +20,9 @@ clouds:
         rg: "opstool-{{ .ctx.region }}"
         subscription:
           key: "ARO Hosted Control Planes (EA Subscription 1)"
-        # Placeholder with empty id as was manually deployed using azure cli. Re-enable when the existing role assignment is cleaned up.
         acr:
           name: "arohcpsvcdev"
           resourceGroup: "global"
-          id: ""
       monitoring:
         alertRuleOwningTeamTag: ""
       dns:
@@ -48,7 +46,7 @@ clouds:
             minCount: 1
             maxCount: 3
             vmSize: "Standard_D4s_v3"
-            osDiskSizeGB: 32
+            osDiskSizeGB: 64
             zones: "1"
             zoneRedundantMode: "Disabled"
         monitoring:
