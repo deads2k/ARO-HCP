@@ -31,7 +31,8 @@
   body_written_bytes: int,
   response_status_code: string,
   duration: int,
-  tag: string
+  tag: string,
+  container_hash: string
 )
 
 .create-or-alter table frontendLogs ingestion json mapping 'ingestionMapping'
@@ -69,6 +70,7 @@
   {"column":"body_read_bytes","Properties":{"path":"$.log.body_read_bytes"}},
   {"column":"body_written_bytes","Properties":{"path":"$.log.body_written_bytes"}},
   {"column":"response_status_code","Properties":{"path":"$.log.response_status_code"}},
-  {"column":"duration","Properties":{"path":"$.log.duration"}}
+  {"column":"duration","Properties":{"path":"$.log.duration"}},
+  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

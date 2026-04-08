@@ -10,7 +10,8 @@
   labels: string,
   pod_name: string,
   region: string,
-  tag: string
+  tag: string,
+  container_hash: string
 )
 
 .create-or-alter table containerLogs ingestion json mapping 'ingestionMapping'
@@ -27,6 +28,7 @@
   {"column":"namespace_name","Properties":{"path":"$.log.kubernetes.namespace_name"}},
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
   {"column":"pod_name","Properties":{"path":"$.log.kubernetes.pod_name"}},
-  {"column":"tag","Properties":{"path":"$.tag"}}
+  {"column":"tag","Properties":{"path":"$.tag"}},
+  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

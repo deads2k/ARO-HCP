@@ -25,7 +25,8 @@
   cluster_id: string,
   cloud_error_code: string,
   cloud_error_message: string,
-  tag: string
+  tag: string,
+  container_hash: string
 )
 
 .create-or-alter table backendLogs ingestion json mapping 'ingestionMapping'
@@ -58,5 +59,6 @@
   {"column":"cluster_id","Properties":{"path":"$.log.cluster_id"}},
   {"column":"cloud_error_code","Properties":{"path":"$.log.cloud_error_code"}},
   {"column":"cloud_error_message","Properties":{"path":"$.log.cloud_error_message"}},
+  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

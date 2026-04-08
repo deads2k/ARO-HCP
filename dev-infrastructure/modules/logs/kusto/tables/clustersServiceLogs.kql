@@ -16,7 +16,8 @@
   msg: string,
   resource_id: string,
   opid: string,
-  cid: string
+  cid: string,
+  container_hash: string
 )
 
 .create-or-alter table clustersServiceLogs ingestion json mapping 'ingestionMapping'
@@ -39,6 +40,7 @@
   {"column":"msg",   "Properties": {"path": "$.log.msg" }},
   {"column":"resource_id", "Properties": {"path": "$.log.aro_hcp_cluster_resource_id"}},
   {"column":"opid",  "Properties": {"path": "$.log.opid"}},
-  {"column":"cid",   "Properties": {"path": "$.log.cid"}}
+  {"column":"cid",   "Properties": {"path": "$.log.cid"}},
+  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```
