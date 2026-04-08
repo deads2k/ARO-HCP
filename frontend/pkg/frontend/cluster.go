@@ -385,7 +385,7 @@ func (f *Frontend) createHCPCluster(writer http.ResponseWriter, request *http.Re
 	clusterCreateOperation := database.NewOperation(
 		database.OperationRequestCreate,
 		newInternalCluster.ID,
-		*newInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		ptr.Deref(newInternalCluster.ServiceProviderProperties.ClusterServiceID, api.InternalID{}),
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -675,7 +675,7 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 	clusterUpdateOperation := database.NewOperation(
 		database.OperationRequestUpdate,
 		oldInternalCluster.ID,
-		*oldInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		ptr.Deref(oldInternalCluster.ServiceProviderProperties.ClusterServiceID, api.InternalID{}),
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
