@@ -108,7 +108,7 @@ show-image:
 .PHONY: show-image
 
 # Deployment is now handled by templatize:
-#   ./templatize-bin pipeline run \
+#   go run ./tooling/templatize/main.go pipeline run \
 #     --service-group Microsoft.Azure.ARO.HCP.Opstool.TenantQuota \
 #     --topology-file topology-opstool.yaml \
 #     --config-file config/config-opstool.yaml \

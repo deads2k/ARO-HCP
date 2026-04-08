@@ -1,47 +1,12 @@
-# Default values for tenant-quota collector
-# This chart deploys the tenant-quota collector to the opstool environment.
-#
-# Tenant configuration is sourced from config/config-opstool.yaml and
-# projected here via templatize range loops. To add a new tenant:
-#
-#   1. Create/update the SP and RBAC:
-#      ./tooling/tenant-quota/scripts/manage-service-principals.sh --tenant <name>
-#   2. Add config: config/config-opstool.yaml under opstool.tenantQuota.tenants
-#   3. Redeploy:   templatize pipeline run ... --step deploy
-#
-# For SP secret renewal:
-#   scripts/renew-sp-secret.sh --list
-#   scripts/renew-sp-secret.sh --tenant <name>
-#
-# =============================================================================
-# Image configuration - uses templatize variable substitution
-imageRegistry: "{{ .opstool.tenantQuota.image.registry }}"
-imageRepository: "{{ .opstool.tenantQuota.image.repository }}"
-imageTag: "{{ .opstool.tenantQuota.image.tag }}"
-# Managed Identity (injected by templatize from pipeline outputs)
-msiClientId: "__tenantQuotaUAMIClientId__"
-# Secret Provider configuration
+# Static chart defaults. The rollout pipeline preprocesses `values.yaml.tmpl`
+# and passes the rendered file to Helm; this file only needs to stay valid YAML
+# so the chart itself can be loaded before overrides are applied.
+imageRegistry: ""
+imageRepository: "tenant-quota-collector"
+imageTag: ""
+msiClientId: ""
 secretProvider:
-  keyVault: "__keyVaultName__"
-  msiClientId: "__tenantQuotaUAMIClientId__"
+  keyVault: ""
+  msiClientId: ""
   tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
-# =============================================================================
-# Tenant configurations projected from config-opstool.yaml
-# =============================================================================
-tenants:
-{{- range .opstool.tenantQuota.tenants }}
-- tenantId: "{{ .tenantId }}"
-  tenantName: "{{ .tenantName }}"
-  servicePrincipalClientId: "{{ .servicePrincipalClientId }}"
-  keyVaultSecretName: "{{ .keyVaultSecretName }}"
-  directoryQuota: {{ .directoryQuota }}
-  subscriptions:
-{{- range .subscriptions }}
-    - name: "{{ .name }}"
-      roleAssignmentLimit: {{ .roleAssignmentLimit }}
-      regions:
-{{- range .regions }}
-        - "{{ . }}"
-{{- end }}
-{{- end }}
-{{- end }}
+tenants: []

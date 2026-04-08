@@ -20,7 +20,7 @@ resourceGroups:
     namespaceFiles:
     - deploy/namespace.yaml
     chartDir: deploy
-    valuesFile: deploy/values.yaml
+    valuesFile: deploy/values.yaml.tmpl
     kustoEndpoint:
       resourceGroup: opstool
       step: output
