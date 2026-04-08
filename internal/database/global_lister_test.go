@@ -33,8 +33,4 @@ func TestGlobalListers_Billing(t *testing.T) {
 	// Verify the BillingDocs method exists and returns a GlobalLister
 	lister := gl.BillingDocs()
 	require.NotNil(t, lister, "BillingDocs() should return a non-nil GlobalLister")
-
-	// Verify the type is correct
-	_, ok := lister.(GlobalLister[BillingDocument])
-	require.True(t, ok, "BillingDocs() should return a GlobalLister[BillingDocument]")
 }

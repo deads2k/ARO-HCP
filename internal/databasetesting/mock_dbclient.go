@@ -580,7 +580,7 @@ func (m *mockBillingDocCRUD) List(ctx context.Context) (database.DBClientIterato
 
 	// Filter billing documents by subscription ID (partition key)
 	for id, doc := range m.mockDB.billing {
-		if strings.ToLower(doc.SubscriptionID) == strings.ToLower(m.subscriptionID) {
+		if strings.EqualFold(doc.SubscriptionID, m.subscriptionID) {
 			ids = append(ids, id)
 			items = append(items, doc)
 		}
