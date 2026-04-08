@@ -107,9 +107,6 @@ type DBClient interface {
 	// to end users via ARM.  They must also survive the thing they are deleting, so they live under a subscription directly.
 	Operations(subscriptionID string) OperationCRUD
 
-	// Billing retrieves a partition-scoped interface for querying billing documents within a subscription.
-	Billing(subscriptionID string) BillingCRUD
-
 	Subscriptions() SubscriptionCRUD
 
 	// BillingDocs retrieves a CRUD interface for managing billing documents within a subscription.
@@ -181,10 +178,6 @@ func (d *cosmosDBClient) HCPClusters(subscriptionID, resourceGroupName string) H
 
 func (d *cosmosDBClient) Operations(subscriptionID string) OperationCRUD {
 	return NewOperationCRUD(d.resources, subscriptionID)
-}
-
-func (d *cosmosDBClient) Billing(subscriptionID string) BillingCRUD {
-	return NewBillingCRUD(d.billing, subscriptionID)
 }
 
 func (d *cosmosDBClient) Subscriptions() SubscriptionCRUD {

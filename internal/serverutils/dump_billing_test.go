@@ -40,17 +40,17 @@ func TestDumpBillingToLogger(t *testing.T) {
 	mockDB := databasetesting.NewMockDBClient()
 
 	// Create billing doc for cluster-1 (active)
-	billingDoc1 := database.NewBillingDocument(cluster1ResourceID)
+	billingDoc1 := database.NewBillingDocument("billing-doc-1", cluster1ResourceID)
 	billingDoc1.CreationTime = time.Now().UTC()
-	err = mockDB.CreateBillingDoc(ctx, billingDoc1)
+	err = mockDB.BillingDocs(cluster1ResourceID.SubscriptionID).Create(ctx, billingDoc1)
 	require.NoError(t, err)
 
 	// Create billing doc for cluster-2 (deleted)
-	billingDoc2 := database.NewBillingDocument(cluster2ResourceID)
+	billingDoc2 := database.NewBillingDocument("billing-doc-2", cluster2ResourceID)
 	billingDoc2.CreationTime = time.Now().UTC().Add(-1 * time.Hour)
 	deletionTime := time.Now().UTC()
 	billingDoc2.DeletionTime = &deletionTime
-	err = mockDB.CreateBillingDoc(ctx, billingDoc2)
+	err = mockDB.BillingDocs(cluster2ResourceID.SubscriptionID).Create(ctx, billingDoc2)
 	require.NoError(t, err)
 
 	// Test: Dump billing for cluster-1 should find the billing document
@@ -84,10 +84,10 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 	mockDB := databasetesting.NewMockDBClient()
 
 	// Create billing docs for all three clusters
-	for _, resourceID := range []*azcorearm.ResourceID{cluster1ResourceID, cluster2ResourceID, cluster3ResourceID} {
-		doc := database.NewBillingDocument(resourceID)
+	for i, resourceID := range []*azcorearm.ResourceID{cluster1ResourceID, cluster2ResourceID, cluster3ResourceID} {
+		doc := database.NewBillingDocument(resourceID.Name+"-billing-"+string(rune('1'+i)), resourceID)
 		doc.CreationTime = time.Now().UTC()
-		err = mockDB.CreateBillingDoc(ctx, doc)
+		err = mockDB.BillingDocs(resourceID.SubscriptionID).Create(ctx, doc)
 		require.NoError(t, err)
 	}
 

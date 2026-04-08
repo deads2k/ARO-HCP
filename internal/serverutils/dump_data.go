@@ -89,7 +89,7 @@ func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, re
 	logger := utils.LoggerFromContext(ctx)
 
 	// Query billing documents for this subscription (partition-scoped, not cross-partition)
-	iter, err := cosmosClient.Billing(resourceID.SubscriptionID).List(ctx)
+	iter, err := cosmosClient.BillingDocs(resourceID.SubscriptionID).List(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}

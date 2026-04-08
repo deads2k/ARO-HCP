@@ -85,8 +85,8 @@ func TestBillingDumpController_SyncOnce_WithBillingDoc(t *testing.T) {
 	mockDB := databasetesting.NewMockDBClient()
 
 	// Create billing document
-	billingDoc := database.NewBillingDocument(clusterResourceID)
-	err = mockDB.CreateBillingDoc(ctx, billingDoc)
+	billingDoc := database.NewBillingDocument("billing-doc-1", clusterResourceID)
+	err = mockDB.BillingDocs(clusterResourceID.SubscriptionID).Create(ctx, billingDoc)
 	require.NoError(t, err)
 
 	syncer := &billingDump{
