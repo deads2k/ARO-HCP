@@ -269,7 +269,7 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	subscriptionNonClusterDataDumpController := datadumpcontrollers.NewSubscriptionNonClusterDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	clusterRecursiveDataDumpController := datadumpcontrollers.NewClusterRecursiveDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	csStateDumpController := datadumpcontrollers.NewCSStateDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers, b.options.ClustersServiceClient)
-	billingDumpController := controllers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
+	billingDumpController := datadumpcontrollers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
 	operationClusterCreateController := operationcontrollers.NewGenericOperationController(
 		"OperationClusterCreate",
