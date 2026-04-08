@@ -46,7 +46,7 @@ require (
 	k8s.io/client-go v0.34.3
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-aggregator v0.34.3
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -69,6 +69,7 @@ require (
 	github.com/Azure/ARO-Tools/tools/registration v0.0.0-20260324125451-f78af490048c // indirect
 	github.com/Azure/ARO-Tools/tools/secret-sync v0.0.0-20260324125451-f78af490048c // indirect
 	github.com/Azure/ARO-Tools/tools/yamlwrap v0.0.0-20260324125451-f78af490048c // indirect
+	github.com/Azure/ARO-Tools/pipelines v0.0.0-20260408081443-a0b4376609ef // indirect
 	github.com/Azure/azure-kusto-go/azkustodata v1.2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice v1.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0 // indirect
