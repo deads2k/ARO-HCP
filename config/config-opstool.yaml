@@ -98,10 +98,10 @@ clouds:
                   regions:
                     - westus3
                 # TODO: Uncomment after getting role assignment write access on this subscription
-                # - name: "ARO SRE Team - INT (EA Subscription 3)"
-                #   roleAssignmentLimit: 4000
-                #   regions:
-                #     - uksouth
+                - name: "ARO SRE Team - INT (EA Subscription 3)"
+                  roleAssignmentLimit: 4000
+                  regions:
+                    - uksouth
             # TODO: Uncomment after creating the Test Tenant SP with:
             #   ./tooling/tenant-quota/scripts/manage-service-principals.sh --tenant test-tenant
             # - tenantId: "93b21e64-4824-439a-b893-46c9b2a51082"
