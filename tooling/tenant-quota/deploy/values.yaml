@@ -8,5 +8,5 @@ msiClientId: ""
 secretProvider:
   keyVault: ""
   msiClientId: ""
-  tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
+  tenantId: ""
 tenants: []

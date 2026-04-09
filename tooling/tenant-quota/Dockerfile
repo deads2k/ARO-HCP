@@ -25,5 +25,3 @@ COPY --from=builder /app/tooling/tenant-quota/tenant-quota-collector .
 ARG REVISION
 LABEL vcs-ref="${REVISION}"
 ENTRYPOINT ["/tenant-quota-collector"]
-
-

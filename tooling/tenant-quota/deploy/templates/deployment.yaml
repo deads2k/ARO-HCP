@@ -17,6 +17,7 @@ spec:
         app: tenant-quota-collector
       annotations:
         azure.workload.identity/use: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: tenant-quota-collector
       tolerations:

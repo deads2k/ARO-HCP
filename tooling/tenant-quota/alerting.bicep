@@ -117,7 +117,7 @@ resource tenantQuotaAlerts 'Microsoft.AlertsManagement/prometheusRuleGroups@2023
         alert: 'TenantQuotaMetricsStale'
         enabled: true
         expression: 'absent(tenant_quota_usage_percentage)'
-        for: 'P3D'
+        for: 'PT6H'
         severity: 2
         labels: {
           severity: 'critical'

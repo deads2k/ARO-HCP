@@ -57,12 +57,14 @@ type Collector struct {
 }
 
 func NewCollector(cfg *config.Config, logger *slog.Logger,
-	credProvider *credentials.Provider, cacheTTL time.Duration) *Collector {
+	credProvider *credentials.Provider, cacheTTL time.Duration, sources ...QuotaSource) *Collector {
 
-	sources := []QuotaSource{
-		NewRoleAssignmentSource(cfg.Tenants),
-		&ComputeQuotaSource{},
-		&NetworkQuotaSource{},
+	if len(sources) == 0 {
+		sources = []QuotaSource{
+			NewRoleAssignmentSource(cfg.Tenants),
+			&ComputeQuotaSource{},
+			&NetworkQuotaSource{},
+		}
 	}
 
 	return &Collector{
@@ -136,8 +138,11 @@ func (c *Collector) collectAll(ctx context.Context) {
 	c.cache.Prune()
 }
 
-func (c *Collector) collectSource(ctx context.Context, source QuotaSource,
+func (c *Collector) collectSource(parentCtx context.Context, source QuotaSource,
 	cred *azidentity.ClientSecretCredential, sub config.SubscriptionConfig) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, c.config.GetTimeout())
+	defer cancel()
 
 	regions := sub.Regions
 	if !source.IsRegional() {

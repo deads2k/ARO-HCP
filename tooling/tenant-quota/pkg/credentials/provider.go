@@ -66,14 +66,21 @@ func (p *Provider) ValidateCredentials(tenants []config.TenantConfig) error {
 }
 
 func (p *Provider) GetCredential(tenant config.TenantConfig) (*azidentity.ClientSecretCredential, error) {
-	cacheKey := credentialCacheKey(tenant)
+	key := credentialCacheKey(tenant)
 
 	p.credMu.RLock()
-	if cred, ok := p.credCache[cacheKey]; ok {
+	if cred, ok := p.credCache[key]; ok {
 		p.credMu.RUnlock()
 		return cred, nil
 	}
 	p.credMu.RUnlock()
+
+	p.credMu.Lock()
+	defer p.credMu.Unlock()
+
+	if cred, ok := p.credCache[key]; ok {
+		return cred, nil
+	}
 
 	secret, err := readSecret(tenant.KeyVaultSecretName)
 	if err != nil {
@@ -90,10 +97,7 @@ func (p *Provider) GetCredential(tenant config.TenantConfig) (*azidentity.Client
 		return nil, fmt.Errorf("create credential: %w", err)
 	}
 
-	p.credMu.Lock()
-	p.credCache[cacheKey] = cred
-	p.credMu.Unlock()
-
+	p.credCache[key] = cred
 	p.logger.Debug("Created credential for tenant", "tenant", tenant.GetDisplayName())
 	return cred, nil
 }
