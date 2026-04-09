@@ -53,6 +53,25 @@
 * **Preferred Logger:** For logging, use `ginkgo.GinkgoLogr` to generate info or error entries in the output. This is the preferred logger. Alternatively, you can use the `klog` from the `k8s.io` module. To measure the execution time of a specific method, utilize the `RecordTestStep` function as a `defer` call within that method.
 * **Ginkgo Writer:** Use `ginkgo.GinkgoWriter` to create a regular message in output.
 
+### Logging in Eventually/Polling Tests
+
+When writing tests that poll until a condition is met (e.g. `Eventually(...)`, `wait.PollUntilContextTimeout`, or any retry loop), follow these rules to produce output that is actionable when failures occur:
+
+1. **Delta-only logging:** Only emit a log line when the observed state *changes* between poll iterations. Logging the same message every 15 seconds creates noise and hides real transitions. Track the previous error/state string and compare before logging.
+
+2. **Minimal state representation:** Find the most compact way to represent what you observed. Prefer a single structured line over multi-line dumps during polling. For example:
+   ```
+   found 2/3 nodes upgraded to release image v4.16.1; 1 node still on v4.15.8: [worker-2]
+   ```
+
+3. **Expected vs. observed:** Every log line during polling and every failure message must make it clear what was expected and what was actually seen. A reader who has never seen the test code should be able to understand the problem from the output alone.
+
+4. **Consider dumping targeted state on failure:** When a polling loop times out, it is strongly recommended to dump the status of the specific resources you were directly polling — e.g. if you were waiting for Machines to upgrade, dump those Machine statuses. Keep this narrowly scoped to avoid log clutter; broad cluster diagnostics should be left to `oc adm inspect` or equivalent artifact collection. The goal is that the most immediately relevant context appears inline next to the failure message.
+
+5. **Use `eventuallyVerify` or equivalent patterns:** The `eventuallyVerify` helper in `e2e/cluster_pullsecret.go` implements delta-only logging by tracking the previous error string. This pattern (based on HyperShift's `EventuallyObject` in [test/e2e/util/eventually.go](https://github.com/openshift/hypershift/blob/main/test/e2e/util/eventually.go)) should be used as the baseline for all polling-style verifications. Consider also logging a timestamp for when the `eventuallyVerify` or similar polling operation completes successfully if the verifier you are using does not already implement this function.
+
+6. **Think about failure before writing the test:** Test authors must consider what happens when the test fails. Before submitting a test, intentionally trigger a failure and verify that the error output answers: *what went wrong, what was expected, and what information does someone need to debug it?*
+
 ## Labels
 
 * **Importance:**
