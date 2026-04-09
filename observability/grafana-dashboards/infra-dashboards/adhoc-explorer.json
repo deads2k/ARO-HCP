@@ -303,5 +303,6 @@
   "refresh": "",
   "schemaVersion": 39,
   "tags": ["explorer", "adhoc"],
+  "uid": "adhoc-explorer",
   "version": 0
 }
