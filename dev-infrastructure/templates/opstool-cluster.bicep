@@ -218,7 +218,9 @@ module opstoolCluster '../modules/aks-cluster-base.bicep' = {
     aksKeyVaultName: aksKeyVaultName
     aksKeyVaultTagName: aksKeyVaultTagName
     aksKeyVaultTagValue: aksKeyVaultTagValue
-    pullAcrResourceIds: empty(svcAcrName) || empty(svcAcrResourceGroupName) ? [] : [resourceId(svcAcrResourceGroupName, 'Microsoft.ContainerRegistry/registries', svcAcrName)]
+    pullAcrResourceIds: empty(svcAcrName) || empty(svcAcrResourceGroupName)
+      ? []
+      : [resourceId(svcAcrResourceGroupName, 'Microsoft.ContainerRegistry/registries', svcAcrName)]
     deploymentMsiId: opstoolMI.uamiID
     enableSwiftV2Nodepools: false
     owningTeamTagValue: owningTeamTagValue
