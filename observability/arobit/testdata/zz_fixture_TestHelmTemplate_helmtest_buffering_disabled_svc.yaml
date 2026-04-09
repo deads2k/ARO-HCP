@@ -362,6 +362,7 @@ spec:
       annotations:
         checksum/configmap: 49ad24d064241d58dbdcf15dded3d32901f320110de9a827f2ed85bfe2946764
     spec:
+      priorityClassName: service-lifecycle-critical
       serviceAccountName: 'arobit-forwarder'
       shareProcessNamespace: true
       containers:

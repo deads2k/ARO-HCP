@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: service-lifecycle-critical
+value: {{ .Values.value }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: {{ .Values.description | quote }}
