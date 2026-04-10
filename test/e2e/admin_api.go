@@ -94,14 +94,13 @@ var _ = Describe("SRE", func() {
 
 			// commonVerifiers are run for both aro-sre-pso and aro-sre-csa access levels.
 			// They cover actual data access smoke tests and SSAR-based read permission
-			// checks matching the system:aro-sre ClusterRole (which is the lower bound
-			// that both levels must satisfy).
+			// for both aro-sre-pso and aro-sre-csa access levels.
 			commonVerifiers := []verifiers.HostedClusterVerifier{
 				// Actual data access smoke tests
 				verifiers.VerifyListNamespaced("kube-system", "pods", "configmaps"),
 				verifiers.VerifyList("nodes", "namespaces"),
 				//verifiers.VerifyGetDeploymentLogs("openshift-monitoring", "prometheus-operator", ""),
-				// Read access across API groups via SSAR (system:aro-sre ClusterRole)
+				// Read access across API groups
 				verifiers.VerifyRBACAllowed(
 					// core API resources
 					verifiers.CanList("", "services"),
@@ -147,9 +146,6 @@ var _ = Describe("SRE", func() {
 					verifiers.CanList("discovery.k8s.io", "endpointslices"),
 					// certificates
 					verifiers.CanList("certificates.k8s.io", "certificatesigningrequests"),
-					// flowcontrol
-					verifiers.CanList("flowcontrol.apiserver.k8s.io", "flowschemas"),
-					verifiers.CanList("flowcontrol.apiserver.k8s.io", "prioritylevelconfigurations"),
 					// scheduling
 					verifiers.CanList("scheduling.k8s.io", "priorityclasses"),
 					// node
@@ -163,14 +159,6 @@ var _ = Describe("SRE", func() {
 					verifiers.CanList("config.openshift.io", "clusterversions"),
 					verifiers.CanList("config.openshift.io", "clusteroperators"),
 					verifiers.CanList("config.openshift.io", "infrastructures"),
-					// OpenShift: monitoring
-					verifiers.CanList("monitoring.coreos.com", "prometheusrules"),
-					verifiers.CanList("monitoring.coreos.com", "servicemonitors"),
-					// OpenShift: machine
-					verifiers.CanList("machine.openshift.io", "machines"),
-					verifiers.CanList("machine.openshift.io", "machinesets"),
-					// OpenShift: operator
-					verifiers.CanList("operator.openshift.io", "ingresscontrollers"),
 					// OpenShift: security
 					verifiers.CanList("security.openshift.io", "securitycontextconstraints"),
 					// OpenShift: route
@@ -193,7 +181,7 @@ var _ = Describe("SRE", func() {
 			By("creating SRE breakglass credentials with aro-sre-pso permissions")
 			aroSrePsoRestConfig, expiresAt, err := tc.CreateSREBreakglassCredentials(ctx, hcpResourceID, 2*time.Minute, "aro-sre-pso", currentIdentity)
 			Expect(err).NotTo(HaveOccurred())
-			err = runCreateSREBreakglassCredentialsVerifier(ctx, "aro-sre-pso", aroSrePsoRestConfig, append(commonVerifiers,
+			err = runCreateSREBreakglassCredentialsVerifier(ctx, "system:cluster-readers", aroSrePsoRestConfig, append(commonVerifiers,
 				// Negative: secrets read is forbidden (actual access test)
 				verifiers.ExpectForbidden(verifiers.VerifyListNamespaced("kube-system", "secrets")),
 				// Negative: write operations are forbidden
@@ -225,7 +213,7 @@ var _ = Describe("SRE", func() {
 			By("creating SRE breakglass credentials with aro-sre-csa permissions")
 			aroSreCsaRestConfig, expiresAt, err := tc.CreateSREBreakglassCredentials(ctx, hcpResourceID, 2*time.Minute, "aro-sre-csa", currentIdentity)
 			Expect(err).NotTo(HaveOccurred())
-			err = runCreateSREBreakglassCredentialsVerifier(ctx, "aro-sre-csa", aroSreCsaRestConfig, append(commonVerifiers,
+			err = runCreateSREBreakglassCredentialsVerifier(ctx, "system:masters", aroSreCsaRestConfig, append(commonVerifiers,
 				// Positive: can read secrets (cluster-admin)
 				verifiers.VerifyListNamespaced("kube-system", "secrets"),
 				// Positive: has full write access (cluster-admin)
@@ -237,6 +225,9 @@ var _ = Describe("SRE", func() {
 					verifiers.CanCreate("apps", "deployments"),
 					verifiers.CanDelete("apps", "deployments"),
 					verifiers.CanUpdate("apps", "deployments"),
+					verifiers.CanList("monitoring.coreos.com", "prometheusrules"),
+					verifiers.CanList("monitoring.coreos.com", "servicemonitors"),
+					verifiers.CanList("operator.openshift.io", "ingresscontrollers"),
 				),
 			))
 			Expect(err).NotTo(HaveOccurred())
@@ -257,6 +248,205 @@ var _ = Describe("SRE", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("and expecting cluster access to be denied")
 			Expect(verifiers.VerifyWhoAmI("aro-sre").Verify(ctx, otherUserRestConfig)).To(HaveOccurred())
+		})
+
+	It("should be able to retrieve serial console logs for a VM",
+		labels.RequireNothing,
+		labels.Medium,
+		labels.Positive,
+		labels.CoreInfraService,
+		labels.DevelopmentOnly,
+		labels.AroRpApiCompatible,
+		func(ctx context.Context) {
+			const (
+				engineeringNetworkSecurityGroupName = "sre-nsg-name"
+				engineeringVnetName                 = "sre-vnet-name"
+				engineeringVnetSubnetName           = "sre-vnet-subnet1"
+				engineeringClusterName              = "sre-hcp-cluster-sc"
+			)
+			tc := framework.NewTestContext()
+
+			if tc.UsePooledIdentities() {
+				err := tc.AssignIdentityContainers(ctx, 1, 60*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			By("creating a resource group")
+			resourceGroup, err := tc.NewResourceGroup(ctx, "admin-api-serialconsole", tc.Location())
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating cluster parameters")
+			clusterParams := framework.NewDefaultClusterParams()
+			clusterParams.ClusterName = engineeringClusterName
+			managedResourceGroupName := framework.SuffixName(*resourceGroup.Name, "-managed", 64)
+			clusterParams.ManagedResourceGroupName = managedResourceGroupName
+
+			By("creating customer resources")
+			clusterParams, err = tc.CreateClusterCustomerResources(ctx,
+				resourceGroup,
+				clusterParams,
+				map[string]interface{}{
+					"customerNsgName":        engineeringNetworkSecurityGroupName,
+					"customerVnetName":       engineeringVnetName,
+					"customerVnetSubnetName": engineeringVnetSubnetName,
+				},
+				TestArtifactsFS,
+				framework.RBACScopeResourceGroup,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the HCP cluster")
+			err = tc.CreateHCPClusterFromParam(
+				ctx,
+				GinkgoLogr,
+				*resourceGroup.Name,
+				clusterParams,
+				45*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a nodepool to provision worker VMs")
+			nodePoolParams := framework.NewDefaultNodePoolParams()
+			nodePoolParams.ClusterName = engineeringClusterName
+			nodePoolParams.NodePoolName = "worker"
+			nodePoolParams.Replicas = int32(1)
+
+			err = tc.CreateNodePoolFromParam(ctx,
+				*resourceGroup.Name,
+				engineeringClusterName,
+				nodePoolParams,
+				45*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			hcpResourceID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.RedHatOpenshift/hcpOpenShiftClusters/%s", api.Must(tc.SubscriptionID(ctx)), *resourceGroup.Name, engineeringClusterName)
+
+			By("resolving current Azure identity")
+			currentIdentity, err := tc.GetCurrentAzureIdentityDetails(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("getting VM name from managed resource group")
+			vmName, err := tc.GetFirstVMFromManagedResourceGroup(ctx, managedResourceGroupName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vmName).NotTo(BeEmpty())
+
+			By(fmt.Sprintf("retrieving serial console logs for VM %s", vmName))
+			logs, err := tc.GetSerialConsoleLogs(ctx, hcpResourceID, vmName, currentIdentity)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(logs).NotTo(BeEmpty())
+
+			By("verifying serial console logs contain boot information")
+			// Serial console logs typically contain boot messages, kernel output, or systemd logs
+			// We just verify that we got some content back
+			Expect(len(logs)).To(BeNumerically(">", 0))
+
+			By("testing error case: non-existent VM name")
+			_, err = tc.GetSerialConsoleLogs(ctx, hcpResourceID, "non-existent-vm-12345", currentIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("404"))
+
+			By("testing error case: invalid VM name format")
+			_, err = tc.GetSerialConsoleLogs(ctx, hcpResourceID, "-invalid-vm-name", currentIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("400"))
+
+			By("testing error case: empty VM name")
+			_, err = tc.GetSerialConsoleLogs(ctx, hcpResourceID, "", currentIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("400"))
+		})
+
+	It("should return 409 when boot diagnostics is disabled on a VM",
+		labels.RequireNothing,
+		labels.Medium,
+		labels.Negative,
+		labels.CoreInfraService,
+		labels.DevelopmentOnly,
+		labels.IntegrationOnly,
+		labels.AroRpApiCompatible,
+		func(ctx context.Context) {
+			const (
+				engineeringNetworkSecurityGroupName = "sre-nsg-name"
+				engineeringVnetName                 = "sre-vnet-name"
+				engineeringVnetSubnetName           = "sre-vnet-subnet1"
+				engineeringClusterName              = "sre-hcp-cluster-bootdiag"
+			)
+			tc := framework.NewTestContext()
+
+			if tc.UsePooledIdentities() {
+				err := tc.AssignIdentityContainers(ctx, 1, 60*time.Second)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			By("creating a resource group")
+			resourceGroup, err := tc.NewResourceGroup(ctx, "admin-api-serialconsole-bootdiag", tc.Location())
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating cluster parameters")
+			clusterParams := framework.NewDefaultClusterParams()
+			clusterParams.ClusterName = engineeringClusterName
+			managedResourceGroupName := framework.SuffixName(*resourceGroup.Name, "-managed", 64)
+			clusterParams.ManagedResourceGroupName = managedResourceGroupName
+
+			By("creating customer resources")
+			clusterParams, err = tc.CreateClusterCustomerResources(ctx,
+				resourceGroup,
+				clusterParams,
+				map[string]interface{}{
+					"customerNsgName":        engineeringNetworkSecurityGroupName,
+					"customerVnetName":       engineeringVnetName,
+					"customerVnetSubnetName": engineeringVnetSubnetName,
+				},
+				TestArtifactsFS,
+				framework.RBACScopeResourceGroup,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the HCP cluster")
+			err = tc.CreateHCPClusterFromParam(
+				ctx,
+				GinkgoLogr,
+				*resourceGroup.Name,
+				clusterParams,
+				45*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating a nodepool to provision worker VMs")
+			nodePoolParams := framework.NewDefaultNodePoolParams()
+			nodePoolParams.ClusterName = engineeringClusterName
+			nodePoolParams.NodePoolName = "worker"
+			nodePoolParams.Replicas = int32(1)
+
+			err = tc.CreateNodePoolFromParam(ctx,
+				*resourceGroup.Name,
+				engineeringClusterName,
+				nodePoolParams,
+				45*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+
+			hcpResourceID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.RedHatOpenshift/hcpOpenShiftClusters/%s", api.Must(tc.SubscriptionID(ctx)), *resourceGroup.Name, engineeringClusterName)
+
+			By("resolving current Azure identity")
+			currentIdentity, err := tc.GetCurrentAzureIdentityDetails(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("getting VM name from managed resource group")
+			vmName, err := tc.GetFirstVMFromManagedResourceGroup(ctx, managedResourceGroupName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vmName).NotTo(BeEmpty())
+
+			By("testing error case: boot diagnostics disabled")
+			err = tc.DisableVMBootDiagnostics(ctx, managedResourceGroupName, vmName)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = tc.GetSerialConsoleLogs(ctx, hcpResourceID, vmName, currentIdentity)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("409"))
+			Expect(err.Error()).To(ContainSubstring("Conflict"))
+			Expect(err.Error()).To(ContainSubstring("Boot diagnostics are unexpectedly not enabled"))
+			Expect(err.Error()).To(ContainSubstring(vmName))
 		})
 })
 

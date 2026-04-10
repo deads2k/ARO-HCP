@@ -18,6 +18,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -40,10 +41,14 @@ const (
 	RBACScopeResource      RBACScope = "resource"
 
 	// Default OpenShift channel group, version, and node pool version for the E2E test
-	DefaultOCPChannelGroup         = "stable"
+	DefaultOCPChannelGroup         = "candidate"
 	DefaultOCPVersionId            = "4.20"
 	DefaultOCPNodePoolVersionId    = "4.20.15"
-	DefaultOCPNodePoolChannelGroup = "stable"
+	DefaultOCPNodePoolChannelGroup = "candidate"
+
+	DefaultPodCIDR      = "10.128.0.0/14"
+	DefaultServiceCIDR  = "172.30.0.0/16"
+	DefaultK8sServiceIP = "172.30.0.1"
 )
 
 type ClusterParams struct {
@@ -83,37 +88,57 @@ type NetworkConfig struct {
 
 func DefaultOpenshiftControlPlaneVersionId() string {
 	version := os.Getenv("ARO_HCP_OPENSHIFT_CONTROLPLANE_VERSION")
-	if version == "" {
+	if len(version) == 0 {
 		version = DefaultOCPVersionId
+		// For nightly channel, calculate the latest version for the default Y stream
+		if DefaultOpenshiftChannelGroup() == "nightly" {
+			var err error
+			version, err = GetLatestInstallVersionForNightlyChannel(version)
+			if err != nil {
+				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) {
+					Skip(fmt.Sprintf("No install version found for %s in nightly channel (%s)", version, err.Error()))
+				} else {
+					Fail(fmt.Sprintf("failed to get latest install version for nightly channel: %s", err.Error()))
+				}
+			}
+		}
 	}
-	GinkgoLogr.Info("Using OpenShift control plane version", "version", version)
 	return version
 }
 
 func DefaultOpenshiftChannelGroup() string {
 	channelGroup := os.Getenv("ARO_HCP_OPENSHIFT_CHANNEL_GROUP")
-	if channelGroup == "" {
+	if len(channelGroup) == 0 {
 		channelGroup = DefaultOCPChannelGroup
 	}
-	GinkgoLogr.Info("Using OpenShift channel group", "channelGroup", channelGroup)
 	return channelGroup
 }
 
 func DefaultOpenshiftNodePoolVersionId() string {
 	version := os.Getenv("ARO_HCP_OPENSHIFT_NODEPOOL_VERSION")
-	if version == "" {
+	if len(version) == 0 {
 		version = DefaultOCPNodePoolVersionId
+		// For nightly channel, calculate the latest version for the default Y stream (it's the same as the control plane version)
+		if DefaultOpenshiftNodePoolChannelGroup() == "nightly" {
+			var err error
+			version, err = GetLatestInstallVersionForNightlyChannel(DefaultOCPVersionId)
+			if err != nil {
+				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) {
+					Skip(fmt.Sprintf("No node pool install version found for %s in nightly channel (%s)", version, err.Error()))
+				} else {
+					Fail(fmt.Sprintf("failed to get latest node pool install version for nightly channel: %s", err.Error()))
+				}
+			}
+		}
 	}
-	GinkgoLogr.Info("Using OpenShift node pool version", "version", version)
 	return version
 }
 
 func DefaultOpenshiftNodePoolChannelGroup() string {
 	channelGroup := os.Getenv("ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP")
-	if channelGroup == "" {
+	if len(channelGroup) == 0 {
 		channelGroup = DefaultOCPNodePoolChannelGroup
 	}
-	GinkgoLogr.Info("Using OpenShift node pool channel group", "channelGroup", channelGroup)
 	return channelGroup
 }
 
@@ -122,8 +147,8 @@ func NewDefaultClusterParams() ClusterParams {
 		OpenshiftVersionId: DefaultOpenshiftControlPlaneVersionId(),
 		Network: NetworkConfig{
 			NetworkType: "OVNKubernetes",
-			PodCIDR:     "10.128.0.0/14",
-			ServiceCIDR: "172.30.0.0/16",
+			PodCIDR:     DefaultPodCIDR,
+			ServiceCIDR: DefaultServiceCIDR,
 			MachineCIDR: "10.0.0.0/16",
 			HostPrefix:  23,
 		},
@@ -150,8 +175,13 @@ type NodePoolParams struct {
 	OSDiskSizeGiB          int32
 	DiskStorageAccountType string
 	ChannelGroup           string
+	// NodeDrainTimeoutMinutes: how long (in minutes) to respect Pod Disruption Budgets when draining
+	// nodes in this pool (e.g. upgrades, scale-in). Valid: 0 to 10080. 0 = no time limit for that phase.
+	// When omitted from the create payload or nil here, the cluster-configured global nodeDrainTimeoutMinutes kicks in.
+	NodeDrainTimeoutMinutes *int32
 	// AutoScaling enables nodepool autoscaling. When set, Replicas is ignored.
-	AutoScaling *NodePoolAutoScalingParams
+	AutoScaling      *NodePoolAutoScalingParams
+	AvailabilityZone string
 }
 
 // NodePoolAutoScalingParams contains min/max node counts for nodepool autoscaling

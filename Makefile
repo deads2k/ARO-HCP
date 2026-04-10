@@ -51,7 +51,18 @@ verify-deepcopy: deepcopy
 	./hack/verify.sh deepcopy
 .PHONY: verify-deepcopy
 
-verify: verify-deepcopy
+json-format: $(	JQ)
+	hack/update-json-format.sh $(JQ)
+.PHONY: json-format
+
+verify-json-format: $(JQ)
+	hack/verify-json-format.sh $(JQ)
+.PHONY: verify-json-format
+
+update: deepcopy json-format
+.PHONY: update
+
+verify: verify-deepcopy verify-json-format verify-generate verify-yamlfmt verify-materialize
 .PHONY: verify
 
 verify-yamlfmt: yamlfmt
@@ -63,7 +74,7 @@ mocks: $(MOCKGEN) $(GOIMPORTS)
 	$(GOIMPORTS) -w -local github.com/Azure/ARO-HCP $$(find . -name "mock_*.go" -not -path "./.git/*" -not -path "./.bingo/*")
 .PHONY: mocks
 
-install-tools: $(BINGO) $(HELM_LINK) $(YQ_LINK) $(JQ_LINK) $(ORAS_LINK)
+install-tools: $(BINGO) $(HELM_LINK) $(YQ_LINK) $(JQ) $(ORAS_LINK)
 	$(BINGO) get
 .PHONY: install-tools
 
@@ -117,8 +128,12 @@ record-nonlocal-e2e: $(GOJQ)
 		$(GOJQ) '[.[] | .SpecReports[]? | select(.State == "passed") | .LeafNodeText] | sort' test/e2e/report.json > ./nonlocal-e2e-specs.txt
 .PHONY: record-nonlocal-e2e
 
-e2e/local: e2e-local/setup
-	$(MAKE) e2e-local/run 
+build-hcpctl:
+	$(MAKE) -C tooling/hcpctl build
+.PHONY: build-hcpctl
+
+e2e/local: e2e-local/setup build-hcpctl
+	$(MAKE) e2e-local/run
 .PHONY: e2e/local
 
 e2e-local/setup:
@@ -143,9 +158,14 @@ e2e-local/run: $(ARO_HCP_TESTS)
 	export SKIP_CERT_VERIFICATION=$${SKIP_CERT_VERIFICATION:-false}; \
 	export FRONTEND_ADDRESS=$${FRONTEND_ADDRESS:-http://localhost:8443}; \
 	export ADMIN_API_ADDRESS=$${ADMIN_API_ADDRESS:-http://localhost:8444}; \
+	export HCPCTL_BINARY="$$(pwd)/tooling/hcpctl/hcpctl"; \
 	mkdir -p "$$ARTIFACT_DIR"; \
 	$(ARO_HCP_TESTS) run-suite "rp-api-compat-all/parallel" --junit-path="$$JUNIT_PATH" --html-path="$$HTML_PATH" --max-concurrency 100
 .PHONY: e2e-local/run
+
+e2e-local/run-test:
+	$(MAKE) -C test -f E2ELocal.mk e2e-local/pf/run-test TEST_NAME="$$TEST_NAME"
+.PHONY: e2e-local/run-test
 
 CONTAINER_RUNTIME ?= docker
 
@@ -320,6 +340,10 @@ test-helm-fixtures:
 	$(MAKE) -C tooling/helmtest test
 .PHONY: test-helmcharts
 
+verify-materialize:
+	$(MAKE) -C config/ detect-change
+.PHONY: verify-materialize
+
 #
 # Generated SDKs
 #
@@ -388,8 +412,8 @@ pipeline/%:
 	$(MAKE) local-run WHAT="--service-group Microsoft.Azure.ARO.HCP.$(notdir $@)"
 
 LOG_LEVEL ?= 3
-DRY_RUN ?= "false"
-PERSIST ?= "false"
+DRY_RUN ?= false
+PERSIST ?= false
 TIMING_OUTPUT ?= timing/steps.yaml
 ENTRYPOINT_JUNIT_OUTPUT ?= _artifacts/junit_entrypoint.xml
 CONFIG_OUTPUT ?= _artifacts/config.yaml
@@ -402,6 +426,7 @@ local-run: $(TEMPLATIZE)
 	                                 --dev-environment $(DEPLOY_ENV) \
 	                                 $(WHAT) $(EXTRA_ARGS) \
 	                                 --dry-run=$(DRY_RUN) \
+	                                 --persist-tag=$(PERSIST) \
 	                                 --verbosity=$(LOG_LEVEL) \
 	                                 --timing-output=$(TIMING_OUTPUT) \
 	                                 --junit-output=$(ENTRYPOINT_JUNIT_OUTPUT) \

@@ -270,6 +270,9 @@ var (
 	toServiceProviderManagedIdentitiesDataPlaneIdentityURL = func(oldObj *api.HCPOpenShiftClusterServiceProviderProperties) *string {
 		return &oldObj.ManagedIdentitiesDataPlaneIdentityURL
 	}
+	toServiceProviderClusterUID = func(oldObj *api.HCPOpenShiftClusterServiceProviderProperties) *string {
+		return &oldObj.ClusterUID
+	}
 )
 
 func validateClusterServiceProviderProperties(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *api.HCPOpenShiftClusterServiceProviderProperties) field.ErrorList {
@@ -307,6 +310,14 @@ func validateClusterServiceProviderProperties(ctx context.Context, op operation.
 	// We can validate URL unconditionally because the URL validator accepts an empty string as the URL
 	errs = append(errs, URL(ctx, op, fldPath.Child("managedIdentitiesDataPlaneIdentityURL"), &newObj.ManagedIdentitiesDataPlaneIdentityURL, nil)...)
 
+	// ClusterUID      string                         `json:"clusterUID,omitempty"`
+	// ClusterUID is always generated server-side by admission.MutateClusterCreate().
+	// Both preflight and real cluster creation call admission before validation.
+	if op.Type == operation.Create {
+		errs = append(errs, validate.RequiredValue(ctx, op, fldPath.Child("clusterUID"), &newObj.ClusterUID, nil)...)
+	}
+	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("clusterUID"), &newObj.ClusterUID, safe.Field(oldObj, toServiceProviderClusterUID))...)
+
 	return errs
 }
 
@@ -325,7 +336,15 @@ func validateVersionProfile(ctx context.Context, op operation.Operation, fldPath
 	// Version ID is required, but some records may not have had it originally, so don't fail them yet.
 	if oldObj == nil || len(oldObj.ID) > 0 {
 		errs = append(errs, validate.RequiredValue(ctx, op, fldPath.Child("id"), &newObj.ID, nil)...)
-		errs = append(errs, VersionMustBeAtLeast(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID), "4.19")...)
+
+		if !op.HasOption(api.FeatureExperimentalReleaseFeatures) {
+			errs = append(errs, VersionMustBeAtLeast(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID), "4.20")...)
+		} else {
+			// only allow install from 4.19 with experimental flag
+			// this should be removed once support for 4.19 has been fully removed
+			errs = append(errs, VersionMustBeAtLeast(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID), "4.19")...)
+		}
+
 		errs = append(errs, VersionMayNotDecrease(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
 	}
 	if !op.HasOption(api.FeatureExperimentalReleaseFeatures) {

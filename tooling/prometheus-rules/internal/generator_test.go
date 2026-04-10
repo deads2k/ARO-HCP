@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/alertsmanagement/armalertsmanagement"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/prometheusrulegroups/armprometheusrulegroups"
 )
 
 func TestNewOptions(t *testing.T) {
@@ -197,6 +197,53 @@ spec:
 			validateFunc: func(t *testing.T, opts *Options) {
 				assert.Len(t, opts.ruleFiles, 1)
 				assert.Equal(t, "", opts.ruleFiles[0].TestFileBaseName)
+			},
+		},
+		{
+			name: "invalid regex replace",
+			configFile: `
+prometheusRules:
+  untestedRules:
+  - untested.yaml
+  outputBicep: generated.bicep
+  regexOutputReplacements:
+  - from: '(badRegex'
+    to: 'replacement'
+`,
+			expectError: true,
+			errorMsg:    "invalid regex in regexOutputReplacements",
+		},
+		{
+			name: "valid regex",
+			configFile: `
+prometheusRules:
+  untestedRules:
+  - untested.yaml
+  outputBicep: generated.bicep
+  regexOutputReplacements:
+  - from: 'good(.+)t'
+    to: 'great$1t'
+`,
+			setupFiles: func(tmpDir string) error {
+				ruleContent := `
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: untested-rules
+spec:
+  groups:
+  - name: untested.rules
+    rules:
+    - alert: goodAlert
+      expr: up == 0
+`
+				return os.WriteFile(filepath.Join(tmpDir, "untested.yaml"), []byte(ruleContent), 0644)
+			},
+			expectError: false,
+			validateFunc: func(t *testing.T, opts *Options) {
+				assert.Len(t, opts.regexOutputReplacements, 1)
+				assert.Equal(t, "good(.+)t", opts.regexOutputReplacements[0].From.String())
+				assert.Equal(t, "great$1t", opts.regexOutputReplacements[0].To)
 			},
 		},
 		{
@@ -473,12 +520,12 @@ func TestOptionsGenerate(t *testing.T) {
 }
 
 func TestWriteGroups(t *testing.T) {
-	group := armalertsmanagement.PrometheusRuleGroupResource{
+	group := armprometheusrulegroups.PrometheusRuleGroupResource{
 		Name: ptr.To("test-group"),
-		Properties: &armalertsmanagement.PrometheusRuleGroupProperties{
+		Properties: &armprometheusrulegroups.PrometheusRuleGroupProperties{
 			Interval: ptr.To("PT30S"),
 			Enabled:  ptr.To(true),
-			Rules: []*armalertsmanagement.PrometheusRule{
+			Rules: []*armprometheusrulegroups.PrometheusRule{
 				{
 					Alert:   ptr.To("TestAlert"),
 					Enabled: ptr.To(true),

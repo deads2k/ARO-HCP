@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	// load all the prometheus client-go metrics
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,12 +31,15 @@ import (
 	k8sutilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/component-base/metrics/legacyregistry"
 	utilsclock "k8s.io/utils/clock"
 
 	azureclient "github.com/Azure/ARO-HCP/backend/pkg/azure/client"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers"
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/billingcontrollers"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/clusterpropertiescontroller"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/datadumpcontrollers"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/mismatchcontrollers"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/nodepoolpropertiescontroller"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/operationcontrollers"
@@ -154,7 +156,7 @@ func (b *Backend) Run(ctx context.Context) error {
 
 	// Handle requests directly for /healthz endpoint
 	if b.options.HealthzServerListenAddress != "" {
-		backendHealthGauge := promauto.With(prometheus.DefaultRegisterer).NewGauge(prometheus.GaugeOpts{Name: "backend_health", Help: "backend_health is 1 when healthy"})
+		backendHealthGauge := promauto.With(legacyregistry.Registerer()).NewGauge(prometheus.GaugeOpts{Name: "backend_health", Help: "backend_health is 1 when healthy"})
 
 		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 
@@ -180,9 +182,9 @@ func (b *Backend) Run(ctx context.Context) error {
 
 	if b.options.MetricsServerListenAddress != "" {
 		http.Handle("/metrics", promhttp.InstrumentMetricHandler(
-			prometheus.DefaultRegisterer,
+			legacyregistry.Registerer(),
 			promhttp.HandlerFor(
-				prometheus.DefaultGatherer,
+				prometheus.Gatherers{legacyregistry.DefaultGatherer},
 				promhttp.HandlerOpts{},
 			),
 		))
@@ -259,15 +261,18 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	_, subscriptionLister := backendInformers.Subscriptions()
 	activeOperationInformer, activeOperationLister := backendInformers.ActiveOperations()
 
+	_, clusterLister := backendInformers.Clusters()
+	_, billingLister := backendInformers.BillingDocs()
+
 	maestroClientBuilder := maestro.NewMaestroClientBuilder()
 
-	dataDumpController := controllerutils.NewClusterWatchingController(
-		"DataDump", b.options.CosmosDBClient, backendInformers, 1*time.Minute, controllers.NewDataDumpController(activeOperationLister, b.options.CosmosDBClient))
+	subscriptionNonClusterDataDumpController := datadumpcontrollers.NewSubscriptionNonClusterDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
+	clusterRecursiveDataDumpController := datadumpcontrollers.NewClusterRecursiveDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
+	csStateDumpController := datadumpcontrollers.NewCSStateDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers, b.options.ClustersServiceClient)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
 	operationClusterCreateController := operationcontrollers.NewGenericOperationController(
 		"OperationClusterCreate",
 		operationcontrollers.NewOperationClusterCreateSynchronizer(
-			b.options.AzureLocation,
 			b.options.CosmosDBClient,
 			b.options.ClustersServiceClient,
 			http.DefaultClient,
@@ -403,6 +408,13 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		backendInformers,
 	)
 	deleteOrphanedCosmosResourcesController := mismatchcontrollers.NewDeleteOrphanedCosmosResourcesController(b.options.CosmosDBClient, subscriptionLister)
+	backfillClusterUIDController := controllerutils.NewClusterWatchingController(
+		"BackfillClusterUID", b.options.CosmosDBClient, backendInformers, 60*time.Minute,
+		mismatchcontrollers.NewBackfillClusterUIDController(utilsclock.RealClock{}, b.options.CosmosDBClient, clusterLister))
+	orphanedBillingCleanupController := billingcontrollers.NewOrphanedBillingCleanupController(utilsclock.RealClock{}, b.options.CosmosDBClient, clusterLister, billingLister)
+	createBillingDocController := controllerutils.NewClusterWatchingController(
+		"CreateBillingDoc", b.options.CosmosDBClient, backendInformers, 60*time.Second,
+		billingcontrollers.NewCreateBillingDocController(utilsclock.RealClock{}, b.options.AzureLocation, b.options.CosmosDBClient, clusterLister, billingLister))
 	controlPlaneActiveVersionController := upgradecontrollers.NewControlPlaneActiveVersionController(
 		b.options.CosmosDBClient,
 		activeOperationLister,
@@ -493,6 +505,13 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		backendInformers,
 	)
 
+	nodePoolCustomerPropertiesMigrationController := nodepoolpropertiescontroller.NewNodePoolCustomerPropertiesMigrationController(
+		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		activeOperationLister,
+		backendInformers,
+	)
+
 	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 		Lock:          b.options.LeaderElectionLock,
 		LeaseDuration: leaderElectionLeaseDuration,
@@ -503,7 +522,9 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				// start the SharedInformers
 				go backendInformers.RunWithContext(ctx)
 
-				go dataDumpController.Run(ctx, 20)
+				go subscriptionNonClusterDataDumpController.Run(ctx, 20)
+				go clusterRecursiveDataDumpController.Run(ctx, 20)
+				go csStateDumpController.Run(ctx, 20)
 				go doNothingController.Run(ctx, 20)
 				go operationClusterCreateController.Run(ctx, 20)
 				go operationClusterUpdateController.Run(ctx, 20)
@@ -522,6 +543,9 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go cosmosMatchingClusterController.Run(ctx, 20)
 				go alwaysSuccessClusterValidationController.Run(ctx, 20)
 				go deleteOrphanedCosmosResourcesController.Run(ctx, 20)
+				go backfillClusterUIDController.Run(ctx, 20)
+				go orphanedBillingCleanupController.Run(ctx, 20)
+				go createBillingDocController.Run(ctx, 20)
 				go controlPlaneActiveVersionController.Run(ctx, 20)
 				go controlPlaneDesiredVersionController.Run(ctx, 20)
 				go triggerControlPlaneUpgradeController.Run(ctx, 20)
@@ -537,6 +561,7 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go maestroDeleteOrphanedReadonlyBundlesController.Run(ctx, 20)
 				go triggerNodePoolUpgradeController.Run(ctx, 20)
 				go nodePoolPropertiesSyncController.Run(ctx, 20)
+				go nodePoolCustomerPropertiesMigrationController.Run(ctx, 20)
 			},
 			OnStoppedLeading: func() {
 				// This needs to be defined even though it does nothing.

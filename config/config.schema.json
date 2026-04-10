@@ -571,6 +571,30 @@
         "digest"
       ]
     },
+    "containerImageTagDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "sha": {
+          "type": "string",
+          "pattern": "^$|^[a-fA-F0-9]{64}$"
+        }
+      },
+      "required": [
+        "repository",
+        "tag",
+        "sha"
+      ]
+    },
     "containerImageSha": {
       "type": "object",
       "additionalProperties": false,
@@ -639,6 +663,23 @@
         "Self",
         "OneCertV2-PublicCA",
         "OneCertV2-PrivateCA"
+      ]
+    },
+    "clusterScopedIdentitiesConfig": {
+      "type": "object",
+      "properties": {
+        "roleSetName": {
+          "type": "string",
+          "enum": [
+            "dev",
+            "public"
+          ],
+          "description": "The role set name refers to a particular set of azure role definitions. What role definitions are used by each cluster scoped identity for each role set and the role set names themselves are defined as part of application code. The role set names are independent from the azure cloud type."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "roleSetName"
       ]
     },
     "backendMaestroConfig": {
@@ -765,6 +806,15 @@
                   "$ref": "#/definitions/containerImageSha"
                 }
               }
+            }
+          }
+        },
+        "thanos": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/containerImageTagDigest"
             }
           }
         }
@@ -1358,6 +1408,9 @@
         "exitOnPanic": {
           "type": "boolean",
           "description": "If true, backend will exit the process if a panic occurs. As of now it only controls the setting of k8s.io/apimachinery/pkg/util/runtime.ReallyCrash"
+        },
+        "clusterScopedIdentitiesConfig": {
+          "$ref": "#/definitions/clusterScopedIdentitiesConfig"
         }
       },
       "additionalProperties": false,
@@ -1368,7 +1421,8 @@
         "managedIdentityName",
         "azureRuntimeConfig",
         "maestro",
-        "exitOnPanic"
+        "exitOnPanic",
+        "clusterScopedIdentitiesConfig"
       ]
     },
     "sessiongate": {
@@ -1409,6 +1463,22 @@
         "k8s",
         "managedIdentityName",
         "cert"
+      ]
+    },
+    "hcpRecovery": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "k8s": {
+          "$ref": "#/definitions/k8sDeployment"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "k8s"
       ]
     },
     "adminApi": {
@@ -1794,7 +1864,8 @@
             "certificate",
             "allowedAcisExtensions",
             "genevaActionsPrincipalId",
-            "application"
+            "application",
+            "publish"
           ],
           "properties": {
             "serviceTag": {
@@ -1851,6 +1922,31 @@
             "application": {
               "$ref": "#/definitions/entraApplication",
               "description": "This is the app our Geneva Actions will use to talk to the Admin API"
+            },
+            "publish": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "buildId": {
+                  "type": "integer"
+                },
+                "packageName": {
+                  "type": "string"
+                },
+                "betaPackageName": {
+                  "type": "string"
+                },
+                "betaCertificate": {
+                  "$ref": "#/definitions/certificateRef",
+                  "description": "Certificate used to publish the beta Geneva Actions package"
+                }
+              },
+              "required": [
+                "buildId",
+                "packageName",
+                "betaPackageName",
+                "betaCertificate"
+              ]
             }
           }
         }
@@ -2343,6 +2439,10 @@
             },
             "environmentName": {
               "type": "string"
+            },
+            "buffering": {
+              "type": "boolean",
+              "description": "Enable disk buffering for kusto output plugin"
             }
           },
           "additionalProperties": false,

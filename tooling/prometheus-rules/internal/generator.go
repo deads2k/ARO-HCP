@@ -35,7 +35,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/alertsmanagement/armalertsmanagement"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/prometheusrulegroups/armprometheusrulegroups"
 )
 
 var defaultEvaluationInterval = "1m"
@@ -55,12 +55,13 @@ type GroupAlerts struct {
 }
 
 type Options struct {
-	forceInfoSeverity  bool
-	promtoolPath       string
-	outputBicep        string
-	includedAlerts     map[string][]string
-	ruleFiles          []alertingRuleFile
-	outputReplacements []Replacements
+	forceInfoSeverity       bool
+	promtoolPath            string
+	outputBicep             string
+	includedAlerts          map[string][]string
+	ruleFiles               []alertingRuleFile
+	outputReplacements      []Replacements
+	regexOutputReplacements []RegexReplacements
 }
 
 type PrometheusRulesConfig struct {
@@ -69,6 +70,7 @@ type PrometheusRulesConfig struct {
 	OutputBicep               string         `json:"outputBicep"`
 	IncludedAlertsByGroup     []GroupAlerts  `json:"includedAlertsByGroup,omitempty"` // Optional: Only alerts listed here are included; if empty, all alerts are included
 	OutputReplacements        []Replacements `json:"outputReplacements,omitempty"`
+	RegexOutputReplacements   []Replacements `json:"regexOutputReplacements,omitempty"`
 	DefaultEvaluationInterval string         `json:"defaultEvaluationInterval,omitempty"`
 }
 
@@ -125,6 +127,21 @@ func (o *Options) Complete(configFilePath string, forceInfoSeverity bool, promto
 	for _, replacement := range o.outputReplacements {
 		if replacement.From == "" || replacement.To == "" {
 			return fmt.Errorf("expression replacement must have both from and to fields (from=%q, to=%q)", replacement.From, replacement.To)
+		}
+	}
+
+	o.regexOutputReplacements = make([]RegexReplacements, len(config.PrometheusRules.RegexOutputReplacements))
+	for i, regexReplacement := range config.PrometheusRules.RegexOutputReplacements {
+		if regexReplacement.From == "" || regexReplacement.To == "" {
+			return fmt.Errorf("regex expression replacement must have both from and to fields (from=%q, to=%q)", regexReplacement.From, regexReplacement.To)
+		}
+		compiledRegex, err := regexp.Compile(regexReplacement.From)
+		if err != nil {
+			return fmt.Errorf("invalid regex in regexOutputReplacements: %w", err)
+		}
+		o.regexOutputReplacements[i] = RegexReplacements{
+			From: compiledRegex,
+			To:   regexReplacement.To,
 		}
 	}
 
@@ -320,9 +337,9 @@ param location string = resourceGroup().location
 					group.Interval = monitoringv1.DurationPointer(irf.DefaultEvaluationInterval)
 				}
 			}
-			armGroup := armalertsmanagement.PrometheusRuleGroupResource{
+			armGroup := armprometheusrulegroups.PrometheusRuleGroupResource{
 				Name: ptr.To(group.Name),
-				Properties: &armalertsmanagement.PrometheusRuleGroupProperties{
+				Properties: &armprometheusrulegroups.PrometheusRuleGroupProperties{
 					Interval: parseToAzureDurationString(group.Interval),
 					Enabled:  ptr.To(true),
 				},
@@ -388,7 +405,7 @@ param location string = resourceGroup().location
 
 				// Filter rules based on the output file type
 				if rule.Alert != "" && isAlertingRulesFile {
-					armGroup.Properties.Rules = append(armGroup.Properties.Rules, &armalertsmanagement.PrometheusRule{
+					armGroup.Properties.Rules = append(armGroup.Properties.Rules, &armprometheusrulegroups.PrometheusRule{
 						Alert:       ptr.To(rule.Alert),
 						Enabled:     ptr.To(true),
 						Labels:      labels,
@@ -402,7 +419,7 @@ param location string = resourceGroup().location
 						Severity: severityFor(labels, o.forceInfoSeverity),
 					})
 				} else if rule.Record != "" && isRecordingRulesFile {
-					armGroup.Properties.Rules = append(armGroup.Properties.Rules, &armalertsmanagement.PrometheusRule{
+					armGroup.Properties.Rules = append(armGroup.Properties.Rules, &armprometheusrulegroups.PrometheusRule{
 						Record:  ptr.To(rule.Record),
 						Enabled: ptr.To(true),
 						Labels:  labels,
@@ -419,7 +436,7 @@ param location string = resourceGroup().location
 				// Use the file type to determine which function to call
 				// Groups are guaranteed to contain only one type of rule
 
-				replacementWriter := NewReplacementWriter(output, o.outputReplacements)
+				replacementWriter := NewReplacementWriter(output, o.outputReplacements, o.regexOutputReplacements)
 
 				if isRecordingRulesFile {
 					if err := writeRecordingGroups(armGroup, replacementWriter); err != nil {
@@ -442,7 +459,7 @@ param location string = resourceGroup().location
 // 2. the best reference for which IcM fields exist and how to set them: https://dev.azure.com/msazure/One/_git/EngSys-MDA-GenevaDocs?path=/documentation/metrics/Prometheus/PromIcMConnectorsetup.md&_a=preview&version=GBmaster
 // 3. the official top-level document: https://eng.ms/docs/products/icm/developers/connectors/icmaction#edit-an-azure-monitor-icm-connector-definition-icm-action
 
-func writeAlertGroups(groups armalertsmanagement.PrometheusRuleGroupResource, into io.Writer) error {
+func writeAlertGroups(groups armprometheusrulegroups.PrometheusRuleGroupResource, into io.Writer) error {
 	tmpl, err := template.New("prometheusRuleGroup").Funcs(
 		map[string]any{"contains": strings.Contains},
 	).Parse(`
@@ -505,7 +522,7 @@ resource {{.name}} 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' 
 	})
 }
 
-func writeRecordingGroups(groups armalertsmanagement.PrometheusRuleGroupResource, into io.Writer) error {
+func writeRecordingGroups(groups armprometheusrulegroups.PrometheusRuleGroupResource, into io.Writer) error {
 	tmpl, err := template.New("prometheusRecordingRuleGroup").Parse(`
 resource {{.name}} 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
   name: '{{.groups.Name}}'

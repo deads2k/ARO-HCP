@@ -1160,7 +1160,7 @@ resource kubernetesSystemApiserver 'Microsoft.AlertsManagement/prometheusRuleGro
           summary: 'Target disappeared from Prometheus target discovery.'
           title: 'Target disappeared from Prometheus target discovery.'
         }
-        expression: 'absent(up{job="controlplane-apiserver"} == 1)'
+        expression: 'count by (cluster) (up{job="controlplane-apiserver"} == 1) == 0'
         for: 'PT15M'
         severity: 3
       }
@@ -1547,7 +1547,7 @@ resource kubernetesSystemKubelet 'Microsoft.AlertsManagement/prometheusRuleGroup
           summary: 'Target disappeared from Prometheus target discovery.'
           title: 'Target disappeared from Prometheus target discovery.'
         }
-        expression: 'absent(up{job="kubelet", metrics_path="/metrics"} == 1)'
+        expression: 'count by (cluster) (up{job="kubelet", metrics_path="/metrics"} == 1) == 0'
         for: 'PT15M'
         severity: 3
       }
@@ -1587,7 +1587,7 @@ resource kubernetesSystemScheduler 'Microsoft.AlertsManagement/prometheusRuleGro
           summary: 'Target disappeared from Prometheus target discovery.'
           title: 'Target disappeared from Prometheus target discovery.'
         }
-        expression: 'absent(up{job="controlplane-kube-scheduler"} == 1)'
+        expression: 'count by (cluster) (up{job="controlplane-kube-scheduler"} == 1) == 0'
         for: 'PT15M'
         severity: 3
       }
@@ -1627,7 +1627,7 @@ resource kubernetesSystemControllerManager 'Microsoft.AlertsManagement/prometheu
           summary: 'Target disappeared from Prometheus target discovery.'
           title: 'Target disappeared from Prometheus target discovery.'
         }
-        expression: 'absent(up{job="controlplane-kube-controller-manager"} == 1)'
+        expression: 'count by (cluster) (up{job="controlplane-kube-controller-manager"} == 1) == 0'
         for: 'PT15M'
         severity: 3
       }
@@ -1980,6 +1980,52 @@ resource hcpHostedclusterMonitorRules 'Microsoft.AlertsManagement/prometheusRule
         expression: '1 - (hostedClusterAPI_kubeapiserver_available:sum_over_time_6h / hostedClusterAPI_kubeapiserver_available:count_over_time_6h) > (1 * (1 - 0.9995)) and hostedClusterAPI_kubeapiserver_available:count_over_time_6h > 360 and 1 - sum by (name, namespace, _id, cluster) (hostedClusterAPI_kubeapiserver_available:ratio_avg_3d) > (1 * (1 - 0.9995)) and hostedClusterAPI_kubeapiserver_available:count_over_time_3d > 4320'
         for: 'PT3H'
         severity: 4
+      }
+    ]
+    scopes: [
+      azureMonitoring
+    ]
+  }
+}
+
+resource hcpClusterHealthRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'hcp-cluster-health-rules'
+  location: location
+  properties: {
+    interval: 'PT1M'
+    rules: [
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'HCPClusterVersionUnhealthy'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'HCPClusterVersionUnhealthy/{{ $labels.cluster }}/{{ $labels.namespace }}'
+          description: '''The Cluster Version Operator for {{ $labels.namespace }} (on Mgmt Cluster {{ $labels.cluster }}) 
+has been in a Failing or Degraded state for more than 1 hour.
+This usually indicates critical operators (Network, API, etc.) are down.
+'''
+          info: '''The Cluster Version Operator for {{ $labels.namespace }} (on Mgmt Cluster {{ $labels.cluster }}) 
+has been in a Failing or Degraded state for more than 1 hour.
+This usually indicates critical operators (Network, API, etc.) are down.
+'''
+          runbook_url: 'TBD'
+          summary: 'HCP Cluster {{ $labels.namespace }} is unhealthy'
+          title: 'HCP Cluster {{ $labels.namespace }} is unhealthy'
+        }
+        expression: 'sum by (cluster, namespace) ( cluster_operator_conditions{name="version", condition=~"failing|degraded"} ) > 0'
+        for: 'PT1H'
+        severity: 3
       }
     ]
     scopes: [

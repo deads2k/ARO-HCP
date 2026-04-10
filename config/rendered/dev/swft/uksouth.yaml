@@ -1,12 +1,12 @@
 acm:
   mce:
     bundle:
-      digest: sha256:3e9c550d71223566ec0a4132ffe9952def98fac9e02ce53621e6b0f5dc9e96e7
+      digest: sha256:6b80ae204f71a52269e361d7255b2021f4d1b9aa0e60e763a504e508c12c02a8
       registry: quay.io
       repository: redhat-user-workloads/crt-redhat-acm-tenant/mce-operator-bundle-mce-210
   operator:
     bundle:
-      digest: sha256:851acca63dfb8ce9ac60dd755f5dd3f4ed77b59cc6124651cd753f918819e01a
+      digest: sha256:21f7525f72a31f271e0140c0489e6b14cd3bf9eef95b8ab3844dbcc55f47fb3f
       registry: quay.io
       repository: redhat-user-workloads/crt-redhat-acm-tenant/acm-operator-bundle-acm-215
 acr:
@@ -35,7 +35,7 @@ adminApi:
     issuer: Self
     name: admin-api-cert-swft-lnstest
   image:
-    digest: sha256:0c22afd00e51db4b606075455dce40f9d4561052e09ff5884ff50493926bc471
+    digest: sha256:3c51851594e81c831dccab9735cee5b1f033765a28df3c7e30874cef67df4b3e
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpadminapi
   k8s:
@@ -65,7 +65,7 @@ armHelperTenantId: 64dc69e4-d083-49fc-9569-ebece1dd1408
 arobit:
   forwarder:
     image:
-      digest: sha256:33bed43b09e3d2384c7661c74f6ed79ca53b0c25a3e28d77f139a7b9d50fbf1a
+      digest: sha256:c1c0efba9c3f1213034c226ee16adc73367eac5b7f83acba1c468866993dbea5
       registry: mcr.microsoft.com
       repository: oss/v2/fluent/fluent-bit
     resources:
@@ -75,12 +75,13 @@ arobit:
         cpu: 100m
         memory: 256Mi
   kusto:
+    buffering: true
     enabled: true
     environmentName: dev
   mdsd:
     enabled: false
     image:
-      digest: sha256:2ae5282c99fa8c82bb394b23dbcb9ea0fa553e4ec3cce9e39d110f44b6282062
+      digest: sha256:1fb51857a0a34e7e7445a91c0a1082d97df235349a66a166a58c86029c80ea89
       registry: mcr.microsoft.com
       repository: geneva/distroless/mdsd
 auditLogsEventHub:
@@ -97,9 +98,11 @@ azureRegionAvailabilityZoneCount: 3
 backend:
   azureRuntimeConfig:
     tlsCertificatesIssuer: Self
+  clusterScopedIdentitiesConfig:
+    roleSetName: dev
   exitOnPanic: true
   image:
-    digest: sha256:ee90fe51b01cc19452db90df72e709b9de16bfb281562ae26ed50ce9b7f90e29
+    digest: sha256:f059abfb7f1b7f64e384eb2745dfc5989661c50aadb18c99bf9d2b7c0246abcf
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpbackend
   k8s:
@@ -120,7 +123,7 @@ backend:
     exporter: ""
 backplaneAPI:
   image:
-    digest: sha256:9595652e07044226b90b19af2b7d1947684086c32e5049404139a72e0dd30b34
+    digest: sha256:01d388d3643c8868a75edecaa8d377c959daa4c8ea26eca3f9c163426c602475
     registry: quay.io
     repository: app-sre/backplane-api
 billing:
@@ -164,7 +167,7 @@ clustersService:
   deployDebugJobs: false
   environment: arohcpswft
   image:
-    digest: sha256:b47789207a8e2d7457eacb1314ddcd07ab6cde06a40a322e8e286e20435e516c
+    digest: sha256:b70f064cad11f7374d475e7078826912d07451c0389dc00de21bb723ca0761c5
     registry: quay.io
     repository: app-sre/aro-hcp-clusters-service
   k8s:
@@ -216,7 +219,7 @@ clustersService:
     exporter: ""
 customExporter:
   image:
-    digest: sha256:f51a27f9b992cc21fee6f455dce01c0b50341ca82c03a52332467a10e226ca9e
+    digest: sha256:63698a49f7577218b2950b6409f4425b8db8dc0e45fed8ef034248a8b472ab5b
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpmetrics
   k8s:
@@ -278,7 +281,7 @@ frontend:
     zoneRedundantMode: Disabled
   exitOnPanic: true
   image:
-    digest: sha256:0a2e5c49f72a3210d62b862501f287750355531c8270cb29d36befe576064e7b
+    digest: sha256:e49ea1795a72e71ff79ef813c353636ddf7a863d6bf361aeb7826a16fae2b0b5
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpfrontend
   k8s:
@@ -316,6 +319,13 @@ geneva:
       softDelete: true
       tagKey: aroHCPPurpose
       tagValue: geneva-actions
+    publish:
+      betaCertificate:
+        keyVault: empty-sentinel
+        name: empty-sentinel
+      betaPackageName: empty-sentinel
+      buildId: 0
+      packageName: empty-sentinel
     serviceTag: GenevaActions
     targetRegion: UK South
   logs:
@@ -390,10 +400,19 @@ global:
         - name: AllowBringYourOwnPublicIpAddress
           poll: true
         poll: true
+hcpRecovery:
+  image:
+    digest: ""
+    registry: arohcpsvcdev.azurecr.io
+    repository: arohcprecovery
+  k8s:
+    namespace: hcp-recovery
+    replicas: 2
+    serviceAccountName: hcp-recovery
 hypershift:
   additionalInstallArg: --enable-cpo-overrides
   image:
-    digest: sha256:c5787a7f15979007174b4099b9f91e449c797c78aff00eb0787a510e4c7cb73a
+    digest: sha256:f147768e5f0091dd8ce873de6453aeb7d00a4de0a1b54be615e6725ce6d16526
     registry: quay.io
     repository: redhat-services-prod/crt-redhat-acm-tenant/hypershift/hypershift-operator
   limitClusterSizes: true
@@ -404,11 +423,11 @@ imageSync:
   ocMirror:
     enabled: true
     image:
-      digest: sha256:ef65f54d57c40a1bb645072be64d2d9822df9f8c163a7b79c7a8147fd9a3584d
+      digest: sha256:f6a24c1a4db168cf2ed8594c8e4b5d8e37c92f0773c497191c1f2e9326640935
       registry: arohcpsvcdev.azurecr.io
       repository: image-sync/oc-mirror
     jobNamePrefix: ""
-    operatorVersionsToMirror: 4.18,4.19,4.20
+    operatorVersionsToMirror: 4.18,4.19,4.20,4.21
     pullSecretName: ocmirror-pull-secret
   ondemandSync:
     pullSecretName: component-sync-pull-secret
@@ -417,7 +436,7 @@ keyVaultDNSSuffix: vault.azure.net
 kubeEvents:
   enabled: true
   image:
-    digest: sha256:f907f0eb97bdf12502907c5003845276d41662736d7a5462ae597eb74e337bc9
+    digest: sha256:e043a7d4a695ba71dc13a64a17cdbaa664553b607859aaa76b6fecf265234c70
     registry: kubernetesshared.azurecr.io
     repository: shared/kube-events
   k8s:
@@ -466,7 +485,7 @@ maestro:
     managedIdentityName: maestro-consumer
     sidecar:
       image:
-        digest: sha256:331aaa0d553e8eec9b69261f1dc6fd74eadc1daec5907287dc5e9bbc3a7e2bc0
+        digest: sha256:b7cec6a44aca2b9577e63285f8cb1be4d697187b8c47d6910a075ed456131031
         registry: mcr.microsoft.com
         repository: azurelinux/base/nginx
   certDomain: selfsigned.maestro.keyvault.azure.com
@@ -476,7 +495,7 @@ maestro:
     name: arohcp-swft-maestro-lnstest
     private: false
   image:
-    digest: sha256:195db1fb826c90b6f3a7621b2d11ed79d632e4e93a5dc475fb4e81d2c2e44cae
+    digest: sha256:91864b4571d431dbc0502d7a5cf9229c8d64fe3f85f60f1df92cddfcce3918f1
     registry: quay.io
     repository: redhat-user-workloads/maestro-rhtap-tenant/maestro/maestro
   postgres:
@@ -599,7 +618,7 @@ mgmt:
       image:
         registry: mcr.microsoft.com/oss/v2
         repository: prometheus/prometheus
-        sha: eb5dcb5c4f6e229d6dfe17b492291e06bea7ba19f080d48a7afc663e4420386c
+        sha: ffd9b77987764e1154338b465a15ed36ad253122459ebd8a6a9cfba364c5685e
       replicas: 2
       resources:
         limits:
@@ -609,6 +628,12 @@ mgmt:
           cpu: NONE
           memory: NONE
       shards: 1
+    thanos:
+      image:
+        registry: arohcpsvcdev.azurecr.io
+        repository: thanos/thanos
+        sha: cf3e9b292e4302ad4a4955b56379703aea39516607d382a57604a3d003c35d10
+        tag: v0.41.0
   rg: hcp-underlay-swft-lnstest-mgmt-1
   subscription:
     certificateDomains:
@@ -809,7 +834,7 @@ sessiongate:
     issuer: Self
     name: sessiongate-cert-swft-lnstest
   image:
-    digest: sha256:24de7f00bc8e1da12e0eb7dcded9def55a753e8a0c296a2e9184d6c549274db0
+    digest: sha256:84f5683368b820a08b2f010cb7ef42f1add30e6d80ea576d77c45e581ff27bc8
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpsessiongate
   k8s:
@@ -866,7 +891,7 @@ svc:
     istioctlVersion: 1.29.1
     tag: prod-stable
     targetVersion: asm-1-26
-    versions: asm-1-26
+    versions: asm-1-26,asm-1-28
   nsp:
     accessMode: Learning
     name: nsp-lnstest-svc
@@ -903,7 +928,7 @@ svc:
       image:
         registry: mcr.microsoft.com/oss/v2
         repository: prometheus/prometheus
-        sha: eb5dcb5c4f6e229d6dfe17b492291e06bea7ba19f080d48a7afc663e4420386c
+        sha: ffd9b77987764e1154338b465a15ed36ad253122459ebd8a6a9cfba364c5685e
       replicas: 2
       resources:
         limits:
@@ -914,6 +939,12 @@ svc:
           memory: NONE
       shards: 1
       version: ""
+    thanos:
+      image:
+        registry: arohcpsvcdev.azurecr.io
+        repository: thanos/thanos
+        sha: cf3e9b292e4302ad4a4955b56379703aea39516607d382a57604a3d003c35d10
+        tag: v0.41.0
   rg: hcp-underlay-swft-lnstest-svc
   subscription:
     certificateDomains:

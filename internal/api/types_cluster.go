@@ -64,14 +64,15 @@ type HCPOpenShiftClusterCustomerProperties struct {
 
 // HCPOpenShiftClusterCustomerProperties represents the property bag of a HCPOpenShiftCluster resource.
 type HCPOpenShiftClusterServiceProviderProperties struct {
-	ExistingCosmosUID string                         `json:"-"`
-	ProvisioningState arm.ProvisioningState          `json:"provisioningState,omitempty"`
-	ClusterServiceID  InternalID                     `json:"clusterServiceID,omitempty"`
-	ActiveOperationID string                         `json:"activeOperationId,omitempty"`
-	DNS               ServiceProviderDNSProfile      `json:"dns,omitempty"`
-	Console           ServiceProviderConsoleProfile  `json:"console,omitempty"`
-	API               ServiceProviderAPIProfile      `json:"api,omitempty"`
-	Platform          ServiceProviderPlatformProfile `json:"platform,omitempty"`
+	ExistingCosmosUID            string                         `json:"-"`
+	ProvisioningState            arm.ProvisioningState          `json:"provisioningState,omitempty"`
+	ClusterServiceID             InternalID                     `json:"clusterServiceID,omitempty"`
+	ActiveOperationID            string                         `json:"activeOperationId,omitempty"`
+	RevokeCredentialsOperationID string                         `json:"revokeCredentialsOperationId,omitempty"`
+	DNS                          ServiceProviderDNSProfile      `json:"dns,omitempty"`
+	Console                      ServiceProviderConsoleProfile  `json:"console,omitempty"`
+	API                          ServiceProviderAPIProfile      `json:"api,omitempty"`
+	Platform                     ServiceProviderPlatformProfile `json:"platform,omitempty"`
 
 	// ExperimentalFeatures captures experimental feature state evaluated from
 	// AFEC and per-resource tags. Stored in Cosmos but NOT exposed via ARM API.
@@ -85,6 +86,11 @@ type HCPOpenShiftClusterServiceProviderProperties struct {
 	// is set to a dummy value by our tools/testsuites/developers when
 	// creating ARO-HCP Clusters
 	ManagedIdentitiesDataPlaneIdentityURL string `json:"managedIdentitiesDataPlaneIdentityURL,omitempty"`
+	ClusterUID                            string `json:"clusterUID,omitempty"`
+	// BillingDocumentCosmosID is the Cosmos DB document ID of the billing document
+	// associated with this cluster. It is set when the billing document is created
+	// and used to avoid redundant creation attempts.
+	BillingDocumentCosmosID string `json:"billingDocumentCosmosID,omitempty"`
 }
 
 // VersionProfile represents the cluster control plane version.

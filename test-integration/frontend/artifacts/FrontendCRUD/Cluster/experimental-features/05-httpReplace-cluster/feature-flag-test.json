@@ -1,5 +1,4 @@
 {
-	"tags": {},
 	"identity": {
 		"type": "UserAssigned",
 		"userAssignedIdentities": {}
@@ -44,8 +43,9 @@
 		},
 		"version": {
 			"channelGroup": "stable",
-			"id": "4.20"
+			"id": "4.19"
 		}
 	},
+	"tags": {},
 	"type": "Microsoft.RedHatOpenShift/hcpOpenShiftClusters"
 }

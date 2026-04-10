@@ -17,10 +17,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	// If using ginkgo, import your tests here
 	_ "github.com/Azure/ARO-HCP/test/e2e"
 
+	"github.com/onsi/gomega/format"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
@@ -30,6 +32,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/test/cmd/aro-hcp-tests/cleanup"
 	customlinktools "github.com/Azure/ARO-HCP/test/cmd/aro-hcp-tests/custom-link-tools"
+	gatherobservability "github.com/Azure/ARO-HCP/test/cmd/aro-hcp-tests/gather-observability"
 	identitypool "github.com/Azure/ARO-HCP/test/cmd/aro-hcp-tests/identity-pool"
 	"github.com/Azure/ARO-HCP/test/cmd/aro-hcp-tests/visualize"
 	"github.com/Azure/ARO-HCP/test/util/framework"
@@ -45,6 +48,11 @@ func slowTestsOnly(query string) string {
 }
 
 func setupCli() *cobra.Command {
+	// Configure Ginkgo to be verbose - when we're emitting a full object to stdout on failure, there's no real value in truncating its
+	// content at some arbitrary length.
+	format.MaxLength = 0
+	format.MaxDepth = 0
+
 	// Extension registry
 	registry := e.NewRegistry()
 
@@ -55,7 +63,7 @@ func setupCli() *cobra.Command {
 
 	// The tests that a suite is composed of can be filtered by CEL expressions. By
 	// default, the qualifiers only apply to tests from this extension.
-	integrationQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.DevelopmentOnly[0])
+	integrationQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.DevelopmentOnly[0], labels.StageAndProdOnly[0])
 	ext.AddSuite(e.Suite{
 		Name: "integration/parallel",
 		Qualifiers: []string{
@@ -101,6 +109,7 @@ func setupCli() *cobra.Command {
 	})
 
 	prodQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.IntegrationOnly[0], labels.DevelopmentOnly[0])
+	prodTestTimeout := 150 * time.Minute
 	ext.AddSuite(e.Suite{
 		Name: "prod/parallel",
 		Qualifiers: []string{
@@ -110,6 +119,7 @@ func setupCli() *cobra.Command {
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
+		TestTimeout: &prodTestTimeout,
 	})
 	ext.AddSuite(e.Suite{
 		Name: "prod/parallel/slow",
@@ -120,6 +130,7 @@ func setupCli() *cobra.Command {
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
+		TestTimeout: &prodTestTimeout,
 	})
 
 	ext.AddSuite(e.Suite{
@@ -236,6 +247,7 @@ func setupCli() *cobra.Command {
 	root.AddCommand(api.Must(visualize.NewCommand()))
 	root.AddCommand(api.Must(customlinktools.NewCommand()))
 	root.AddCommand(api.Must(identitypool.NewCommand()))
+	root.AddCommand(api.Must(gatherobservability.NewCommand()))
 	return root
 }
 
