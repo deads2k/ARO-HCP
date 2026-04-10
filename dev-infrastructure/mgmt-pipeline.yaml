@@ -277,7 +277,7 @@ resourceGroups:
     - name: RESOURCE_GROUP
       configRef: mgmt.rg
     dependsOn:
-    - resourceGroup: service
+    - resourceGroup: management
       step: delete-non-swift-user-nodepools
   - name: nsp
     action: ARM
