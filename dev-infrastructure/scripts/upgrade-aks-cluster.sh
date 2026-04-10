@@ -9,8 +9,8 @@ set -euo pipefail
 echo " Upgrading cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' to '${KUBERNETES_VERSION}'..."
 
 az aks upgrade \
-    --resource-group ${CLUSTER_NAME} \
-    --name ${RESOURCE_GROUP} \
+    --resource-group ${RESOURCE_GROUP} \
+    --name ${CLUSTER_NAME} \
     --kubernetes-version ${KUBERNETES_VERSION} \
     --yes
 
