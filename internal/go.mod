@@ -34,7 +34,7 @@ require (
 	gotest.tools v2.2.0+incompatible
 	k8s.io/apimachinery v0.34.3
 	k8s.io/component-base v0.34.3
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	sigs.k8s.io/randfill v1.0.0
 )
 
