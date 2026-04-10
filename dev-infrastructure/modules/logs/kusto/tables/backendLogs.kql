@@ -5,7 +5,7 @@
   cluster: string,
   namespace_name: string,
   container_name: string,
-  container_image: string,           // fluentbit kubernetes.container_image: image from pod spec (may include tag)
+  container_image: string,
   host: string,
   labels: string,
   pod_name: string,
@@ -25,8 +25,8 @@
   cluster_id: string,
   cloud_error_code: string,
   cloud_error_message: string,
-  tag: string,                       // fluentbit tag: routing identifier (e.g. kube.<namespace>.<pod>.<container>)
-  container_status_image_id: string  // fluentbit kubernetes.container_hash: image digest from container status (k8s .status.containerStatuses[].imageID)
+  tag: string,
+  container_status_image_id: string
 )
 
 .create-or-alter table backendLogs ingestion json mapping 'ingestionMapping'
