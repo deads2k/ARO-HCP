@@ -16,7 +16,6 @@ package breakglass
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -25,8 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/set"
 
-	ocmerrors "github.com/openshift-online/ocm-sdk-go/errors"
-
+	hcphelpers "github.com/Azure/ARO-HCP/admin/server/handlers/hcp"
 	"github.com/Azure/ARO-HCP/admin/server/middleware"
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
@@ -35,6 +33,14 @@ import (
 	sessiongateapiv1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
 	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/clientset/versioned/typed/sessiongate/v1alpha1"
 )
+
+// breakglass credentials for groups mentioned in this map are rewritten
+// this allows us get remove the sre-breakglass-role ACM policy while
+// keeping the same level of access for SREs
+var groupRewriteMap = map[string]string{
+	"aro-sre-pso": "system:cluster-readers",
+	"aro-sre-csa": "system:masters",
+}
 
 // HCPBreakglassSessionCreationHandler handles requests to create breakglass sessions.
 // This endpoint is accessed exclusively via Geneva Actions. See package documentation for security model.
@@ -73,12 +79,12 @@ func (h *HCPBreakglassSessionCreationHandler) ServeHTTP(writer http.ResponseWrit
 
 	clusterHypershiftDetails, err := h.csClient.GetClusterHypershiftDetails(request.Context(), hcp.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
-		return clusterServiceError(err, "hypershift details")
+		return hcphelpers.ClusterServiceError(err, "hypershift details")
 	}
 
 	provisionShard, err := h.csClient.GetClusterProvisionShard(request.Context(), hcp.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
-		return clusterServiceError(err, "provision shard")
+		return hcphelpers.ClusterServiceError(err, "provision shard")
 	}
 
 	group, ttl, err := h.validateSessionParameters(request)
@@ -183,18 +189,13 @@ func (h *HCPBreakglassSessionCreationHandler) validateSessionParameters(request 
 		}
 	}
 
-	return body.Group, ttl, utilerrors.NewAggregate(errs)
-}
-
-// clusterServiceError checks if err is an OCM not-found error and returns a
-// specific CloudError. This prevents ReportError from misinterpreting it as
-// "HCP resource not found" (the HCP was already found in the database).
-// Non-OCM errors are wrapped for ReportError to handle as internal errors.
-func clusterServiceError(err error, what string) error {
-	var ocmErr *ocmerrors.Error
-	if errors.As(err, &ocmErr) && ocmErr.Status() == http.StatusNotFound {
-		return arm.NewCloudError(http.StatusNotFound, arm.CloudErrorCodeNotFound, "",
-			"%s not found in cluster service", what)
+	// not every group accepted as payload has a corresponding RBAC group within HCPs
+	// so we rewrite the actual group here. this is a temporary measure until
+	// the geneva action will start adopting the target group names.
+	group := body.Group
+	if rewrittenGroup, ok := groupRewriteMap[group]; ok {
+		group = rewrittenGroup
 	}
-	return fmt.Errorf("failed to get %s from cluster service: %w", what, err)
+
+	return group, ttl, utilerrors.NewAggregate(errs)
 }

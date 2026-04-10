@@ -48,16 +48,11 @@ func NewCommand() (*cobra.Command, error) {
 }
 
 func Visualize(ctx context.Context, opts *RawOptions) error {
-	logger, err := logr.FromContext(ctx)
-	if err != nil {
-		return err
-	}
-
 	validated, err := opts.Validate()
 	if err != nil {
 		return err
 	}
-	completed, err := validated.Complete(logger)
+	completed, err := validated.Complete(ctx)
 	if err != nil {
 		return err
 	}

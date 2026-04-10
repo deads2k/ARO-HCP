@@ -68368,7 +68368,7 @@ spec:
             - --config-reloader-cpu-limit=0
             - --config-reloader-memory-request=0
             - --config-reloader-memory-limit=0
-            - --thanos-default-base-image=quay.io/thanos/thanos:v0.37.2
+            - --thanos-default-base-image=arohcpsvcdev.azurecr.io/thanos/thanos:v0.41.0@sha256:1234567890
             - --secret-field-selector=type!=kubernetes.io/dockercfg,type!=kubernetes.io/service-account-token,type!=helm.sh/release.v1
             - --web.enable-tls=true
             - --web.cert-file=/cert/cert
@@ -68543,8 +68543,8 @@ spec:
       app.kubernetes.io/managed-by: prometheus-operator
 ---
 # Source: hcp-prometheus/templates/prometheus.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: Prometheus
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: PrometheusAgent
 metadata:
   name: prometheus
   namespace: 'prometheus'
@@ -68561,8 +68561,6 @@ spec:
             values:
             - infra
   automountServiceAccountToken: true
-  enableAdminAPI: false
-  evaluationInterval: 30s
   hostNetwork: false
   listenLocal: false
   logFormat: logfmt
@@ -68579,11 +68577,7 @@ spec:
     matchLabels:
       release: arohcp-monitor
   replicas: 1
-  retention: '1d'
-  retentionSize: '45GiB'
   routePrefix: /
-  ruleNamespaceSelector: {}
-  ruleSelector: {}
   scrapeConfigNamespaceSelector: {}
   scrapeConfigSelector:
     matchLabels:
@@ -68627,8 +68621,6 @@ spec:
     maxSkew: 1
     topologyKey: kubernetes.io/hostname
     whenUnsatisfiable: ScheduleAnyway
-  tsdb:
-    outOfOrderTimeWindow: 0s
   walCompression: true
   externalLabels:
     cluster: 'dev-westus3-mgmt-1'

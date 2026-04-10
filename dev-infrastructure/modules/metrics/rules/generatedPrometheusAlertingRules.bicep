@@ -189,7 +189,7 @@ resource prometheusRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-0
           summary: 'Prometheus fails to send samples to remote storage.'
           title: 'Prometheus fails to send samples to remote storage.'
         }
-        expression: '((rate(prometheus_remote_storage_failed_samples_total{job="prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus-prometheus",namespace="prometheus"}[5m])) / ((rate(prometheus_remote_storage_failed_samples_total{job="prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus-prometheus",namespace="prometheus"}[5m])) + (rate(prometheus_remote_storage_succeeded_samples_total{job="prometheus-prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_total{job="prometheus-prometheus",namespace="prometheus"}[5m])))) * 100 > 1'
+        expression: '((rate(prometheus_remote_storage_failed_samples_total{job="prometheus/prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus/prometheus",namespace="prometheus"}[5m])) / ((rate(prometheus_remote_storage_failed_samples_total{job="prometheus/prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_failed_total{job="prometheus/prometheus",namespace="prometheus"}[5m])) + (rate(prometheus_remote_storage_succeeded_samples_total{job="prometheus/prometheus",namespace="prometheus"}[5m]) or rate(prometheus_remote_storage_samples_total{job="prometheus/prometheus",namespace="prometheus"}[5m])))) * 100 > 1'
         for: 'PT15M'
         severity: 3
       }
@@ -216,7 +216,7 @@ resource prometheusRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-0
           summary: 'Prometheus is not ingesting samples.'
           title: 'Prometheus is not ingesting samples.'
         }
-        expression: '(sum without (type) (rate(prometheus_tsdb_head_samples_appended_total{job="prometheus-prometheus",namespace="prometheus"}[5m])) <= 0 and (sum without (scrape_job) (prometheus_target_metadata_cache_entries{job="prometheus-prometheus",namespace="prometheus"}) > 0 or sum without (rule_group) (prometheus_rule_group_rules{job="prometheus-prometheus",namespace="prometheus"}) > 0))'
+        expression: '(sum without (type) (rate(prometheus_tsdb_head_samples_appended_total{job="prometheus/prometheus",namespace="prometheus"}[5m])) <= 0 and sum without (scrape_job) (prometheus_target_metadata_cache_entries{job="prometheus/prometheus",namespace="prometheus"}) > 0)'
         for: 'PT10M'
         severity: 3
       }
@@ -243,35 +243,8 @@ resource prometheusRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-0
           summary: 'Failed Prometheus configuration reload.'
           title: 'Failed Prometheus configuration reload.'
         }
-        expression: 'max_over_time(prometheus_config_last_reload_successful{job="prometheus-prometheus",namespace="prometheus"}[5m]) == 0'
+        expression: 'max_over_time(prometheus_config_last_reload_successful{job="prometheus/prometheus",namespace="prometheus"}[5m]) == 0'
         for: 'PT10M'
-        severity: 3
-      }
-      {
-        actions: [
-          for g in actionGroups: {
-            actionGroupId: g
-            actionProperties: {
-              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
-              'IcM.CorrelationId': '#$.annotations.correlationId#'
-            }
-          }
-        ]
-        alert: 'PrometheusRuleFailures'
-        enabled: true
-        labels: {
-          severity: 'critical'
-        }
-        annotations: {
-          correlationId: 'PrometheusRuleFailures/{{ $labels.cluster }}/{{ $labels.namespace }}/{{ $labels.pod }}'
-          description: 'Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to evaluate {{ printf "%.0f" $value }} rules in the last 5m.'
-          info: 'Prometheus {{$labels.namespace}}/{{$labels.pod}} has failed to evaluate {{ printf "%.0f" $value }} rules in the last 5m.'
-          runbook_url: 'https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusrulefailures'
-          summary: 'Prometheus is failing rule evaluations.'
-          title: 'Prometheus is failing rule evaluations.'
-        }
-        expression: 'increase(prometheus_rule_evaluation_failures_total{job="prometheus-prometheus",namespace="prometheus"}[5m]) > 0'
-        for: 'PT15M'
         severity: 3
       }
       {
@@ -297,7 +270,7 @@ resource prometheusRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-0
           summary: 'Prometheus has failed scrapes that have exceeded the configured sample limit.'
           title: 'Prometheus has failed scrapes that have exceeded the configured sample limit.'
         }
-        expression: 'increase(prometheus_target_scrapes_exceeded_sample_limit_total{job="prometheus-prometheus",namespace="prometheus"}[5m]) > 0'
+        expression: 'increase(prometheus_target_scrapes_exceeded_sample_limit_total{job="prometheus/prometheus",namespace="prometheus"}[5m]) > 0'
         for: 'PT15M'
         severity: 3
       }
@@ -716,24 +689,176 @@ resource arobitRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01
         alert: 'ArobitForwarderJobUp'
         enabled: true
         labels: {
-          severity: 'critical'
+          severity: 'warning'
         }
         annotations: {
           correlationId: 'ArobitForwarderJobUp/{{ $labels.cluster }}'
-          description: '''Arobit forwarder has not been reachable for the past 15 minutes.
-This may indicate that the Arobit forwarder is down, or experiencing a crash loop.
-Check the status of the Arobit forwarder pods, service endpoints, and network connectivity.
+          description: '''The Arobit forwarder metrics endpoint on cluster {{ $labels.cluster }} has been unreachable for 15 minutes.
 '''
-          info: '''Arobit forwarder has not been reachable for the past 15 minutes.
-This may indicate that the Arobit forwarder is down, or experiencing a crash loop.
-Check the status of the Arobit forwarder pods, service endpoints, and network connectivity.
+          info: '''The Arobit forwarder metrics endpoint on cluster {{ $labels.cluster }} has been unreachable for 15 minutes.
 '''
           runbook_url: 'TBD'
-          summary: 'Arobit forwarder is unreachable for 15 minutes.'
-          title: 'Arobit forwarder is unreachable for 15 minutes.'
+          summary: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
+          title: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
         }
         expression: 'group by (cluster) (up{job="kube-state-metrics"}) unless on(cluster) group by (cluster) (up{job="arobit-forwarder",namespace="arobit"} == 1)'
         for: 'PT15M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'LowOutputBytesProcessed'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'LowOutputBytesProcessed/{{ $labels.cluster }}/{{ $labels.pod }}'
+          description: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} output is low.
+The metric fluentbit_output_proc_bytes_total only counts bytes from chunks that were sent successfully, this indicates a problem with the output plugin or low input.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} output is low.
+The metric fluentbit_output_proc_bytes_total only counts bytes from chunks that were sent successfully, this indicates a problem with the output plugin or low input.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          summary: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
+          title: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
+        }
+        expression: 'sum(rate(fluentbit_output_proc_bytes_total{name=~"azure_kusto.*"}[5m])) by (cluster, pod) < 50'
+        for: 'PT15M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'FluentBitIngestionPaused'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'FluentBitIngestionPaused/{{ $labels.cluster }}/{{ $labels.pod }}'
+          description: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has paused collecting new log data for at least 5 minutes.
+Ingestion pauses when Fluent Bit\'s internal memory or storage buffers are full, typically caused by backpressure from a slow or failing output.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has paused collecting new log data for at least 5 minutes.
+Ingestion pauses when Fluent Bit\'s internal memory or storage buffers are full, typically caused by backpressure from a slow or failing output.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          summary: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
+          title: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
+        }
+        expression: 'sum(fluentbit_input_ingestion_paused) by (cluster, pod) > 0'
+        for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'FluentBitHighOutputRetries'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'FluentBitHighOutputRetries/{{ $labels.cluster }}/{{ $labels.pod }}'
+          description: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is retrying chunk delivery.
+Retries occur when the azure_kusto output encounters a recoverable error (e.g. transient network failure, HTTP 429/5xx from Kusto).
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is retrying chunk delivery.
+Retries occur when the azure_kusto output encounters a recoverable error (e.g. transient network failure, HTTP 429/5xx from Kusto).
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          summary: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
+          title: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
+        }
+        expression: 'sum(rate(fluentbit_output_retries_total{name=~"azure_kusto.*"}[5m])) by (cluster, pod) > 3'
+        for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'FluentBitOutputErrors'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'FluentBitOutputErrors/{{ $labels.cluster }}/{{ $labels.pod }}'
+          description: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is encountering errors sending log chunks to Kusto.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is encountering errors sending log chunks to Kusto.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          summary: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
+          title: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
+        }
+        expression: 'sum(rate(fluentbit_output_errors_total{name=~"azure_kusto.*"}[5m])) by (cluster, pod) > 0'
+        for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'FluentBitOutputRetriesExhausted'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'FluentBitOutputRetriesExhausted/{{ $labels.cluster }}/{{ $labels.pod }}'
+          description: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has chunks that exceeded the configured Retry_Limit for the Kusto output.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has chunks that exceeded the configured Retry_Limit for the Kusto output.
+Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
+'''
+          summary: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
+          title: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
+        }
+        expression: 'sum(rate(fluentbit_output_retries_failed_total{name=~"azure_kusto.*"}[5m])) by (cluster, pod) > 0'
+        for: 'PT5M'
         severity: 3
       }
     ]
@@ -1038,6 +1163,50 @@ resource serviceTagCapacityRules 'Microsoft.AlertsManagement/prometheusRuleGroup
         expression: 'public_ip_count_by_region_service_tag{service_tag_type="FirstPartyUsage",service_tag_value="/aro-hcp-prod-outbound-svc"} / 32 > 0.8'
         for: 'PT15M'
         severity: 4
+      }
+    ]
+    scopes: [
+      azureMonitoring
+    ]
+  }
+}
+
+resource hcpDeletionRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'hcp-deletion-rules'
+  location: location
+  properties: {
+    interval: 'PT1M'
+    rules: [
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'HCPClusterStuckDeleting'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'HCPClusterStuckDeleting/{{ $labels.cluster }}/{{ $labels.exported_namespace }}'
+          description: '''Cluster {{ $labels.exported_namespace }} has been in a deleting state for more than 2 hours. 
+This may indicate that finalizers are stuck or resources are failing to cleanup.
+'''
+          info: '''Cluster {{ $labels.exported_namespace }} has been in a deleting state for more than 2 hours. 
+This may indicate that finalizers are stuck or resources are failing to cleanup.
+'''
+          runbook_url: 'TBD'
+          summary: 'Cluster {{ $labels.exported_namespace }} stuck deleting'
+          title: 'Cluster {{ $labels.exported_namespace }} stuck deleting'
+        }
+        expression: 'sum by (cluster, exported_namespace, name) (hypershift_cluster_deleting_duration_seconds) > 7200'
+        for: 'PT5M'
+        severity: 3
       }
     ]
     scopes: [

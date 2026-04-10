@@ -108,7 +108,7 @@ defaults:
       image:
         registry: mcr.microsoft.com
         repository: oss/v2/fluent/fluent-bit
-        digest: sha256:4eeae6cca3a863a7d9b732da04c07495af2ac7f2f5c00325c40fa7fa2c1df9af # v4.2.3 (2026-03-31 18:39)
+        digest: sha256:c1c0efba9c3f1213034c226ee16adc73367eac5b7f83acba1c468866993dbea5 # v4.2.3 (2026-04-09 22:24)
       resources:
         requests:
           cpu: 100m
@@ -124,7 +124,7 @@ defaults:
       image:
         registry: mcr.microsoft.com
         repository: geneva/distroless/mdsd
-        digest: sha256:08c968b97ffae66051da8c5a469ac8252bc63225fcf697618cb0fb5e3ea8bbb0 # 1.40.2-20260406-1 (2026-04-06 21:41)
+        digest: sha256:1fb51857a0a34e7e7445a91c0a1082d97df235349a66a166a58c86029c80ea89 # 1.40.3-20260409-1 (2026-04-09 21:05)
   # Kube Events
   kubeEvents:
     enabled: true
@@ -156,7 +156,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpmetrics
-      digest: sha256:bc304e23e29317704f942d3a147c2e304b4d1ec9112f2f06b3deef33673a01a8 # 2baea8d (2026-04-08 05:02)
+      digest: sha256:63698a49f7577218b2950b6409f4425b8db8dc0e45fed8ef034248a8b472ab5b # a541f06 (2026-04-09 20:41)
   # Secret Sync Controller
   secretSyncController:
     image:
@@ -278,7 +278,7 @@ defaults:
     image:
       registry: quay.io
       repository: redhat-services-prod/crt-redhat-acm-tenant/hypershift/hypershift-operator
-      digest: sha256:3964219e27675362dba759225e14be67205f15f60b6f560a7fdcb63357c9c99e # 7000c24bf13465d899b5db07166b07d81276c008 (2026-04-07 16:16)
+      digest: sha256:f147768e5f0091dd8ce873de6453aeb7d00a4de0a1b54be615e6725ce6d16526 # 6a333169a21858dd7eb14509b01ab34f7f24e99e (2026-04-09 17:31)
     namespace: hypershift
     additionalInstallArg: '--enable-cpo-overrides'
     # By default we set it to empty as this tag is only required for msft environments. We override
@@ -456,7 +456,7 @@ defaults:
         image:
           registry: mcr.microsoft.com/oss/v2
           repository: prometheus/prometheus
-          sha: 1a25cc2dcbd33a4d48ab73a59136ba572f820c77edc79131f6bf8b2290cf387d # v3.11.0 (2026-04-03 16:43)
+          sha: ffd9b77987764e1154338b465a15ed36ad253122459ebd8a6a9cfba364c5685e # v3.11.1 (2026-04-08 21:44)
         version: ""
         resources:
           requests:
@@ -483,6 +483,12 @@ defaults:
             registry: arohcpsvcdev.azurecr.io
             repository: k8s-cache/ingress-nginx/kube-webhook-certgen
             sha: 01038e7de14b78d702d2849c3aad72fd25903c4765af63cf16aa3398f5d5f2dd # v1.6.9 (2026-03-19 15:52)
+      thanos:
+        image:
+          registry: arohcpsvcdev.azurecr.io
+          repository: thanos/thanos
+          tag: v0.41.0
+          sha: cf3e9b292e4302ad4a4955b56379703aea39516607d382a57604a3d003c35d10
   # MGMT cluster specifics
   mgmt:
     hcpBackups:
@@ -575,7 +581,7 @@ defaults:
         image:
           registry: mcr.microsoft.com/oss/v2
           repository: prometheus/prometheus
-          sha: 1a25cc2dcbd33a4d48ab73a59136ba572f820c77edc79131f6bf8b2290cf387d # v3.11.0 (2026-04-03 16:43)
+          sha: ffd9b77987764e1154338b465a15ed36ad253122459ebd8a6a9cfba364c5685e # v3.11.1 (2026-04-08 21:44)
         resources:
           requests:
             cpu: NONE
@@ -601,12 +607,18 @@ defaults:
             registry: arohcpsvcdev.azurecr.io
             repository: k8s-cache/ingress-nginx/kube-webhook-certgen
             sha: 01038e7de14b78d702d2849c3aad72fd25903c4765af63cf16aa3398f5d5f2dd # v1.6.9 (2026-03-19 15:52)
+      thanos:
+        image:
+          registry: arohcpsvcdev.azurecr.io
+          repository: thanos/thanos
+          tag: v0.41.0
+          sha: cf3e9b292e4302ad4a4955b56379703aea39516607d382a57604a3d003c35d10
   # Backend
   backend:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpbackend
-      digest: sha256:c5ffb34da9a99fb52d3d87fd1576527e211d56de42fd3b895df0369f2dabb098 # 2baea8d (2026-04-08 05:05)
+      digest: sha256:f059abfb7f1b7f64e384eb2745dfc5989661c50aadb18c99bf9d2b7c0246abcf # a541f06 (2026-04-09 20:43)
     tracing:
       address: ""
       exporter: ""
@@ -635,7 +647,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpadminapi
-      digest: sha256:6f7906440b603599bc286792ab253b2ceddefd09b42b1b32d0248c0f801f0f76 # 2baea8d (2026-04-08 05:04)
+      digest: sha256:3c51851594e81c831dccab9735cee5b1f033765a28df3c7e30874cef67df4b3e # a541f06 (2026-04-09 20:43)
     managedIdentityName: admin-api
     k8s:
       replicas: 2
@@ -654,7 +666,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpsessiongate
-      digest: sha256:12ce6a99c77c0de469e691815b852627c10341cdeeb6c849ee534cb9185b7f95 # 2baea8d (2026-04-08 05:04)
+      digest: sha256:84f5683368b820a08b2f010cb7ef42f1add30e6d80ea576d77c45e581ff27bc8 # a541f06 (2026-04-09 20:43)
     managedIdentityName: sessiongate
     k8s:
       replicas: 2
@@ -679,7 +691,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpfrontend
-      digest: sha256:f0bcdeafc73b87cfb986787aefab1b92acefb0acdf99d2056f31ae8ac6454c2b # 2baea8d (2026-04-08 05:04)
+      digest: sha256:e49ea1795a72e71ff79ef813c353636ddf7a863d6bf361aeb7826a16fae2b0b5 # a541f06 (2026-04-09 20:42)
     tracing:
       address: ""
       exporter: ""
@@ -863,18 +875,18 @@ defaults:
       bundle:
         registry: quay.io
         repository: redhat-user-workloads/crt-redhat-acm-tenant/acm-operator-bundle-acm-215
-        digest: sha256:39976aea54b64465636777c181baab607bedd8908af784306163adecb28581a1 # v2.15.2-458 (2026-04-07 23:14)
+        digest: sha256:21f7525f72a31f271e0140c0489e6b14cd3bf9eef95b8ab3844dbcc55f47fb3f # v2.15.2-463 (2026-04-09 17:25)
     mce:
       bundle:
         registry: quay.io
         repository: redhat-user-workloads/crt-redhat-acm-tenant/mce-operator-bundle-mce-210
-        digest: sha256:846f21fd182fbd06e493870fc87d77ca87a8db5a6ee7c6c5abdb750aa9a7bdc2 # v2.10.2-483 (2026-04-08 05:41)
+        digest: sha256:6b80ae204f71a52269e361d7255b2021f4d1b9aa0e60e763a504e508c12c02a8 # v2.10.2-487 (2026-04-09 17:25)
   # Cluster Service
   clustersService:
     image:
       registry: quay.io
       repository: app-sre/aro-hcp-clusters-service
-      digest: sha256:4337a0c3fe75c190e5cc1ccd92ce9712f4dd93bf043d07fdcc4a418172835278 # 1f7a8e0c5afc676cb39affc82e8024d7ceda929d (2026-04-03 12:15)
+      digest: sha256:b70f064cad11f7374d475e7078826912d07451c0389dc00de21bb723ca0761c5 # 28911b36ad59807e10fb4443679ec676f206ebf2 (2026-04-09 16:18)
     # controls how many HCPs can be placed on an MC, sadly not configurable per MC
     provisionShardClusterLimit: 100
     # batch processes
@@ -946,9 +958,9 @@ defaults:
       image:
         registry: arohcpsvcdev.azurecr.io
         repository: image-sync/oc-mirror
-        digest: sha256:c76849b485c6feab71b94539ea3677bc4c7a8fe289c18b16a478f3de1d16d5d3 # 2baea8d (2026-04-08 05:05)
+        digest: sha256:f6a24c1a4db168cf2ed8594c8e4b5d8e37c92f0773c497191c1f2e9326640935 # a541f06 (2026-04-09 20:41)
       pullSecretName: ocmirror-pull-secret
-      operatorVersionsToMirror: "4.18,4.19,4.20"
+      operatorVersionsToMirror: "4.18,4.19,4.20,4.21"
   # Automation Account
   automationDryRun: true
   # Mock Managed Identities - not relevant for most MSFT envs
@@ -1141,7 +1153,7 @@ clouds:
           accessMode: 'Learning'
         istio:
           targetVersion: "asm-1-26"
-          versions: "asm-1-26"
+          versions: "asm-1-26,asm-1-28"
         aks:
           etcd:
             softDelete: false
@@ -1416,6 +1428,9 @@ clouds:
           # SVC
           svc:
             rg: "hcp-underlay-{{ .ctx.environment }}-{{ .ctx.regionShort }}-svc"
+            istio:
+              targetVersion: "asm-1-28"
+              versions: "asm-1-28"
             aks:
               name: "{{ .ctx.environment }}-{{ .ctx.regionShort }}-svc"
               userAgentPool:
@@ -1589,6 +1604,9 @@ clouds:
           # SVC
           svc:
             rg: "hcp-underlay-{{ .ctx.environment }}-{{ .ctx.regionShort }}-svc"
+            istio:
+              targetVersion: "asm-1-28"
+              versions: "asm-1-28"
             aks:
               name: "{{ .ctx.environment }}-{{ .ctx.regionShort }}-svc"
               userAgentPool:
