@@ -382,8 +382,8 @@ record-services-override: $(YQ) $(ORAS)
 # One-Step Personal Dev Environment
 #
 ifeq ($(DEPLOY_ENV),$(filter $(DEPLOY_ENV),pers swft))
-personal-dev-env: OVERRIDE_CONFIG_FILE = $(PERS_OVERRIDE_FILE)
-personal-dev-env: install-tools build-services record-services-override entrypoint/Region infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
+personal-dev-env: install-tools build-services record-services-override infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
+	$(MAKE) entrypoint/Region OVERRIDE_CONFIG_FILE=$(PERS_OVERRIDE_FILE)
 else
 personal-dev-env:
 	$(error personal-dev-env: DEPLOY_ENV must be set to "pers" or "swft", not "$(DEPLOY_ENV)")
