@@ -354,10 +354,36 @@ generate-kiota:
 .PHONY: generate-kiota
 
 #
+# Build and push all in-repo service images, then record a combined override config
+#
+PERS_OVERRIDE_FILE ?= /tmp/personal-dev-override.yaml
+
+build-services:
+	$(MAKE) -C frontend build-and-push
+	$(MAKE) -C backend build-and-push
+	$(MAKE) -C admin build-and-push
+	$(MAKE) -C sessiongate build-and-push
+.PHONY: build-services
+
+record-services-override: $(YQ) $(ORAS)
+	$(MAKE) -C frontend record-override OVERRIDE_CONFIG_FILE=/tmp/_frontend-override.yaml
+	$(MAKE) -C backend record-override OVERRIDE_CONFIG_FILE=/tmp/_backend-override.yaml
+	$(MAKE) -C admin record-override OVERRIDE_CONFIG_FILE=/tmp/_admin-override.yaml
+	$(MAKE) -C sessiongate record-override OVERRIDE_CONFIG_FILE=/tmp/_sessiongate-override.yaml
+	$(YQ) eval-all '. as $$item ireduce ({}; . * $$item)' \
+	  /tmp/_frontend-override.yaml \
+	  /tmp/_backend-override.yaml \
+	  /tmp/_admin-override.yaml \
+	  /tmp/_sessiongate-override.yaml \
+	  > $(PERS_OVERRIDE_FILE)
+.PHONY: record-services-override
+
+#
 # One-Step Personal Dev Environment
 #
 ifeq ($(DEPLOY_ENV),$(filter $(DEPLOY_ENV),pers swft))
-personal-dev-env: install-tools entrypoint/Region infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
+personal-dev-env: OVERRIDE_CONFIG_FILE = $(PERS_OVERRIDE_FILE)
+personal-dev-env: install-tools build-services record-services-override entrypoint/Region infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
 else
 personal-dev-env:
 	$(error personal-dev-env: DEPLOY_ENV must be set to "pers" or "swft", not "$(DEPLOY_ENV)")
