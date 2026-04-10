@@ -5,7 +5,7 @@
   cluster: string,
   namespace: string,
   containerName: string,
-  containerImage: string,
+  containerImage: string,            // fluentbit: kubernetes.container_image
   host: string,
   labels: string,
   podName: string,
@@ -22,8 +22,8 @@
   objectUID: string,
   reason: string,
   sourceComponent: string,
-  tag: string,
-  containerStatusImageId: string
+  tag: string,                       // fluentbit: tag routing identifier
+  containerStatusImageId: string     // fluentbit: kubernetes.container_hash (k8s status.containerStatuses.imageID)
 )
 
 
