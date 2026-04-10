@@ -177,8 +177,6 @@ usage() {
 #
 TENANTS=(
     "RedHat0:64dc69e4-d083-49fc-9569-ebece1dd1408:1ef710d1-afd7-4bf3-8095-e8126650607f:custom-metrics-collector-redhat0-client-secret"
-    # TODO: Uncomment after creating the Test Tenant SP with: ./scripts/manage-service-principals.sh --tenant test-tenant
-    # "TestTenant:93b21e64-4824-439a-b893-46c9b2a51082:<client-id>:custom-metrics-collector-test-tenant-client-secret"
 )
 
 get_tenant_config() {

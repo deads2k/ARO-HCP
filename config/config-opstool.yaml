@@ -83,41 +83,25 @@ clouds:
             repository: "tenant-quota-collector"
             tag: "latest"
           tenants:
-            - tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
-              tenantName: "RedHat0"
-              servicePrincipalClientId: "1ef710d1-afd7-4bf3-8095-e8126650607f"
-              keyVaultSecretName: "custom-metrics-collector-redhat0-client-secret"
-              directoryQuota: true
-              subscriptions:
-                - name: "ARO Hosted Control Planes (EA Subscription 1)"
-                  roleAssignmentLimit: 4000
-                  regions:
-                    - westus3
-                - name: "ARO HCP E2E Hosted Clusters (EA Subscription)"
-                  roleAssignmentLimit: 8000
-                  regions:
-                    - westus3
-                # TODO: Uncomment after getting role assignment write access on this subscription
-                - name: "ARO SRE Team - INT (EA Subscription 3)"
-                  roleAssignmentLimit: 4000
-                  regions:
-                    - uksouth
-            # TODO: Uncomment after creating the Test Tenant SP with:
-            #   ./tooling/tenant-quota/scripts/manage-service-principals.sh --tenant test-tenant
-            # - tenantId: "93b21e64-4824-439a-b893-46c9b2a51082"
-            #   tenantName: "TestTenant"
-            #   servicePrincipalClientId: "TODO"
-            #   keyVaultSecretName: "custom-metrics-collector-test-tenant-client-secret"
-            #   directoryQuota: false
-            #   subscriptions:
-            #     - name: "ARO HCP E2E"
-            #       roleAssignmentLimit: 4000
-            #       regions:
-            #         - uksouth
-            #     - name: "ARO HCP E2E - Staging"
-            #       roleAssignmentLimit: 4000
-            #       regions:
-            #         - uksouth
+          - tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
+            tenantName: "RedHat0"
+            servicePrincipalClientId: "1ef710d1-afd7-4bf3-8095-e8126650607f"
+            keyVaultSecretName: "custom-metrics-collector-redhat0-client-secret"
+            directoryQuota: true
+            subscriptions:
+            - name: "ARO Hosted Control Planes (EA Subscription 1)"
+              roleAssignmentLimit: 4000
+              regions:
+              - westus3
+            - name: "ARO HCP E2E Hosted Clusters (EA Subscription)"
+              roleAssignmentLimit: 8000
+              regions:
+              - westus3
+            # TODO: Uncomment after getting role assignment write access on this subscription
+            - name: "ARO SRE Team - INT (EA Subscription 3)"
+              roleAssignmentLimit: 4000
+              regions:
+              - uksouth
     environments:
       opstool:
         regions:

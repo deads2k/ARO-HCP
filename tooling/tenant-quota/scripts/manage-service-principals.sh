@@ -21,7 +21,6 @@
 #
 # Usage:
 #   ./scripts/manage-service-principals.sh --tenant redhat
-#   ./scripts/manage-service-principals.sh --tenant test-tenant
 #   ./scripts/manage-service-principals.sh --list
 #
 # After running, redeploy the collector to pick up any new secrets.
@@ -90,21 +89,6 @@ setup_redhat() {
         # TODO: Uncomment after getting role assignment write access
         "ARO SRE Team - INT (EA Subscription 3)"
         "ARO HCP E2E Hosted Clusters (EA Subscription)"
-    )
-
-    create_or_get_sp "${APPLICATION_NAME}"
-    grant_graph_permissions "${APP_ID}" "${DIRECTORY_QUOTA}"
-    grant_subscription_reader "${APP_ID}" "${SUBSCRIPTIONS[@]}"
-    store_secret "${APP_ID}" "${KEYVAULT_SECRET_NAME}"
-}
-
-setup_test_tenant() {
-    local APPLICATION_NAME="tenant-quota-collector-test-tenant"
-    local KEYVAULT_SECRET_NAME="custom-metrics-collector-test-tenant-client-secret"
-    local DIRECTORY_QUOTA=false
-    local SUBSCRIPTIONS=(
-        "ARO HCP E2E"
-        "ARO HCP E2E - Staging"
     )
 
     create_or_get_sp "${APPLICATION_NAME}"
@@ -305,16 +289,13 @@ store_secret() {
 list_tenants() {
     header "Available tenant configurations"
     echo "  redhat       - RedHat0 tenant (dev/int/e2e subscriptions)"
-    echo "  test-tenant  - Test Tenant (stg/prod testing subscriptions)"
     echo ""
     echo "Usage:"
     echo "  $0 --tenant redhat"
-    echo "  $0 --tenant test-tenant"
     echo ""
     echo "Prerequisites:"
     echo "  Login to the TARGET tenant before running:"
     echo "    RedHat0:      az login --tenant 64dc69e4-d083-49fc-9569-ebece1dd1408"
-    echo "    Test Tenant:  az login --tenant 93b21e64-4824-439a-b893-46c9b2a51082"
     echo ""
     echo "  Then login to dev tenant to access Key Vault for storing secrets:"
     echo "    az login"
@@ -326,7 +307,7 @@ usage() {
     echo "Creates and configures service principals for the tenant-quota collector."
     echo ""
     echo "Options:"
-    echo "  --tenant NAME    Setup SP for the named tenant (redhat, test-tenant)"
+    echo "  --tenant NAME    Setup SP for the named tenant (redhat)"
     echo "  --list           List available tenant configurations"
     echo "  --keyvault NAME  Override Key Vault name (default: ${KEYVAULT_NAME})"
     echo "  --help           Show this help message"
@@ -372,9 +353,6 @@ fi
 case "${TENANT}" in
     redhat|RedHat0|redhat0)
         setup_redhat
-        ;;
-    test-tenant|TestTenant|test)
-        setup_test_tenant
         ;;
     *)
         print_error "Unknown tenant: ${TENANT}"
