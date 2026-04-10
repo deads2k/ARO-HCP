@@ -193,7 +193,6 @@ resourceGroups:
     - resourceGroup: service
       step: cluster
   - name: upgrade-aks-cluster
-    aksCluster: '{{ .svc.aks.name }}'
     action: Shell
     command: ./upgrade-aks-cluster.sh
     workingDir: ./scripts

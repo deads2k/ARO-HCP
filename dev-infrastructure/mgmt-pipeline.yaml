@@ -260,7 +260,6 @@ resourceGroups:
     - resourceGroup: management
       step: cluster
   - name: upgrade-aks-cluster
-    aksCluster: '{{ .mgmt.aks.name }}'
     action: Shell
     command: ./upgrade-aks-cluster.sh
     workingDir: ./scripts
