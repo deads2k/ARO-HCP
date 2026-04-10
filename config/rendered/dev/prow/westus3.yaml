@@ -716,6 +716,11 @@ monitoring:
       actionGroupShortName: ""
       automitigationEnabled: ""
       routingId: ""
+    rp:
+      actionGroupName: ""
+      actionGroupShortName: ""
+      automitigationEnabled: ""
+      routingId: ""
     sl:
       actionGroupName: ""
       actionGroupShortName: ""
