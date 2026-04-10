@@ -106,11 +106,3 @@ show-image:
 	@echo "Repository: ${TENANT_QUOTA_IMAGE_REPOSITORY}"
 	@echo "Tag: ${TENANT_QUOTA_IMAGE_TAG}"
 .PHONY: show-image
-
-# Deployment is now handled by templatize:
-#   go run ./tooling/templatize/main.go pipeline run \
-#     --service-group Microsoft.Azure.ARO.HCP.Opstool.TenantQuota \
-#     --topology-file topology-opstool.yaml \
-#     --config-file config/config-opstool.yaml \
-#     --dev-settings-file tooling/templatize/settings.yaml \
-#     --dev-environment opstool

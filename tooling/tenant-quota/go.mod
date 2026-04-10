@@ -3,7 +3,7 @@ module github.com/Azure/ARO-HCP/tooling/tenant-quota
 go 1.25.5
 
 require (
-	github.com/Azure/ARO-HCP/internal v0.0.0
+	github.com/Azure/ARO-HCP/internal v0.0.0-20260410130855-a983e955fbe8
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
@@ -45,5 +45,3 @@ require (
 	k8s.io/component-base v0.34.3 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 )
-
-replace github.com/Azure/ARO-HCP/internal => ../../internal

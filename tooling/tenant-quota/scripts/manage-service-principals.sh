@@ -86,7 +86,6 @@ setup_redhat() {
     local DIRECTORY_QUOTA=true
     local SUBSCRIPTIONS=(
         "ARO Hosted Control Planes (EA Subscription 1)"
-        # TODO: Uncomment after getting role assignment write access
         "ARO SRE Team - INT (EA Subscription 3)"
         "ARO HCP E2E Hosted Clusters (EA Subscription)"
     )

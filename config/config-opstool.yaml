@@ -97,7 +97,6 @@ clouds:
               roleAssignmentLimit: 8000
               regions:
               - westus3
-            # TODO: Uncomment after getting role assignment write access on this subscription
             - name: "ARO SRE Team - INT (EA Subscription 3)"
               roleAssignmentLimit: 4000
               regions:
