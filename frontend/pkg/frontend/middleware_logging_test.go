@@ -206,6 +206,7 @@ func TestFrontendLogsKustoMappingContract(t *testing.T) {
 	assert.Equal(t, "$.log.correlation_request_id", columnToPath["correlation_request_id"])
 	assert.Equal(t, "$.log.resource_id", columnToPath["resource_id"])
 	assert.Equal(t, "$.log.resource_name", columnToPath["resource_name"])
+	assert.Equal(t, "$.log.kubernetes.container_hash", columnToPath["container_status_image_id"])
 }
 
 type frontendKustoMapping struct {
