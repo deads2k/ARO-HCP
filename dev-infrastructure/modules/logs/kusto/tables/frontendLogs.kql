@@ -5,7 +5,7 @@
   cluster: string,
   namespace_name: string,
   container_name: string,
-  container_image: string,
+  container_image: string,           // fluentbit kubernetes.container_image: image from pod spec (may include tag)
   host: string,
   labels: string,
   pod_name: string,
@@ -31,8 +31,8 @@
   body_written_bytes: int,
   response_status_code: string,
   duration: int,
-  tag: string,
-  container_hash: string
+  tag: string,                       // fluentbit tag: routing identifier (e.g. kube.<namespace>.<pod>.<container>)
+  container_status_image_id: string  // fluentbit kubernetes.container_hash: image digest from container status (k8s .status.containerStatuses[].imageID)
 )
 
 .create-or-alter table frontendLogs ingestion json mapping 'ingestionMapping'
@@ -71,6 +71,6 @@
   {"column":"body_written_bytes","Properties":{"path":"$.log.body_written_bytes"}},
   {"column":"response_status_code","Properties":{"path":"$.log.response_status_code"}},
   {"column":"duration","Properties":{"path":"$.log.duration"}},
-  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
+  {"column":"container_status_image_id","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

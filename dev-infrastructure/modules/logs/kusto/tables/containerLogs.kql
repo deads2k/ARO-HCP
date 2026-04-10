@@ -5,13 +5,13 @@
   cluster: string,
   namespace_name: string,
   container_name: string,
-  container_image: string,
+  container_image: string,           // fluentbit kubernetes.container_image: image from pod spec (may include tag)
   host: string,
   labels: string,
   pod_name: string,
   region: string,
-  tag: string,
-  container_hash: string
+  tag: string,                       // fluentbit tag: routing identifier (e.g. kube.<namespace>.<pod>.<container>)
+  container_status_image_id: string  // fluentbit kubernetes.container_hash: image digest from container status (k8s .status.containerStatuses[].imageID)
 )
 
 .create-or-alter table containerLogs ingestion json mapping 'ingestionMapping'
@@ -29,6 +29,6 @@
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
   {"column":"pod_name","Properties":{"path":"$.log.kubernetes.pod_name"}},
   {"column":"tag","Properties":{"path":"$.tag"}},
-  {"column":"container_hash","Properties":{"path":"$.log.kubernetes.container_hash"}}
+  {"column":"container_status_image_id","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

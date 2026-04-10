@@ -5,7 +5,7 @@
   cluster: string,
   namespace: string,
   containerName: string,
-  containerImage: string,
+  containerImage: string,            // fluentbit kubernetes.container_image: image from pod spec (may include tag)
   host: string,
   labels: string,
   podName: string,
@@ -22,8 +22,8 @@
   objectUID: string,
   reason: string,
   sourceComponent: string,
-  tag: string,
-  containerHash: string
+  tag: string,                       // fluentbit tag: routing identifier (e.g. kube.<namespace>.<pod>.<container>)
+  containerStatusImageId: string     // fluentbit kubernetes.container_hash: image digest from container status (k8s .status.containerStatuses[].imageID)
 )
 
 
@@ -54,6 +54,6 @@
   {"column":"objectUID","Properties":{"path":"$.log.involved_object.uid"}},
   {"column":"reason","Properties":{"path":"$.log.reason"}},
   {"column":"sourceComponent","Properties":{"path":"$.log.source.component"}},
-  {"column":"containerHash","Properties":{"path":"$.log.kubernetes.container_hash"}}
+  {"column":"containerStatusImageId","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```
