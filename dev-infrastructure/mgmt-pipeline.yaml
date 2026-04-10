@@ -271,10 +271,10 @@ resourceGroups:
     variables:
     - name: CLUSTER_NAME
       configRef: mgmt.aks.name
-    - name: KUBERNETES_VERSION
-      configRef: mgmt.aks.kubernetesVersion
     - name: RESOURCE_GROUP
       configRef: mgmt.rg
+    - name: KUBERNETES_VERSION
+      configRef: mgmt.aks.kubernetesVersion
     dependsOn:
     - resourceGroup: management
       step: delete-non-swift-user-nodepools

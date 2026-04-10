@@ -204,10 +204,10 @@ resourceGroups:
     variables:
     - name: CLUSTER_NAME
       configRef: svc.aks.name
-    - name: KUBERNETES_VERSION
-      configRef: svc.aks.kubernetesVersion
     - name: RESOURCE_GROUP
       configRef: svc.rg
+    - name: KUBERNETES_VERSION
+      configRef: svc.aks.kubernetesVersion
     dependsOn:
     - resourceGroup: service
       step: delete-old-user-nodepools

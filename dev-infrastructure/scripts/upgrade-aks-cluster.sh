@@ -3,10 +3,10 @@ set -euo pipefail
 
 # Inputs via environment variables:
 #   CLUSTER_NAME   - AKS cluster name
-#   KUBERNETES_VERSION - Kubernetes Version
 #   RESOURCE_GROUP - Resource group containing the cluster
+#   KUBERNETES_VERSION - Kubernetes Version
 
-echo " Upgrading cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' to '${KUBERNETES_VERSION}'..."
+echo "Upgrading cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' to '${KUBERNETES_VERSION}'..."
 
 az aks upgrade \
     --resource-group ${RESOURCE_GROUP} \
