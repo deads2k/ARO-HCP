@@ -329,6 +329,11 @@ defaults:
         actionGroupShortName: ""
         routingId: ""
         automitigationEnabled: ""
+      rp:
+        actionGroupName: ""
+        actionGroupShortName: ""
+        routingId: ""
+        automitigationEnabled: ""
       msft:
         actionGroupName: ""
         actionGroupShortName: ""

@@ -30,6 +30,11 @@ run-hcp:
 	$(MAKE) fmt-devinfra
 .PHONY: run-hcp
 
+run-rp:
+	go run ./...  --config-file ../../observability/observability-rp.yaml $(EXTRA_FLAGS)
+	$(MAKE) fmt-devinfra
+.PHONY: run-rp
+
 run-msft:
 	go run ./...  --config-file ../../observability/observability-msft.yaml $(EXTRA_FLAGS)
 	$(MAKE) fmt-devinfra

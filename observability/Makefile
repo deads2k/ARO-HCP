@@ -13,6 +13,8 @@ alerts: kubernetesControlPlane-prometheusRule
 	az bicep format -f $$(yq '.prometheusRules.outputBicep' observability.yaml)
 	EXTRA_FLAGS=$(GENERATOR_FLAGS) make -C ../tooling/prometheus-rules run-hcp
 	az bicep format -f $$(yq '.prometheusRules.outputBicep' observability-hcp.yaml)
+	EXTRA_FLAGS=$(GENERATOR_FLAGS) make -C ../tooling/prometheus-rules run-rp
+	az bicep format -f $$(yq '.prometheusRules.outputBicep' observability-rp.yaml)
 	EXTRA_FLAGS=$(GENERATOR_FLAGS) make -C ../tooling/prometheus-rules run-msft
 	az bicep format -f $$(yq '.prometheusRules.outputBicep' observability-msft.yaml)
 .PHONY: alerts
