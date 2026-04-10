@@ -357,29 +357,10 @@ func (f *Frontend) ArmResourceActionRequestAdminCredential(writer http.ResponseW
 	}
 
 	// New credential cannot be requested while credentials are being revoked.
-
-	// XXX Enable this once the backend change to clear RevokeCredentialsOperationID reaches production.
-	//if len(cluster.ServiceProviderProperties.RevokeCredentialsOperationID) > 0 {
-	//	writer.Header().Set("Retry-After", strconv.Itoa(10))
-	//	return arm.NewConflictError(clusterResourceID, "Cannot request credential while credentials are being revoked")
-	//}
-
-	// XXX Remove this once the backend change to clear RevokeCredentialsOperationID reaches production.
-	iterator := f.dbClient.Operations(clusterResourceID.SubscriptionID).ListActiveOperations(&database.DBClientListActiveOperationDocsOptions{
-		Request:    api.Ptr(database.OperationRequestRevokeCredentials),
-		ExternalID: clusterResourceID,
-	})
-
-	for range iterator.Items(ctx) {
+	if len(cluster.ServiceProviderProperties.RevokeCredentialsOperationID) > 0 {
 		writer.Header().Set("Retry-After", strconv.Itoa(10))
 		return arm.NewConflictError(clusterResourceID, "Cannot request credential while credentials are being revoked")
 	}
-
-	err = iterator.GetError()
-	if err != nil {
-		return utils.TrackError(err)
-	}
-	// XXX End of code to remove.
 
 	csCredential, err := f.clusterServiceClient.PostBreakGlassCredential(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
@@ -467,29 +448,10 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	}
 
 	// Credential revocation cannot be requested while another revocation is in progress.
-
-	// XXX Enable this once the backend change to clear RevokeCredentialsOperationID reaches production.
-	//if len(cluster.ServiceProviderProperties.RevokeCredentialsOperationID) > 0 {
-	//	writer.Header().Set("Retry-After", strconv.Itoa(10))
-	//	return arm.NewConflictError(clusterResourceID, "Credentials are already being revoked")
-	//}
-
-	// XXX Remove this once the backend change to clear RevokeCredentialsOperationID reaches production.
-	iterator := f.dbClient.Operations(clusterResourceID.SubscriptionID).ListActiveOperations(&database.DBClientListActiveOperationDocsOptions{
-		Request:    api.Ptr(database.OperationRequestRevokeCredentials),
-		ExternalID: clusterResourceID,
-	})
-
-	for range iterator.Items(ctx) {
+	if len(cluster.ServiceProviderProperties.RevokeCredentialsOperationID) > 0 {
 		writer.Header().Set("Retry-After", strconv.Itoa(10))
 		return arm.NewConflictError(clusterResourceID, "Credentials are already being revoked")
 	}
-
-	err = iterator.GetError()
-	if err != nil {
-		return utils.TrackError(err)
-	}
-	// XXX End of code to remove.
 
 	err = f.clusterServiceClient.DeleteBreakGlassCredentials(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
