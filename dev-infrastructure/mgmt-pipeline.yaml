@@ -259,6 +259,26 @@ resourceGroups:
     dependsOn:
     - resourceGroup: management
       step: cluster
+  - name: upgrade-aks-cluster
+    aksCluster: '{{ .mgmt.aks.name }}'
+    action: Shell
+    command: ./upgrade-aks-cluster.sh
+    workingDir: ./scripts
+    shellIdentity:
+      input:
+        resourceGroup: global
+        step: output
+        name: globalMSIId
+    variables:
+    - name: CLUSTER_NAME
+      configRef: mgmt.aks.name
+    - name: KUBERNETES_VERSION
+      configRef: mgmt.aks.kubernetesVersion
+    - name: RESOURCE_GROUP
+      configRef: mgmt.rg
+    dependsOn:
+    - resourceGroup: service
+      step: delete-non-swift-user-nodepools
   - name: nsp
     action: ARM
     omitFromServiceGroupCompletion: true
