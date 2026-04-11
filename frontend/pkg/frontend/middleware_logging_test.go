@@ -219,14 +219,24 @@ type frontendKustoMapping struct {
 func parseFrontendKustoMappings(t *testing.T, kqlContent string) []frontendKustoMapping {
 	t.Helper()
 
-	start := strings.Index(kqlContent, "[")
-	end := strings.LastIndex(kqlContent, "]")
-	require.NotEqual(t, -1, start)
-	require.NotEqual(t, -1, end)
-	require.Greater(t, end, start)
+	// Find the ingestion json mapping section to avoid matching brackets in the schema
+	mappingIdx := strings.Index(kqlContent, "ingestion json mapping")
+	require.NotEqual(t, -1, mappingIdx, "ingestion json mapping section not found")
+
+	// Find the opening backtick block after the mapping declaration
+	rest := kqlContent[mappingIdx:]
+	openTick := strings.Index(rest, "```")
+	require.NotEqual(t, -1, openTick, "opening backtick block not found")
+
+	// Skip past the opening backticks to find the JSON content
+	afterOpenTick := rest[openTick+3:]
+
+	// Find the closing backtick block
+	closeTick := strings.Index(afterOpenTick, "```")
+	require.NotEqual(t, -1, closeTick, "closing backtick block not found")
 
 	var mappings []frontendKustoMapping
-	require.NoError(t, json.Unmarshal([]byte(kqlContent[start:end+1]), &mappings))
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(afterOpenTick[:closeTick])), &mappings))
 	return mappings
 }
 
