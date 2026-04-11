@@ -192,6 +192,25 @@ resourceGroups:
     dependsOn:
     - resourceGroup: service
       step: cluster
+  - name: upgrade-aks-cluster
+    action: Shell
+    command: ./upgrade-aks-cluster.sh
+    workingDir: ./scripts
+    shellIdentity:
+      input:
+        resourceGroup: global
+        step: output
+        name: globalMSIId
+    variables:
+    - name: CLUSTER_NAME
+      configRef: svc.aks.name
+    - name: RESOURCE_GROUP
+      configRef: svc.rg
+    - name: KUBERNETES_VERSION
+      configRef: svc.aks.kubernetesVersion
+    dependsOn:
+    - resourceGroup: service
+      step: delete-old-user-nodepools
   - name: cluster-output
     action: ARM
     template: templates/output-svc-cluster.bicep
