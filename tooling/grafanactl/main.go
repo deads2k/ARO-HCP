@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/ARO-Tools/tools/grafanactl/cmd/clean"
 	"github.com/Azure/ARO-Tools/tools/grafanactl/cmd/list"
 	"github.com/Azure/ARO-Tools/tools/grafanactl/cmd/sync"
+	"github.com/Azure/ARO-Tools/tools/grafanactl/cmd/verify"
 )
 
 const (
@@ -78,6 +79,7 @@ and other operational tasks.`,
 		clean.NewCleanCommand,
 		list.NewListCommand,
 		sync.NewSyncCommand,
+		verify.NewVerifyCommand,
 	}
 	for _, newCmd := range mainCommands {
 		c, err := newCmd(mainGroupID)

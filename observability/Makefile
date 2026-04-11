@@ -23,3 +23,7 @@ recording-rules:
 	make -C ../tooling/prometheus-rules run-hcp-recording-rules
 	az bicep format -f $$(yq '.prometheusRules.outputBicep' observability-hcp-recording-rules.yaml)
 .PHONY: recording-rules
+
+verify:
+	go run ../tooling/grafanactl/main.go verify dashboards --config-file observability.yaml
+.PHONY: verify
