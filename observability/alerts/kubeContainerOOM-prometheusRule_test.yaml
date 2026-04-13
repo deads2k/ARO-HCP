@@ -1,0 +1,44 @@
+rule_files:
+- kubeContainerOOM-prometheusRule.yaml
+evaluation_interval: 1m
+tests:
+# Scenario 1: Container is OOMKilled - alert should fire
+- interval: 1m
+  input_series:
+  - series: 'kube_pod_container_status_last_terminated_reason{cluster="svc-1",namespace="aro-hcp",pod="frontend-abc-12345",container="frontend",reason="OOMKilled",job="kube-state-metrics"}'
+    values: "1+0x10"
+  alert_rule_test:
+  - eval_time: 1m
+    alertname: KubeContainerOOMKilled
+    exp_alerts:
+    - exp_labels:
+        alertname: KubeContainerOOMKilled
+        severity: warning
+        cluster: svc-1
+        namespace: aro-hcp
+        pod: frontend-abc-12345
+        container: frontend
+        reason: OOMKilled
+        job: kube-state-metrics
+      exp_annotations:
+        summary: "Container frontend in pod aro-hcp/frontend-abc-12345 was OOMKilled"
+        description: "Container frontend in pod aro-hcp/frontend-abc-12345 on cluster svc-1 has been OOMKilled. This indicates the container exceeded its memory limit and was terminated by the kernel."
+        runbook_url: TBD
+# Scenario 2: Container terminated for a different reason (not OOMKilled) - no alert
+- interval: 1m
+  input_series:
+  - series: 'kube_pod_container_status_last_terminated_reason{cluster="svc-1",namespace="aro-hcp",pod="backend-xyz-67890",container="backend",reason="Error",job="kube-state-metrics"}'
+    values: "1+0x10"
+  alert_rule_test:
+  - eval_time: 5m
+    alertname: KubeContainerOOMKilled
+    exp_alerts: []
+# Scenario 3: OOMKilled reason exists but metric value is 0 - no alert
+- interval: 1m
+  input_series:
+  - series: 'kube_pod_container_status_last_terminated_reason{cluster="svc-1",namespace="aro-hcp",pod="backend-ok-11111",container="backend",reason="OOMKilled",job="kube-state-metrics"}'
+    values: "0+0x10"
+  alert_rule_test:
+  - eval_time: 5m
+    alertname: KubeContainerOOMKilled
+    exp_alerts: []

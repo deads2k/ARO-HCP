@@ -1214,3 +1214,42 @@ This may indicate that finalizers are stuck or resources are failing to cleanup.
     ]
   }
 }
+
+resource kubeContainerOomRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'kube-container-oom-rules'
+  location: location
+  properties: {
+    interval: 'PT1M'
+    rules: [
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'KubeContainerOOMKilled'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'KubeContainerOOMKilled/{{ $labels.cluster }}/{{ $labels.container }}/{{ $labels.namespace }}/{{ $labels.pod }}'
+          description: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} on cluster {{ $labels.cluster }} has been OOMKilled. This indicates the container exceeded its memory limit and was terminated by the kernel.'
+          info: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} on cluster {{ $labels.cluster }} has been OOMKilled. This indicates the container exceeded its memory limit and was terminated by the kernel.'
+          runbook_url: 'TBD'
+          summary: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled'
+          title: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled'
+        }
+        expression: 'kube_pod_container_status_last_terminated_reason{reason="OOMKilled", job="kube-state-metrics"} == 1'
+        severity: 3
+      }
+    ]
+    scopes: [
+      azureMonitoring
+    ]
+  }
+}
