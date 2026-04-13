@@ -1989,9 +1989,8 @@ func TestValidateClusterUpdate(t *testing.T) {
 				c.ServiceProviderProperties.ManagedIdentitiesDataPlaneIdentityURL = "https://oldhost.identity.azure.net"
 				return c
 			}(),
-			// channelGroup is mutable, but version.id, dns.baseDomainPrefix and api.visibility are immutable without experimental flag
+			// channelGroup and version.id are mutable; dns.baseDomainPrefix, api.visibility and managedIdentitiesDataPlaneIdentityURL are immutable without experimental flag
 			expectErrors: []expectedError{
-				{message: "field is immutable", fieldPath: "customerProperties.version.id"},
 				{message: "field is immutable", fieldPath: "customerProperties.dns.baseDomainPrefix"},
 				{message: "field is immutable", fieldPath: "customerProperties.api.visibility"},
 				{message: "field is immutable", fieldPath: "serviceProviderProperties.managedIdentitiesDataPlaneIdentityURL"},
@@ -2140,7 +2139,6 @@ func TestValidateClusterUpdate(t *testing.T) {
 			}(),
 			expectErrors: []expectedError{
 				{message: "OpenShift v5 and above is not supported", fieldPath: "customerProperties.version.id"},
-				{message: "field is immutable", fieldPath: "customerProperties.version.id"},
 			},
 		},
 		{

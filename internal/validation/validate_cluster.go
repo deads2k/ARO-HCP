@@ -350,10 +350,10 @@ func validateVersionProfile(ctx context.Context, op operation.Operation, fldPath
 		errs = append(errs, OpenshiftVersionAtMostOneMinorSkewWithField(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
 	}
 	if !op.HasOption(api.FeatureExperimentalReleaseFeatures) {
-		// only allow our subscription to change versions for now until we add validation protecting the change
-		errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
 		// we never allow micro to any cluster that might live longer than a couple days.  We cannot allow it because it might install naughty things
 		errs = append(errs, OpenshiftVersionWithoutMicro(ctx, op, fldPath.Child("id"), &newObj.ID, nil)...)
+		// only allow OpenShift v5 and above for subscriptions that have the experimental feature registered for now
+		// remove this together with the matching check in the control plane desired version controller when we are ready
 		if v, err := semver.ParseTolerant(newObj.ID); err == nil && v.Major >= 5 {
 			errs = append(errs, field.Invalid(fldPath.Child("id"), newObj.ID, "OpenShift v5 and above is not supported"))
 		}
