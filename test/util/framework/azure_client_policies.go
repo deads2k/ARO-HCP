@@ -23,10 +23,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/onsi/ginkgo/v2"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+
+	"github.com/Azure/ARO-HCP/internal/api/arm"
 )
 
 // armSystemDataPolicy adds ARM system data headers for direct RP requests.
@@ -44,6 +47,26 @@ func (p *armSystemDataPolicy) Do(req *policy.Request) (*http.Response, error) {
 		systemData := fmt.Sprintf(`{"createdBy": "e2e-test", "createdByType": "Application", "createdAt": "%s"}`, time.Now().UTC().Format(time.RFC3339))
 		req.Raw().Header.Set("X-Ms-Arm-Resource-System-Data", systemData)
 		req.Raw().Header.Set("X-Ms-Identity-Url", "https://dummyhost.identity.azure.net")
+	}
+	return req.Next()
+}
+
+// correlationRequestIDPolicy generates a UUIDv4 correlation ID per request
+// to the RP frontend, setting the X-Ms-Correlation-Request-Id header. When
+// requests go through ARM, ARM generates this header; in development
+// environments where e2e tests talk directly to the RP, we need to set it
+// ourselves. The header is only set when the request targets the RP frontend
+// and no correlation ID is already present.
+type correlationRequestIDPolicy struct{}
+
+func (p *correlationRequestIDPolicy) Do(req *policy.Request) (*http.Response, error) {
+	frontendURL, err := url.Parse(frontendAddress())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse frontend address: %w", err)
+	}
+
+	if req.Raw().URL.Host == frontendURL.Host && req.Raw().Header.Get(arm.HeaderNameCorrelationRequestID) == "" {
+		req.Raw().Header.Set(arm.HeaderNameCorrelationRequestID, uuid.New().String())
 	}
 	return req.Next()
 }

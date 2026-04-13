@@ -157,6 +157,7 @@ func (tc *perBinaryInvocationTestContext) getClientFactoryOptions() *azcorearm.C
 					delegate: tc.defaultTransport,
 				},
 				PerCallPolicies: []policy.Policy{
+					&correlationRequestIDPolicy{},
 					NewLROPollerRetryDeploymentNotFoundPolicy(),
 					&sanitizeAuthHeaderPolicy{},
 				},
@@ -197,6 +198,7 @@ func (tc *perBinaryInvocationTestContext) getHCPClientFactoryOptions() *azcorear
 				},
 				InsecureAllowCredentialWithHTTP: true,
 				PerCallPolicies: []policy.Policy{
+					&correlationRequestIDPolicy{},
 					&armSystemDataPolicy{},
 					&sanitizeAuthHeaderPolicy{},
 				},
