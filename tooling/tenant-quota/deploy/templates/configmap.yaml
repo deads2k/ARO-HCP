@@ -1,0 +1,31 @@
+# Purpose: Tenant configuration - defines which tenants to collect quota from and their service principal credentials
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-quota-config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    interval: "5m"
+    timeout: "30s"
+    cacheTTL: "24h"
+    tenants:
+      {{- range .Values.tenants }}
+      - tenantId: "{{ .tenantId }}"
+        tenantName: "{{ .tenantName }}"
+        servicePrincipalClientId: "{{ .servicePrincipalClientId }}"
+        keyVaultSecretName: "{{ .keyVaultSecretName }}"
+        scope: "https://graph.microsoft.com/.default"
+        directoryQuota: {{ .directoryQuota | default true }}
+        {{- if .subscriptions }}
+        subscriptions:
+          {{- range .subscriptions }}
+          - name: "{{ .name }}"
+            roleAssignmentLimit: {{ .roleAssignmentLimit | default 4000 }}
+            regions:
+              {{- range .regions }}
+              - "{{ . }}"
+              {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}

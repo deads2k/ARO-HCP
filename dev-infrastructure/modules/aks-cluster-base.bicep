@@ -1,8 +1,3 @@
-import {
-  csvToArray
-  parseIPServiceTag
-} from '../modules/common.bicep'
-
 // Constants
 param aksClusterName string
 param aksNodeResourceGroupName string

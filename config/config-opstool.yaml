@@ -20,11 +20,9 @@ clouds:
         rg: "opstool-{{ .ctx.region }}"
         subscription:
           key: "ARO Hosted Control Planes (EA Subscription 1)"
-        # Placeholder with empty id as was manually deployed using azure cli. Re-enable when the existing role assignment is cleaned up.
         acr:
           name: "arohcpsvcdev"
           resourceGroup: "global"
-          id: ""
       monitoring:
         alertRuleOwningTeamTag: ""
       dns:
@@ -48,7 +46,7 @@ clouds:
             minCount: 1
             maxCount: 3
             vmSize: "Standard_D4s_v3"
-            osDiskSizeGB: 32
+            osDiskSizeGB: 64
             zones: "1"
             zoneRedundantMode: "Disabled"
         monitoring:
@@ -84,6 +82,25 @@ clouds:
             registry: "arohcpsvcdev.azurecr.io"
             repository: "tenant-quota-collector"
             tag: "latest"
+          tenants:
+          - tenantId: "64dc69e4-d083-49fc-9569-ebece1dd1408"
+            tenantName: "RedHat0"
+            servicePrincipalClientId: "1ef710d1-afd7-4bf3-8095-e8126650607f"
+            keyVaultSecretName: "custom-metrics-collector-redhat0-client-secret"
+            directoryQuota: true
+            subscriptions:
+            - name: "ARO Hosted Control Planes (EA Subscription 1)"
+              roleAssignmentLimit: 4000
+              regions:
+              - westus3
+            - name: "ARO HCP E2E Hosted Clusters (EA Subscription)"
+              roleAssignmentLimit: 8000
+              regions:
+              - westus3
+            - name: "ARO SRE Team - INT (EA Subscription 3)"
+              roleAssignmentLimit: 4000
+              regions:
+              - uksouth
     environments:
       opstool:
         regions:

@@ -183,7 +183,12 @@
               "type": "object",
               "description": "Tenant quota collector configuration",
               "properties": {
-                "image": { "$ref": "#/$defs/Image" }
+                "image": { "$ref": "#/$defs/Image" },
+                "tenants": {
+                  "type": "array",
+                  "description": "List of Azure AD tenants to monitor for directory and subscription quota",
+                  "items": { "$ref": "#/$defs/TenantQuotaConfig" }
+                }
               }
             }
           }
@@ -200,6 +205,37 @@
         "digest": { "type": "string" },
         "tag": { "type": "string" }
       }
+    },
+    "TenantQuotaConfig": {
+      "type": "object",
+      "description": "Configuration for monitoring a single Azure AD tenant",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Azure AD tenant ID" },
+        "tenantName": { "type": "string", "description": "Display name for metrics labels" },
+        "servicePrincipalClientId": { "type": "string", "description": "App ID of the service principal" },
+        "keyVaultSecretName": { "type": "string", "description": "Key Vault secret name holding the SP client secret" },
+        "directoryQuota": { "type": "boolean", "description": "Enable directory (Azure AD) quota monitoring" },
+        "subscriptions": {
+          "type": "array",
+          "description": "Subscriptions to monitor for compute/network/RBAC quota",
+          "items": { "$ref": "#/$defs/SubscriptionQuotaConfig" }
+        }
+      },
+      "required": ["tenantId", "tenantName", "servicePrincipalClientId", "keyVaultSecretName"]
+    },
+    "SubscriptionQuotaConfig": {
+      "type": "object",
+      "description": "Configuration for monitoring quota in a single subscription",
+      "properties": {
+        "name": { "type": "string", "description": "Subscription display name (used to resolve the subscription ID at runtime)" },
+        "roleAssignmentLimit": { "type": "integer", "description": "Role assignment limit for the subscription (default 4000)" },
+        "regions": {
+          "type": "array",
+          "description": "Azure regions to monitor for regional quotas",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "regions"]
     }
   }
 }

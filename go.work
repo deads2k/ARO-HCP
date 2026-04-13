@@ -20,5 +20,6 @@ use (
 	./tooling/prometheus-rules
 	./tooling/secret-sync
 	./tooling/templatize
+	./tooling/tenant-quota
 	./tooling/yamlwrap
 )

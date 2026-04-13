@@ -1,0 +1,12 @@
+# Static chart defaults. The rollout pipeline preprocesses `values.yaml.tmpl`
+# and passes the rendered file to Helm; this file only needs to stay valid YAML
+# so the chart itself can be loaded before overrides are applied.
+imageRegistry: ""
+imageRepository: "tenant-quota-collector"
+imageTag: ""
+msiClientId: ""
+secretProvider:
+  keyVault: ""
+  msiClientId: ""
+  tenantId: ""
+tenants: []
