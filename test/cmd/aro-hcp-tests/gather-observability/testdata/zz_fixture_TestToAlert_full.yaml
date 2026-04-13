@@ -1,0 +1,13 @@
+alert:
+  alertRule: /subscriptions/sub/providers/rules/myRule
+  condition: Fired
+  description: Test description
+  endsAt: "2025-01-15T10:30:00Z"
+  name: full-alert
+  severity: Sev2
+  signalType: Metric
+  startsAt: "2025-01-15T10:00:00Z"
+  state: New
+metadata:
+  knownIssue: false
+  monitoringWorkspace: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Monitor/accounts/myWorkspace

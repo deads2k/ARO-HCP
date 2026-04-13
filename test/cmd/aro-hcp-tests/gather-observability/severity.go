@@ -77,13 +77,13 @@ func ParseSeverityThreshold(s string) (int, error) {
 
 // filterAlertsBySeverity returns only the alerts whose severity rank is at or
 // below the given threshold. A threshold of -1 means no filtering.
-func filterAlertsBySeverity(alerts []AlertSummary, threshold int) []AlertSummary {
+func filterAlertsBySeverity(alerts []alert, threshold int) []alert {
 	if threshold < 0 {
 		return alerts
 	}
-	filtered := make([]AlertSummary, 0, len(alerts))
+	filtered := make([]alert, 0, len(alerts))
 	for _, a := range alerts {
-		rank := severityRank(a.Severity)
+		rank := severityRank(a.Alert.Severity)
 		if rank >= 0 && rank <= threshold {
 			filtered = append(filtered, a)
 		}

@@ -1,0 +1,8 @@
+- alert:
+    condition: ""
+    name: BackendControllerRetryHotLoop
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: true
+    knownIssueReason: first pattern

@@ -38,12 +38,18 @@ import (
 const (
 	// minLegendHeight is the minimum height for the chart legend area.
 	minLegendHeight = 40
-	// pixelsPerLegendEntry is the height per legend entry in timeseries charts.
-	pixelsPerLegendEntry = 22
+	// legendRowHeight is the height of one row of legend entries.
+	legendRowHeight = 22
 	// baseChartHeight is the base height for timeseries charts before legend.
 	baseChartHeight = 400
 	// legendBottomPadding is extra space below the legend area.
 	legendBottomPadding = 20
+	// legendCharWidth is the approximate pixel width per character in legend labels.
+	legendCharWidth = 7
+	// legendEntryPadding is the approximate pixel width for the legend icon and spacing.
+	legendEntryPadding = 40
+	// defaultChartWidth is the default chart width in pixels.
+	defaultChartWidth = 1200
 )
 
 // parsedSeries is a timeseries with parsed data points ready for charting.
@@ -65,28 +71,37 @@ func (s parsedSeries) peakValue() float64 {
 	return peak
 }
 
-// queryPageData is the data passed to the query.html.tmpl template.
-type queryPageData struct {
+// panelPageData is the data passed to the metricspanel.html.tmpl template.
+type panelPageData struct {
 	Title      string
-	Query      string
-	HasData    bool
-	Error      string
-	ChartHTML  template.HTML // raw HTML from go-echarts, not escaped
+	Charts     []chartData
 	TimeWindow struct {
 		Start string
 		End   string
 	}
 }
 
-func renderQueryPage(outputPath string, data queryPageData) error {
-	tmplContent := mustReadArtifact("query.html.tmpl")
-	tmpl, err := template.New("query").Parse(string(tmplContent))
+// chartData holds the rendered chart HTML and metadata for a single query
+// within a panel.
+type chartData struct {
+	Title       string
+	Description string
+	Query       string
+	HasData     bool
+	Error       string
+	ChartHTML   template.HTML // raw HTML from go-echarts, not escaped
+}
+
+// renderPanel assembles multiple charts into a single HTML page.
+func renderPanel(outputPath string, data panelPageData) error {
+	tmplContent := mustReadArtifact("metricspanel.html.tmpl")
+	tmpl, err := template.New("panel").Parse(string(tmplContent))
 	if err != nil {
-		return fmt.Errorf("failed to parse query template: %w", err)
+		return fmt.Errorf("failed to parse panel template: %w", err)
 	}
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return fmt.Errorf("failed to execute query template: %w", err)
+		return fmt.Errorf("failed to execute panel template: %w", err)
 	}
 	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", outputPath, err)
@@ -94,11 +109,30 @@ func renderQueryPage(outputPath string, data queryPageData) error {
 	return nil
 }
 
-// renderTimeseriesChart creates an interactive ECharts line chart from
-// Prometheus query_range results. Each PrometheusResult becomes a separate
-// series, labeled by its metric labels. Series where all values are zero
-// are filtered out. If no data is available, a "no results" page is rendered.
-func renderTimeseriesChart(outputPath, title, query, queryErr string, results []PrometheusResult, tw timing.TimeWindow) error {
+// estimateLegendHeight approximates the pixel height needed for the ECharts
+// horizontal legend by simulating how entries wrap across rows.
+func estimateLegendHeight(series []parsedSeries, chartWidth int) int {
+	if len(series) == 0 {
+		return minLegendHeight
+	}
+	currentRowWidth := 0
+	rows := 1
+	for _, s := range series {
+		entryWidth := len(s.label)*legendCharWidth + legendEntryPadding
+		if currentRowWidth+entryWidth > chartWidth && currentRowWidth > 0 {
+			rows++
+			currentRowWidth = entryWidth
+		} else {
+			currentRowWidth += entryWidth
+		}
+	}
+	return max(minLegendHeight, rows*legendRowHeight)
+}
+
+// buildChartData builds the chart HTML for a single PromQL query result.
+// Each PrometheusResult becomes a separate series, labeled by its metric
+// labels. Series where all values are zero are filtered out.
+func buildChartData(title, description, query, queryErr string, results []PrometheusResult, tw timing.TimeWindow) chartData {
 	var series []parsedSeries
 	for _, result := range results {
 		if len(result.Values) == 0 {
@@ -134,10 +168,7 @@ func renderTimeseriesChart(outputPath, title, query, queryErr string, results []
 	}
 
 	if len(series) == 0 {
-		data := queryPageData{Title: title, Query: query, Error: queryErr}
-		data.TimeWindow.Start = tw.Start.UTC().Format(time.RFC3339)
-		data.TimeWindow.End = tw.End.UTC().Format(time.RFC3339)
-		return renderQueryPage(outputPath, data)
+		return chartData{Title: title, Description: description, Query: query, Error: queryErr}
 	}
 
 	// Sort by peak value descending for consistent legend ordering
@@ -153,22 +184,23 @@ func renderTimeseriesChart(outputPath, title, query, queryErr string, results []
 	}
 
 	// Adjust chart height for legend when many series
-	legendHeight := max(minLegendHeight, len(series)*pixelsPerLegendEntry)
+	legendHeight := estimateLegendHeight(series, defaultChartWidth)
 	chartHeight := baseChartHeight + legendHeight
 
 	line := charts.NewLine()
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
-			PageTitle: title,
-			Renderer:  "svg",
-			Height:    fmt.Sprintf("%dpx", chartHeight),
-			Width:     "1200px",
-			Theme:     "dark",
+			PageTitle:       title,
+			Renderer:        "svg",
+			Height:          fmt.Sprintf("%dpx", chartHeight),
+			Width:           fmt.Sprintf("%dpx", defaultChartWidth),
+			Theme:           "dark",
+			BackgroundColor: "#000",
 		}),
 		charts.WithTitleOpts(opts.Title{
 			Title:      title,
 			Subtitle:   subtitle,
-			TitleStyle: &opts.TextStyle{Align: "left", Color: "#4E9AF1"},
+			TitleStyle: &opts.TextStyle{Align: "left", Color: "#4E9AF1", FontSize: 18},
 			TextAlign:  "left",
 			Left:       "center",
 		}),
@@ -202,17 +234,15 @@ func renderTimeseriesChart(outputPath, title, query, queryErr string, results []
 
 	// Extract just the chart div+script from go-echarts, stripping the outer HTML shell
 	rendered := line.RenderContent()
-	chartHTML := extractChartBody(rendered)
+	html := extractChartBody(rendered)
 
-	data := queryPageData{
-		Title:     title,
-		Query:     query,
-		HasData:   true,
-		ChartHTML: template.HTML(chartHTML), //nolint:gosec // trusted go-echarts output
+	return chartData{
+		Title:       title,
+		Description: description,
+		Query:       query,
+		HasData:     true,
+		ChartHTML:   template.HTML(html), //nolint:gosec // trusted go-echarts output
 	}
-	data.TimeWindow.Start = tw.Start.UTC().Format(time.RFC3339)
-	data.TimeWindow.End = tw.End.UTC().Format(time.RFC3339)
-	return renderQueryPage(outputPath, data)
 }
 
 // extractChartBody strips the outer HTML/head/body tags from go-echarts output

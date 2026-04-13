@@ -95,6 +95,7 @@ type completedOptions struct {
 	SvcPromEndpoint   string
 	HcpPromEndpoint   string
 	cred              azcore.TokenCredential
+	knownIssues       []knownIssue
 }
 
 type Options struct {
@@ -187,52 +188,76 @@ func (o *ValidatedOptions) Complete(ctx context.Context) (*Options, error) {
 
 	scope := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", o.SubscriptionID, regionRG)
 
-	completed := &completedOptions{
+	queries, err := loadQueriesConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load queries config: %w", err)
+	}
+	var totalQueries int
+	for _, p := range queries.Panels {
+		totalQueries += len(p.Queries)
+	}
+	logger.Info("loaded embedded queries config", "panels", len(queries.Panels), "queries", totalQueries)
+
+	// Resolve Prometheus endpoints eagerly so we fail fast
+	svcPromEndpoint, err := lookupPrometheusEndpoint(ctx, cred, o.SubscriptionID, regionRG, svcWorkspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up svc Prometheus endpoint for workspace %s in %s: %w", svcWorkspace, regionRG, err)
+	}
+	logger.Info("resolved svc Prometheus endpoint", "endpoint", svcPromEndpoint)
+
+	hcpPromEndpoint, err := lookupPrometheusEndpoint(ctx, cred, o.SubscriptionID, regionRG, hcpWorkspace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up hcp Prometheus endpoint for workspace %s in %s: %w", hcpWorkspace, regionRG, err)
+	}
+	logger.Info("resolved hcp Prometheus endpoint", "endpoint", hcpPromEndpoint)
+
+	knownIssues, err := parseKnownIssues(defaultKnownIssuesData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse known issues config: %w", err)
+	}
+	logger.Info("loaded known issues config", "patterns", len(knownIssues))
+
+	return &Options{completedOptions: &completedOptions{
 		OutputDir:         o.OutputDir,
 		Scope:             scope,
 		SvcWorkspace:      svcWorkspace,
 		HcpWorkspace:      hcpWorkspace,
 		TimeWindow:        tw,
+		Queries:           queries,
 		SeverityThreshold: o.severityThreshold,
+		SvcPromEndpoint:   svcPromEndpoint,
+		HcpPromEndpoint:   hcpPromEndpoint,
 		cred:              cred,
-	}
-
-	queries, err := loadQueriesConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load queries config: %w", err)
-	}
-	completed.Queries = queries
-	logger.Info("loaded embedded queries config", "queries", len(queries.Queries))
-
-	// Resolve Prometheus endpoints eagerly so we fail fast
-	completed.SvcPromEndpoint, err = lookupPrometheusEndpoint(ctx, cred, o.SubscriptionID, regionRG, svcWorkspace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to look up svc Prometheus endpoint for workspace %s in %s: %w", svcWorkspace, regionRG, err)
-	}
-	logger.Info("resolved svc Prometheus endpoint", "endpoint", completed.SvcPromEndpoint)
-
-	completed.HcpPromEndpoint, err = lookupPrometheusEndpoint(ctx, cred, o.SubscriptionID, regionRG, hcpWorkspace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to look up hcp Prometheus endpoint for workspace %s in %s: %w", hcpWorkspace, regionRG, err)
-	}
-	logger.Info("resolved hcp Prometheus endpoint", "endpoint", completed.HcpPromEndpoint)
-
-	return &Options{completedOptions: completed}, nil
+		knownIssues:       knownIssues,
+	}}, nil
 }
 
-// templateData is the data passed to the HTML template.
-type templateData struct {
-	Alerts       []AlertSummary
-	SvcWorkspace string
-	HcpWorkspace string
-	Scope        string
-	TimeWindow   struct {
-		Start string
-		End   string
-	}
-	SeverityCounts map[armalertsmanagement.Severity]int
-	HasAlerts      bool
+// alertsOutput is written to alerts.json and passed to the HTML template.
+type alertsSummary struct {
+	Total      int                                  `json:"total"`
+	Known      int                                  `json:"known"`
+	Unknown    int                                  `json:"unknown"`
+	BySeverity map[armalertsmanagement.Severity]int `json:"bySeverity"`
 }
+
+type alertsOutput struct {
+	Scope      string `json:"scope"`
+	TimeWindow struct {
+		Start string `json:"start"`
+		End   string `json:"end"`
+	} `json:"timeWindow"`
+	Summary alertsSummary `json:"summary"`
+	Alerts  []alert       `json:"alerts"`
+}
+
+// Template helpers for the HTML template.
+func (o alertsOutput) SeverityCounts() map[armalertsmanagement.Severity]int {
+	return o.Summary.BySeverity
+}
+func (o alertsOutput) HasAlerts() bool        { return o.Summary.Total > 0 }
+func (o alertsOutput) HasUnknownAlerts() bool { return o.Summary.Unknown > 0 }
+func (o alertsOutput) KnownCount() int        { return o.Summary.Known }
+func (o alertsOutput) UnknownCount() int      { return o.Summary.Unknown }
 
 func (o Options) Run(ctx context.Context) error {
 	logger, err := logr.FromContext(ctx)
@@ -251,8 +276,37 @@ func (o Options) Run(ctx context.Context) error {
 	if o.SeverityThreshold >= 0 {
 		logger.Info("filtered alerts by severity threshold", "threshold", fmt.Sprintf("Sev%d", o.SeverityThreshold), "before", len(allAlerts), "after", len(alerts))
 	}
+
+	alerts = classifyAlerts(alerts, o.knownIssues)
+
+	// Build output used for both JSON and HTML
+	severityCounts := map[armalertsmanagement.Severity]int{}
+	var knownCount int
+	for _, a := range alerts {
+		severityCounts[a.Alert.Severity]++
+		if a.Metadata.KnownIssue {
+			knownCount++
+		}
+	}
+	unknownCount := len(alerts) - knownCount
+
+	logger.Info("classified alerts", "known", knownCount, "unknown", unknownCount)
+
+	output := alertsOutput{
+		Scope:  o.Scope,
+		Alerts: alerts,
+		Summary: alertsSummary{
+			Total:      len(alerts),
+			Known:      knownCount,
+			Unknown:    unknownCount,
+			BySeverity: severityCounts,
+		},
+	}
+	output.TimeWindow.Start = o.TimeWindow.Start.UTC().Format(time.RFC3339)
+	output.TimeWindow.End = o.TimeWindow.End.UTC().Format(time.RFC3339)
+
 	jsonPath := filepath.Join(o.OutputDir, "alerts.json")
-	jsonData, err := json.MarshalIndent(alerts, "", "  ")
+	jsonData, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to marshal alerts to JSON: %w", err))
 	}
@@ -261,26 +315,9 @@ func (o Options) Run(ctx context.Context) error {
 	}
 	logger.Info("wrote alert JSON artifact", "path", jsonPath, "alerts", len(alerts))
 
-	// Build template data
-	severityCounts := map[armalertsmanagement.Severity]int{}
-	for _, a := range alerts {
-		severityCounts[a.Severity]++
-	}
-
-	data := templateData{
-		Alerts:         alerts,
-		SvcWorkspace:   o.SvcWorkspace,
-		HcpWorkspace:   o.HcpWorkspace,
-		Scope:          o.Scope,
-		SeverityCounts: severityCounts,
-		HasAlerts:      len(alerts) > 0,
-	}
-	data.TimeWindow.Start = o.TimeWindow.Start.UTC().Format(time.RFC3339)
-	data.TimeWindow.End = o.TimeWindow.End.UTC().Format(time.RFC3339)
-
 	// Render HTML artifact
 	htmlPath := filepath.Join(o.OutputDir, "alerts-summary.html")
-	if err := renderTemplate(htmlPath, data); err != nil {
+	if err := renderTemplate(htmlPath, output); err != nil {
 		return utils.TrackError(fmt.Errorf("failed to render alerts HTML: %w", err))
 	}
 	logger.Info("wrote alert HTML artifact", "path", htmlPath)
@@ -302,30 +339,42 @@ func (o Options) runQueries(ctx context.Context) error {
 	}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
-	for _, q := range o.Queries.Queries {
-		endpoint := resolveWorkspaceEndpoint(q, o.SvcPromEndpoint, o.HcpPromEndpoint)
+	for _, panel := range o.Queries.Panels {
+		logger.Info("executing panel queries", "panel", panel.Title, "queries", len(panel.Queries))
 
-		logger.Info("executing PromQL query", "title", q.Title, "workspace", q.Workspace)
+		var panelCharts []chartData
+		for _, q := range panel.Queries {
+			endpoint := resolveWorkspaceEndpoint(q, o.SvcPromEndpoint, o.HcpPromEndpoint)
 
-		var results []PrometheusResult
-		var queryErr string
-		resp, err := queryRange(ctx, httpClient, o.cred, endpoint, q.Query, o.TimeWindow.Start, o.TimeWindow.End, q.Step)
-		if err != nil {
-			logger.Error(err, "PromQL query failed", "title", q.Title)
-			queryErr = err.Error()
-		} else {
-			results = resp.Data.Result
+			logger.Info("executing PromQL query", "panel", panel.Title, "title", q.Title, "workspace", q.Workspace)
+
+			var results []PrometheusResult
+			var queryErr string
+			resp, err := queryRange(ctx, httpClient, o.cred, endpoint, q.Query, o.TimeWindow.Start, o.TimeWindow.End, q.Step)
+			if err != nil {
+				logger.Error(err, "PromQL query failed", "title", q.Title)
+				queryErr = err.Error()
+			} else {
+				results = resp.Data.Result
+			}
+
+			panelCharts = append(panelCharts, buildChartData(q.Title, q.Description, q.Query, queryErr, results, o.TimeWindow))
 		}
 
 		// filename must match the Spyglass HTML lens regex .*-summary.*\.html
 		// so that Prow renders it inline in the job UI.
-		fileName := fmt.Sprintf("query-%s-summary.html", sanitizeTitle(q.Title))
-		chartPath := filepath.Join(o.OutputDir, fileName)
-		if err := renderTimeseriesChart(chartPath, q.Title, q.Query, queryErr, results, o.TimeWindow); err != nil {
-			logger.Error(err, "failed to render timeseries chart", "title", q.Title)
+		fileName := fmt.Sprintf("panel-%s-summary.html", sanitizeTitle(panel.Title))
+		panelPath := filepath.Join(o.OutputDir, fileName)
+
+		pageData := panelPageData{Title: panel.Title, Charts: panelCharts}
+		pageData.TimeWindow.Start = o.TimeWindow.Start.UTC().Format(time.RFC3339)
+		pageData.TimeWindow.End = o.TimeWindow.End.UTC().Format(time.RFC3339)
+
+		if err := renderPanel(panelPath, pageData); err != nil {
+			logger.Error(err, "failed to render panel", "panel", panel.Title)
 			continue
 		}
-		logger.Info("wrote timeseries chart", "path", chartPath, "series", len(results))
+		logger.Info("wrote panel", "path", panelPath, "charts", len(panelCharts))
 	}
 	return nil
 }
@@ -366,11 +415,25 @@ func renderTemplate(outputPath string, data any) error {
 				return ""
 			}
 		},
-		"truncate": func(s string, n int) string {
-			if len(s) <= n {
-				return s
+		"label": func(labels map[string]string, key string) string {
+			return labels[key]
+		},
+		"annotation": func(annotations map[string]string, key string) string {
+			return annotations[key]
+		},
+		"relativeTime": func(windowStart string, t *time.Time) string {
+			if t == nil {
+				return ""
 			}
-			return s[:n] + "..."
+			start, err := time.Parse(time.RFC3339, windowStart)
+			if err != nil {
+				return ""
+			}
+			minutes := int(t.Sub(start).Minutes())
+			if minutes < 0 {
+				return fmt.Sprintf("T%dm", minutes)
+			}
+			return fmt.Sprintf("T+%dm", minutes)
 		},
 	}
 

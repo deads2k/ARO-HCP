@@ -113,18 +113,18 @@ func TestParseSeverityThreshold(t *testing.T) {
 
 func TestFilterAlertsBySeverity(t *testing.T) {
 	t.Parallel()
-	alerts := []AlertSummary{
-		{Name: "critical-alert", Severity: armalertsmanagement.SeveritySev0},
-		{Name: "error-alert", Severity: armalertsmanagement.SeveritySev1},
-		{Name: "warning-alert", Severity: armalertsmanagement.SeveritySev2},
-		{Name: "info-alert", Severity: armalertsmanagement.SeveritySev3},
-		{Name: "verbose-alert", Severity: armalertsmanagement.SeveritySev4},
-		{Name: "unknown-alert", Severity: "Unknown"},
+	alerts := []alert{
+		{Alert: alertData{Name: "critical-alert", Severity: armalertsmanagement.SeveritySev0}},
+		{Alert: alertData{Name: "error-alert", Severity: armalertsmanagement.SeveritySev1}},
+		{Alert: alertData{Name: "warning-alert", Severity: armalertsmanagement.SeveritySev2}},
+		{Alert: alertData{Name: "info-alert", Severity: armalertsmanagement.SeveritySev3}},
+		{Alert: alertData{Name: "verbose-alert", Severity: armalertsmanagement.SeveritySev4}},
+		{Alert: alertData{Name: "unknown-alert", Severity: "Unknown"}},
 	}
 
 	tests := []struct {
 		name      string
-		alerts    []AlertSummary
+		alerts    []alert
 		threshold int
 		wantCount int
 		wantNames []string
@@ -158,13 +158,13 @@ func TestFilterAlertsBySeverity(t *testing.T) {
 		},
 		{
 			name:      "empty alerts returns empty",
-			alerts:    []AlertSummary{},
+			alerts:    []alert{},
 			threshold: 2,
 			wantCount: 0,
 		},
 		{
 			name:      "unknown severity is filtered out",
-			alerts:    []AlertSummary{{Name: "unknown", Severity: "Unknown"}},
+			alerts:    []alert{{Alert: alertData{Name: "unknown", Severity: "Unknown"}}},
 			threshold: 4,
 			wantCount: 0,
 		},
@@ -182,8 +182,8 @@ func TestFilterAlertsBySeverity(t *testing.T) {
 						t.Errorf("missing expected alert at index %d: %s", i, name)
 						continue
 					}
-					if got[i].Name != name {
-						t.Errorf("alert[%d].Name = %q, want %q", i, got[i].Name, name)
+					if got[i].Alert.Name != name {
+						t.Errorf("alert[%d].Alert.Name = %q, want %q", i, got[i].Alert.Name, name)
 					}
 				}
 			}

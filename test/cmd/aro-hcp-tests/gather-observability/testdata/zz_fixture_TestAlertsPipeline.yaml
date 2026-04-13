@@ -1,0 +1,95 @@
+alerts:
+- alert:
+    alertRule: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/Microsoft.AlertsManagement/prometheusRuleGroups/mise
+    annotations:
+      correlationId: MiseEnvoyScrapeDown/test-svc
+      description: Prometheus scrape for envoy-stats job in namespace mise is failing
+        or missing.
+      info: Prometheus scrape for envoy-stats job in namespace mise is failing or
+        missing.
+      runbook_url: TBD
+      summary: Envoy scrape target down for namespace=mise
+      title: Envoy scrape target down for namespace=mise
+    condition: Fired
+    description: Prometheus scrape for envoy-stats job in namespace mise is failing
+      or missing.
+    expression: group by (cluster) (up{job="kube-state-metrics", cluster=~".*-svc(-[0-9]+)?$"})
+      unless on(cluster) group by (cluster) (up{endpoint="http-envoy-prom", container="istio-proxy",
+      namespace="mise"} == 1)
+    labels:
+      alertname: MiseEnvoyScrapeDown
+      cluster: test-svc
+      severity: info
+    name: MiseEnvoyScrapeDown
+    severity: Sev4
+    signalType: Metric
+    startsAt: "2026-04-13T06:47:46.0457216Z"
+    state: New
+  metadata:
+    knownIssue: true
+    knownIssueReason: envoy scrape flaky during provisioning
+    monitoringWorkspace: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/microsoft.monitor/accounts/test-workspace
+- alert:
+    alertRule: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/Microsoft.AlertsManagement/prometheusRuleGroups/backend
+    annotations:
+      correlationId: BackendControllerRetryHotLoop/test-svc/operationnodepooldelete
+      description: Backend controller workqueue operationnodepooldelete has a retry
+        ratio of > 50% sustained over 10 minutes, indicating most queue activity is
+        failed retries rather than fresh work.
+      info: Backend controller workqueue operationnodepooldelete has a retry ratio
+        of > 50% sustained over 10 minutes, indicating most queue activity is failed
+        retries rather than fresh work.
+      runbook_url: TBD
+      summary: Backend controller workqueue operationnodepooldelete retry hot loop
+      title: Backend controller workqueue operationnodepooldelete retry hot loop
+    condition: Resolved
+    description: Backend controller workqueue operationnodepooldelete has a retry
+      ratio of > 50% sustained over 10 minutes, indicating most queue activity is
+      failed retries rather than fresh work.
+    endsAt: "2026-04-13T05:49:12.9148687Z"
+    expression: ( sum by (name, cluster) ( max without(prometheus_replica) ( rate(workqueue_retries_total{namespace="aro-hcp"}[10m])
+      ) ) / sum by (name, cluster) ( max without(prometheus_replica) ( rate(workqueue_adds_total{namespace="aro-hcp"}[10m])
+      ) ) ) > 0.5
+    labels:
+      alertname: BackendControllerRetryHotLoop
+      cluster: test-svc
+      name: operationnodepooldelete
+      severity: critical
+    name: BackendControllerRetryHotLoop
+    severity: Sev3
+    signalType: Metric
+    startsAt: "2026-04-13T05:36:11.5391795Z"
+    state: New
+  metadata:
+    knownIssue: true
+    knownIssueReason: known for delete controllers
+    monitoringWorkspace: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/microsoft.monitor/accounts/test-workspace
+- alert:
+    alertRule: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/Microsoft.AlertsManagement/prometheusRuleGroups/hcp-prometheus-rules
+    condition: Fired
+    expression: max_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff",
+      job="kube-state-metrics"}[5m]) >= 1
+    labels:
+      alertname: KubePodImagePull
+      cluster: test-svc
+      namespace: aro-hcp
+      pod: frontend-abc123
+    name: KubePodImagePull
+    severity: Sev4
+    signalType: Metric
+    startsAt: "2026-04-13T07:00:00Z"
+    state: New
+  metadata:
+    knownIssue: false
+    monitoringWorkspace: /subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/hcp-underlay-test-rg/providers/microsoft.monitor/accounts/test-workspace
+scope: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/hcp-underlay-test-rg
+summary:
+  bySeverity:
+    Sev3: 1
+    Sev4: 2
+  known: 2
+  total: 3
+  unknown: 1
+timeWindow:
+  end: "2026-04-13T08:00:00Z"
+  start: "2026-04-13T05:00:00Z"

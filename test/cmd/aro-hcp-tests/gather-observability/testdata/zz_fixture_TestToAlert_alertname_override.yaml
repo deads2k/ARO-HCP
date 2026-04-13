@@ -1,0 +1,10 @@
+alert:
+  condition: ""
+  labels:
+    alertname: BackendControllerRetryHotLoop
+    name: operationnodepooldelete
+  name: BackendControllerRetryHotLoop
+  severity: Sev2
+  state: ""
+metadata:
+  knownIssue: false

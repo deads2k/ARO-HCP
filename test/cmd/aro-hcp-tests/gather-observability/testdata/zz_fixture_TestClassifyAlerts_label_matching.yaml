@@ -1,0 +1,28 @@
+- alert:
+    condition: ""
+    labels:
+      name: operationnodepooldelete
+      severity: warning
+    name: BackendControllerRetryHotLoop
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: true
+    knownIssueReason: known for delete controller
+- alert:
+    condition: ""
+    labels:
+      name: operationcreate
+      severity: warning
+    name: BackendControllerRetryHotLoop
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: false
+- alert:
+    condition: ""
+    name: BackendControllerRetryHotLoop
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: false

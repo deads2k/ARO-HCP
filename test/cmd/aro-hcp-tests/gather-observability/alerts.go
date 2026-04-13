@@ -17,32 +17,47 @@ package gatherobservability
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/alertsmanagement/armalertsmanagement"
 )
 
-// AlertSummary is a flattened representation of an Azure Monitor alert
-// suitable for serialization and display.
-type AlertSummary struct {
-	Name           string                       `json:"name"`
-	Severity       armalertsmanagement.Severity `json:"severity"`
-	State          string                       `json:"state"`
-	Condition      string                       `json:"condition"`
-	FiredAt        *time.Time                   `json:"firedAt,omitempty"`
-	ResolvedAt     *time.Time                   `json:"resolvedAt,omitempty"`
-	Description    string                       `json:"description,omitempty"`
-	AlertRule      string                       `json:"alertRule,omitempty"`
-	TargetResource string                       `json:"targetResource,omitempty"`
-	SignalType     string                       `json:"signalType,omitempty"`
-	Workspace      string                       `json:"workspace,omitempty"`
+// alertData holds the Prometheus-native and Azure alert fields.
+type alertData struct {
+	Name        string                       `json:"name"`
+	Severity    armalertsmanagement.Severity `json:"severity"`
+	State       string                       `json:"state"`
+	Condition   string                       `json:"condition"`
+	AlertRule   string                       `json:"alertRule,omitempty"`
+	SignalType  string                       `json:"signalType,omitempty"`
+	StartsAt    *time.Time                   `json:"startsAt,omitempty"`
+	EndsAt      *time.Time                   `json:"endsAt,omitempty"`
+	Description string                       `json:"description,omitempty"`
+	Labels      map[string]string            `json:"labels,omitempty"`
+	Annotations map[string]string            `json:"annotations,omitempty"`
+	Expression  string                       `json:"expression,omitempty"`
 }
 
-func fetchAlerts(ctx context.Context, cred azcore.TokenCredential, scope string, start, end time.Time) ([]AlertSummary, error) {
+// alertMetadata holds enrichments added by our tooling.
+type alertMetadata struct {
+	KnownIssue          bool   `json:"knownIssue"`
+	KnownIssueReason    string `json:"knownIssueReason,omitempty"`
+	MonitoringWorkspace string `json:"monitoringWorkspace,omitempty"`
+}
+
+// alert combines the alert data with our metadata.
+type alert struct {
+	Alert    alertData     `json:"alert"`
+	Metadata alertMetadata `json:"metadata"`
+}
+
+func fetchAlerts(ctx context.Context, cred azcore.TokenCredential, scope string, start, end time.Time) ([]alert, error) {
 	logger, err := logr.FromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("logger not found in context: %w", err)
@@ -53,7 +68,7 @@ func fetchAlerts(ctx context.Context, cred azcore.TokenCredential, scope string,
 		return nil, fmt.Errorf("failed to create alerts client: %w", err)
 	}
 
-	var allAlerts []AlertSummary
+	var allAlerts []alert
 
 	customTimeRange := fmt.Sprintf("%s/%s",
 		start.UTC().Format(time.RFC3339),
@@ -61,8 +76,10 @@ func fetchAlerts(ctx context.Context, cred azcore.TokenCredential, scope string,
 	)
 	logger.Info("querying alerts fired within window", "scope", scope, "timeRange", customTimeRange)
 
+	includeContext := true
 	pager := client.NewGetAllPager(&armalertsmanagement.AlertsClientGetAllOptions{
 		CustomTimeRange: &customTimeRange,
+		IncludeContext:  &includeContext,
 	})
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
@@ -70,51 +87,88 @@ func fetchAlerts(ctx context.Context, cred azcore.TokenCredential, scope string,
 			return nil, fmt.Errorf("failed to list alerts: %w", err)
 		}
 		for _, alert := range page.Value {
-			allAlerts = append(allAlerts, toAlertSummary(alert))
+			allAlerts = append(allAlerts, toAlert(alert))
 		}
 	}
+	slices.SortFunc(allAlerts, func(a, b alert) int {
+		switch {
+		case a.Alert.StartsAt == nil && b.Alert.StartsAt == nil:
+			return 0
+		case a.Alert.StartsAt == nil:
+			return -1
+		case b.Alert.StartsAt == nil:
+			return 1
+		default:
+			return a.Alert.StartsAt.Compare(*b.Alert.StartsAt)
+		}
+	})
 	logger.Info("alerts fetched", "count", len(allAlerts))
 	return allAlerts, nil
 }
 
-func toAlertSummary(alert *armalertsmanagement.Alert) AlertSummary {
-	s := AlertSummary{}
-	if alert.Name != nil {
-		s.Name = *alert.Name
+func toAlert(raw *armalertsmanagement.Alert) alert {
+	var a alertData
+	var m alertMetadata
+	if raw.Name != nil {
+		a.Name = *raw.Name
 	}
-	if alert.Properties == nil || alert.Properties.Essentials == nil {
-		return s
+	if raw.Properties == nil || raw.Properties.Essentials == nil {
+		return alert{Alert: a, Metadata: m}
 	}
-	e := alert.Properties.Essentials
+	e := raw.Properties.Essentials
 	if e.Severity != nil {
-		s.Severity = *e.Severity
+		a.Severity = *e.Severity
 	}
 	if e.AlertState != nil {
-		s.State = string(*e.AlertState)
+		a.State = string(*e.AlertState)
 	}
 	if e.MonitorCondition != nil {
-		s.Condition = string(*e.MonitorCondition)
+		a.Condition = string(*e.MonitorCondition)
 	}
 	if e.StartDateTime != nil {
-		s.FiredAt = e.StartDateTime
+		a.StartsAt = e.StartDateTime
 	}
 	if e.MonitorConditionResolvedDateTime != nil {
-		s.ResolvedAt = e.MonitorConditionResolvedDateTime
+		a.EndsAt = e.MonitorConditionResolvedDateTime
 	}
 	if e.Description != nil {
-		s.Description = *e.Description
+		a.Description = *e.Description
 	}
 	if e.AlertRule != nil {
-		s.AlertRule = *e.AlertRule
+		a.AlertRule = *e.AlertRule
 	}
 	if e.TargetResource != nil {
-		s.TargetResource = *e.TargetResource
-		if rid, err := azcorearm.ParseResourceID(s.TargetResource); err == nil {
-			s.Workspace = rid.Name
-		}
+		m.MonitoringWorkspace = *e.TargetResource
 	}
 	if e.SignalType != nil {
-		s.SignalType = string(*e.SignalType)
+		a.SignalType = string(*e.SignalType)
 	}
-	return s
+	ctx := parseContext(raw.Properties.Context)
+	a.Labels = ctx.Labels
+	a.Annotations = ctx.Annotations
+	a.Expression = ctx.Expression
+	if alertname, ok := a.Labels["alertname"]; ok {
+		a.Name = alertname
+	}
+	return alert{Alert: a, Metadata: m}
+}
+
+// prometheusAlertContext represents the typed shape of the Prometheus alert
+// context that the Azure SDK returns as untyped any.
+type prometheusAlertContext struct {
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	Expression  string            `json:"expression"`
+}
+
+func parseContext(ctx any) prometheusAlertContext {
+	data, err := yaml.Marshal(ctx)
+	if err != nil {
+		return prometheusAlertContext{}
+	}
+	var c prometheusAlertContext
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		return prometheusAlertContext{}
+	}
+	return c
 }

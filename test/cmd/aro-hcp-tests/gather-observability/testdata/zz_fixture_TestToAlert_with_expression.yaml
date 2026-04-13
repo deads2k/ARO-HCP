@@ -1,0 +1,15 @@
+alert:
+  annotations:
+    description: Backend controller workqueue operationnodepoolcreate has a retry
+      ratio of > 50%
+    summary: Backend controller workqueue operationnodepoolcreate retry hot loop
+  condition: ""
+  expression: rate(workqueue_retries_total[10m]) > 0.5
+  labels:
+    alertname: BackendControllerRetryHotLoop
+    name: operationnodepoolcreate
+  name: BackendControllerRetryHotLoop
+  severity: Sev3
+  state: ""
+metadata:
+  knownIssue: false
