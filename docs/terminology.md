@@ -113,4 +113,4 @@
 - **Definition**: Microsoft best practices for deploying services to minimize any customer impact caused by platform changes.
 - **Abbreviation**: SDP
 - **References**:
-  - [Docs](https://ev2docs.azure.net/getting-started/sdp.html)
+  - [Docs](https://eng.ms/cid/89eb69a3-0de3-4f8d-8c97-7a872983e9cb/fid/d79688e079645a16c788074dd28781f9089bbfdb3212f126cb0d0ad3a7b656ca)
