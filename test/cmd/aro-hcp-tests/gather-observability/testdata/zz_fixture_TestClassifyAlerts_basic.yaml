@@ -1,0 +1,38 @@
+- alert:
+    condition: ""
+    name: BackendOperationErrorRate
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: true
+    knownIssueReason: error rate known
+- alert:
+    condition: ""
+    name: BackendControllerRetryHotLoop
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: true
+    knownIssueReason: controller churn
+- alert:
+    condition: ""
+    name: BackendControllerQueueDepthHigh
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: true
+    knownIssueReason: controller churn
+- alert:
+    condition: ""
+    name: SomethingUnknown
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: false
+- alert:
+    condition: ""
+    name: AnotherUnknown
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: false

@@ -1,0 +1,9 @@
+alert:
+  condition: ""
+  labels:
+    severity: warning
+  name: azure-alert-id
+  severity: Sev1
+  state: ""
+metadata:
+  knownIssue: false

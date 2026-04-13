@@ -1,0 +1,13 @@
+knownIssues:
+- name: "BackendControllerRetryHotLoop"
+  labels:
+    name: "operationnodepoolcreate"
+  reason: "Nodepool create controller retry hot loops are observed during e2e runs. Needs investigation."
+- name: "BackendControllerRetryHotLoop"
+  labels:
+    name: "operationnodepooldelete"
+  reason: "Nodepool delete controller retry hot loops are observed during e2e runs. Needs investigation."
+- name: "LowOutputBytesProcessed"
+  reason: "Fluent Bit output bytes can drop during e2e cluster provisioning and teardown while pods restart or clusters scale."
+- name: "prometheusJobUp"
+  reason: "Prometheus job up alerts are expected during e2e runs as clusters and pods are created and destroyed."

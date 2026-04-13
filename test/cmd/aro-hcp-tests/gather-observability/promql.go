@@ -35,18 +35,27 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 )
 
-// QueriesConfig holds the list of PromQL queries to run against Azure Monitor
-// Prometheus workspaces.
+// QueriesConfig holds panels of grouped PromQL queries to run against Azure
+// Monitor Prometheus workspaces. Each panel produces one HTML page with
+// multiple charts.
 type QueriesConfig struct {
+	Panels []PanelSpec `json:"panels" yaml:"panels"`
+}
+
+// PanelSpec groups related queries that should be rendered together on a
+// single HTML page.
+type PanelSpec struct {
+	Title   string      `json:"title" yaml:"title"`
 	Queries []QuerySpec `json:"queries" yaml:"queries"`
 }
 
 // QuerySpec describes a single PromQL query to execute and chart.
 type QuerySpec struct {
-	Title     string `json:"title" yaml:"title"`
-	Query     string `json:"query" yaml:"query"`
-	Workspace string `json:"workspace" yaml:"workspace"` // "svc" or "hcp"
-	Step      string `json:"step,omitempty" yaml:"step,omitempty"`
+	Title       string `json:"title" yaml:"title"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	Query       string `json:"query" yaml:"query"`
+	Workspace   string `json:"workspace" yaml:"workspace"` // "svc" or "hcp"
+	Step        string `json:"step,omitempty" yaml:"step,omitempty"`
 }
 
 // PrometheusResponse is the top-level Prometheus HTTP API response.
@@ -81,18 +90,26 @@ func parseQueriesConfig(data []byte) (*QueriesConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse queries config: %w", err)
 	}
-	for i, q := range cfg.Queries {
-		if q.Title == "" {
-			return nil, fmt.Errorf("query %d: title is required", i)
+	for pi, p := range cfg.Panels {
+		if p.Title == "" {
+			return nil, fmt.Errorf("panel %d: title is required", pi)
 		}
-		if q.Query == "" {
-			return nil, fmt.Errorf("query %d (%s): query is required", i, q.Title)
+		if len(p.Queries) == 0 {
+			return nil, fmt.Errorf("panel %d (%s): at least one query is required", pi, p.Title)
 		}
-		if q.Workspace != "svc" && q.Workspace != "hcp" {
-			return nil, fmt.Errorf("query %d (%s): workspace must be \"svc\" or \"hcp\", got %q", i, q.Title, q.Workspace)
-		}
-		if q.Step == "" {
-			cfg.Queries[i].Step = "60s"
+		for qi, q := range p.Queries {
+			if q.Title == "" {
+				return nil, fmt.Errorf("panel %d (%s), query %d: title is required", pi, p.Title, qi)
+			}
+			if q.Query == "" {
+				return nil, fmt.Errorf("panel %d (%s), query %d (%s): query is required", pi, p.Title, qi, q.Title)
+			}
+			if q.Workspace != "svc" && q.Workspace != "hcp" {
+				return nil, fmt.Errorf("panel %d (%s), query %d (%s): workspace must be \"svc\" or \"hcp\", got %q", pi, p.Title, qi, q.Title, q.Workspace)
+			}
+			if q.Step == "" {
+				cfg.Panels[pi].Queries[qi].Step = "60s"
+			}
 		}
 	}
 	return &cfg, nil

@@ -1,0 +1,7 @@
+- alert:
+    condition: ""
+    name: SomeAlert
+    severity: ""
+    state: ""
+  metadata:
+    knownIssue: false

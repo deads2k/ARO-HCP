@@ -1,0 +1,12 @@
+alert:
+  annotations:
+    description: More than 5% of REST API requests are returning 5xx status codes.
+    summary: Maestro REST API error rate above 5%
+  condition: ""
+  labels:
+    alertname: MaestroRESTAPIErrorRate
+  name: MaestroRESTAPIErrorRate
+  severity: Sev3
+  state: ""
+metadata:
+  knownIssue: false

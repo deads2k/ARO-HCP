@@ -1,0 +1,7 @@
+alert:
+  condition: ""
+  name: partial-alert
+  severity: Sev1
+  state: Acknowledged
+metadata:
+  knownIssue: false

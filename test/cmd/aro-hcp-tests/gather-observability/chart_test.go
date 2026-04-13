@@ -413,80 +413,110 @@ func TestLoadQueriesConfig(t *testing.T) {
 		check   func(t *testing.T, cfg *QueriesConfig)
 	}{
 		{
-			name: "valid config",
-			yaml: `queries:
-  - title: "CPU Usage"
-    query: "rate(cpu_seconds_total[5m])"
-    workspace: svc
-    step: "30s"
-  - title: "Memory"
-    query: "process_resident_memory_bytes"
-    workspace: hcp
+			name: "valid config with panels",
+			yaml: `panels:
+  - title: "CPU Panel"
+    queries:
+    - title: "CPU Usage"
+      query: "rate(cpu_seconds_total[5m])"
+      workspace: svc
+      step: "30s"
+    - title: "Memory"
+      query: "process_resident_memory_bytes"
+      workspace: hcp
 `,
 			check: func(t *testing.T, cfg *QueriesConfig) {
-				if len(cfg.Queries) != 2 {
-					t.Fatalf("expected 2 queries, got %d", len(cfg.Queries))
+				if len(cfg.Panels) != 1 {
+					t.Fatalf("expected 1 panel, got %d", len(cfg.Panels))
 				}
-				if cfg.Queries[0].Title != "CPU Usage" {
-					t.Errorf("Queries[0].Title = %q, want %q", cfg.Queries[0].Title, "CPU Usage")
+				if cfg.Panels[0].Title != "CPU Panel" {
+					t.Errorf("Panels[0].Title = %q, want %q", cfg.Panels[0].Title, "CPU Panel")
 				}
-				if cfg.Queries[0].Step != "30s" {
-					t.Errorf("Queries[0].Step = %q, want %q", cfg.Queries[0].Step, "30s")
+				if len(cfg.Panels[0].Queries) != 2 {
+					t.Fatalf("expected 2 queries, got %d", len(cfg.Panels[0].Queries))
 				}
-				if cfg.Queries[1].Title != "Memory" {
-					t.Errorf("Queries[1].Title = %q, want %q", cfg.Queries[1].Title, "Memory")
+				if cfg.Panels[0].Queries[0].Step != "30s" {
+					t.Errorf("Panels[0].Queries[0].Step = %q, want %q", cfg.Panels[0].Queries[0].Step, "30s")
 				}
 			},
 		},
 		{
-			name: "missing title returns error",
-			yaml: `queries:
-  - query: "rate(cpu_seconds_total[5m])"
-    workspace: svc
+			name: "missing panel title returns error",
+			yaml: `panels:
+  - queries:
+    - title: "CPU"
+      query: "up"
+      workspace: svc
+`,
+			wantErr: "title is required",
+		},
+		{
+			name: "empty queries returns error",
+			yaml: `panels:
+  - title: "Empty Panel"
+    queries: []
+`,
+			wantErr: "at least one query is required",
+		},
+		{
+			name: "missing query title returns error",
+			yaml: `panels:
+  - title: "Panel"
+    queries:
+    - query: "rate(cpu_seconds_total[5m])"
+      workspace: svc
 `,
 			wantErr: "title is required",
 		},
 		{
 			name: "missing query returns error",
-			yaml: `queries:
-  - title: "CPU Usage"
-    workspace: svc
+			yaml: `panels:
+  - title: "Panel"
+    queries:
+    - title: "CPU Usage"
+      workspace: svc
 `,
 			wantErr: "query is required",
 		},
 		{
 			name: "invalid workspace returns error",
-			yaml: `queries:
-  - title: "CPU Usage"
-    query: "rate(cpu_seconds_total[5m])"
-    workspace: mgmt
+			yaml: `panels:
+  - title: "Panel"
+    queries:
+    - title: "CPU Usage"
+      query: "rate(cpu_seconds_total[5m])"
+      workspace: mgmt
 `,
 			wantErr: `workspace must be "svc" or "hcp"`,
 		},
 		{
 			name: "step defaults to 60s when omitted",
-			yaml: `queries:
-  - title: "CPU Usage"
-    query: "rate(cpu_seconds_total[5m])"
-    workspace: svc
+			yaml: `panels:
+  - title: "Panel"
+    queries:
+    - title: "CPU Usage"
+      query: "rate(cpu_seconds_total[5m])"
+      workspace: svc
 `,
 			check: func(t *testing.T, cfg *QueriesConfig) {
-				if cfg.Queries[0].Step != "60s" {
-					t.Errorf("Queries[0].Step = %q, want %q", cfg.Queries[0].Step, "60s")
+				if cfg.Panels[0].Queries[0].Step != "60s" {
+					t.Errorf("Step = %q, want %q", cfg.Panels[0].Queries[0].Step, "60s")
 				}
 			},
 		},
 		{
 			name: "step is preserved when provided",
-			yaml: `queries:
-  - title: "CPU Usage"
-    query: "rate(cpu_seconds_total[5m])"
-    workspace: svc
-    step: "15s"
+			yaml: `panels:
+  - title: "Panel"
+    queries:
+    - title: "CPU Usage"
+      query: "rate(cpu_seconds_total[5m])"
+      workspace: svc
+      step: "15s"
 `,
 			check: func(t *testing.T, cfg *QueriesConfig) {
-				if cfg.Queries[0].Step != "15s" {
-					t.Errorf("Queries[0].Step = %q, want %q", cfg.Queries[0].Step, "15s")
+				if cfg.Panels[0].Queries[0].Step != "15s" {
+					t.Errorf("Step = %q, want %q", cfg.Panels[0].Queries[0].Step, "15s")
 				}
 			},
 		},
@@ -521,7 +551,12 @@ func TestLoadQueriesConfigEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("embedded queries.yaml should parse without error: %v", err)
 	}
-	if len(cfg.Queries) == 0 {
-		t.Fatal("embedded queries.yaml should contain at least one query")
+	if len(cfg.Panels) == 0 {
+		t.Fatal("embedded queries.yaml should contain at least one panel")
+	}
+	for _, p := range cfg.Panels {
+		if len(p.Queries) == 0 {
+			t.Errorf("panel %q should contain at least one query", p.Title)
+		}
 	}
 }
