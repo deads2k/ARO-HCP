@@ -63,6 +63,8 @@ var secretValidators = map[string]secretValidator{
 	"quay-io-bearer":             {validate: validateNonEmptyString},
 	"quay-password":              {validate: validateNonEmptyString},
 	"quay-username":              {validate: validateNonEmptyString},
+	"redhat-prod-quay-password":  {validate: validateNonEmptyString},
+	"redhat-prod-quay-username":  {validate: validateNonEmptyString},
 }
 
 func validatePullSecret(data []byte) error {
