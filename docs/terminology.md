@@ -94,13 +94,13 @@
 
 - **Definition**: Microsoft automated platform for deploying Azure resources across clouds.
 - **References**:
-  - [ARO HCP EV2](https://ev2docs.azure.net/getting-started/overview.html)
+  - [ARO HCP EV2](https://eng.ms/cid/89eb69a3-0de3-4f8d-8c97-7a872983e9cb/fid/32bb8caf4bb62a7f6412cd19d3b877bcab3622ebcb825dd948384da61ff5d5c9)
 
 ### EV2 Stamp
 
 - **Definition**: A stamp allows for partitioning a region into scaling units. Used to build multiple management clusters in a region.
 - **References**:
-  - [Docs](https://ev2docs.azure.net/features/rollout-orchestration/configure-stamps.html)
+  - [Docs](https://eng.ms/cid/89eb69a3-0de3-4f8d-8c97-7a872983e9cb/fid/21005d42f338b4537368b3f223f67d4c24fb4806d9330370156b042363d55491)
 
 ### MSI-RP
 
