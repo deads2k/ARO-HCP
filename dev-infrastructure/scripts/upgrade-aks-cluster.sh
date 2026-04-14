@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-}
 
 # Inputs via environment variables:
 #   RESOURCE_GROUP - Resource group containing the cluster
@@ -9,6 +8,7 @@ set -euo pipefail
 
 version_greater_than() {
     [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" != "$1" ]
+}
 
 echo "Checking if cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' needs upgrade to '${KUBERNETES_VERSION}'..."
 
