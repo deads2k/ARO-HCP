@@ -18,8 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
+
+	workv1 "open-cluster-management.io/api/work/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -73,45 +74,54 @@ func NewDeleteOrphanedMaestroReadonlyBundlesController(cosmosClient database.DBC
 }
 
 // SyncOnce current algorithm is:
-//  1. List all ServiceProviderClusters
-//  2. Build a map that contains an association between the CS Provision Shard ID and the ServiceProviderClusters that
-//     are allocated to that shard. IMPORTANT NOTE: This assumes that the maestro server associated to the provision shard
-//     has resources with always the same source ID. If it turns out we cannot have this assumption this logic would not
-//     be good enough. In that case it might be necessary to store to what source ID a Maestro Bundle/set of Maestro Bundles
-//     belongs to but then the instantiation of the Maestro client needs to be done differently as its scoped to
-//     Maestro Consumer Name + Maestro Source ID. We know for example that in the CSPR environment different CS instances
-//     have different Maestro source IDs using the same Maestro Server.
-//  3. For each shard in the map previously built, we use the Maestro API to list all the Maestro Bundles, and for each
-//     Maestro Bundle we check if its Maestro API Maestro Bundle Name matches any of the MaestroBundleReferences in any
-//     of the ServiceProviderClusters allocated to that shard. If it does not match, we delete the Maestro Bundle. If it
-//     matches we leave it alone
+//  1. List all ServiceProviderClusters (initial snapshot).
+//  2. Build a map from Cluster Service provision shard ID to Maestro client (one client per registered provision shard).
+//  3. Build initialShardToSPCs: map provision shard ID to the ServiceProviderClusters on that shard (from the initial list).
+//     This assumes the Maestro server for a provision shard uses a single Maestro source ID for resources we list; if not,
+//     client construction would need to change (Maestro Consumer Name + Maestro Source ID scope).
+//  4. For each shard, list Maestro bundles (paginated, same label selector as today). A bundle is a delete candidate if
+//     it passes the readonly managed-by label filter and its name is not referenced by any SPC on that shard in initialShardToSPCs.
+//     Each candidate records the provision shard id and a pointer to the listed ManifestWork.
+//  5. List all ServiceProviderClusters again (fresh snapshot), rebuild freshShardToSPCs the same way as (3).
+//  6. For each candidate, if the bundle name is still not referenced on that shard in the fresh snapshot, delete it via Maestro
 //
-// We considered using the Maestro API Maestro UID which is globally unique but it's possible that there's a scenario
-// where the cluster scoped maestro readonly bundles controller creates a bundle reference in the ServiceProviderClass, created the bundle
-// using the Maestro API but failed to persist it in the database for some reason and the cluster ended up being deleted.
-// In that scenario we would not have the Maestro UID to identify the Maestro Bundle and we would not be able to delete it. Furthermore
-// we should not use the fact of the UID being empty as the trigger to delete because it could be that it's being created
-// and not yet persisted in Cosmos.
+// Cross-store: The fresh SPC list and per-shard reference set (steps 5-6) prevent deleting a bundle that is already referenced
+// in committed Cosmos documents by the time that snapshot is built, so a stale initial list alone does not cause accidental
+// delete.
+
+// IMPORTANT NOTE: This assumes that the maestro server associated to the provision shard
+// has resources with always the same source ID. If it turns out we cannot have this assumption this logic would not
+// be good enough. In that case it might be necessary to store to what source ID a Maestro Bundle/set of Maestro Bundles
+// belongs to but then the instantiation of the Maestro client needs to be done differently as its scoped to
+// Maestro Consumer Name + Maestro Source ID. We know for example that in the CSPR environment different CS instances
+// have different Maestro source IDs using the same Maestro Server.
 func (c *deleteOrphanedMaestroReadonlyBundles) SyncOnce(ctx context.Context, _ any) error {
 	logger := utils.LoggerFromContext(ctx)
 	logger.Info("Syncing orphaned Maestro Readonly Bundles")
-	allServiceProviderClusters, err := c.getAllServiceProviderClusters(ctx)
+	initialServiceProviderClusters, err := c.getAllServiceProviderClusters(ctx)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get all ServiceProviderClusters: %w", err))
 	}
-	logger.Info(fmt.Sprintf("Found %d ServiceProviderClusters", len(allServiceProviderClusters)))
+	logger.Info(fmt.Sprintf("Found %d ServiceProviderClusters (initial)", len(initialServiceProviderClusters)))
 
-	logger.Info("Building Provision Shard to ServiceProviderClusters index")
-	provisionShardsToServiceProviderClustersIndex, err := c.buildProvisionShardToServiceProviderClustersIndex(ctx, allServiceProviderClusters)
-	// We cancel the Maestro clients when the sync is done. This is important to avoid leaking resources when the sync is done.
-	defer cancelMaestroClientsInIndex(provisionShardsToServiceProviderClustersIndex) // close on success or error (index may be partial on error)
+	logger.Info("Building Maestro clients per Cluster Service provision shard")
+	maestroClientsByShard, err := c.buildMaestroClientsByProvisionShard(ctx)
+	// Cancel Maestro clients when the sync is done to avoid leaking resources (map may be partial on error).
+	defer cancelMaestroClientsByProvisionShard(maestroClientsByShard)
 	if err != nil {
-		return utils.TrackError(fmt.Errorf("failed to build Provision Shard to ServiceProviderClusters index: %w", err))
+		return utils.TrackError(fmt.Errorf("failed to build Maestro clients by provision shard: %w", err))
 	}
-	logger.Info(fmt.Sprintf("Built Provision Shard to ServiceProviderClusters index with %d keys", len(provisionShardsToServiceProviderClustersIndex)))
+	logger.Info(fmt.Sprintf("Built Maestro clients for %d provision shards", len(maestroClientsByShard)))
+
+	logger.Info("Mapping initial ServiceProviderClusters to provision shards")
+	initialShardToSPCs, err := c.mapServiceProviderClustersByProvisionShard(ctx, initialServiceProviderClusters, maestroClientsByShard)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("failed to map ServiceProviderClusters to provision shards: %w", err))
+	}
+	logger.Info(fmt.Sprintf("Initial ServiceProviderClusters mapped to %d provision shards", len(initialShardToSPCs)))
 
 	logger.Info("Ensuring orphaned Maestro Readonly Bundles are deleted")
-	err = c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, provisionShardsToServiceProviderClustersIndex)
+	err = c.ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx, maestroClientsByShard, initialShardToSPCs)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to ensure orphaned Maestro Bundles are deleted: %w", err))
 	}
@@ -154,148 +164,120 @@ func (c *deleteOrphanedMaestroReadonlyBundles) getAllServiceProviderClusters(ctx
 	return allServiceProviderClusters, nil
 }
 
-// provisionShardServiceProviderClusters represents the set of ServiceProviderClusters whose Maestro bundles
-// are associated to a Provision Shard (Management Cluster)
-type provisionShardServiceProviderClusters struct {
-	// maestroClient is the Maestro client to communicate with the Maestro server
-	// associated to the provision shard. IMPORTANT NOTE: This assumes that
-	// all the resources in the Maestro server associated to the provision shard
-	// have the same source ID. If it turns out we cannot have this assumption
-	// this logic would not be good enough.
-	maestroClient maestro.Client
-	// maestroClientCancelFunc is the cancel function to cancel the Maestro client.
-	// Calling this function is important when the client is not needed anymore to avoid leaking resources when the sync is done.
+// shardMaestroClient holds a Maestro API client for one Cluster Service provision shard and its teardown cancel func.
+type shardMaestroClient struct {
+	maestroClient           maestro.Client
 	maestroClientCancelFunc context.CancelFunc
-	// serviceProviderClusters is the list of ServiceProviderClusters that are allocated to the shard.
-	// IMPORTANT NOTE: This assumes that all the resources in the Maestro server associated to the provision shard
-	// have the same source ID. If it turns out we cannot have this assumption
-	// this logic would not be good enough.
-	serviceProviderClusters []*api.ServiceProviderCluster
 }
 
-// cancelMaestroClientsInIndex runs the cancel function for each entry in the index.
-// The caller of buildProvisionShardToServiceProviderClustersIndex should defer this so the index is cancelled on success or error (on error the index may be partial).
-func cancelMaestroClientsInIndex(index map[string]*provisionShardServiceProviderClusters) {
-	for _, shardToSPCs := range index {
-		shardToSPCs.maestroClientCancelFunc()
+// cancelMaestroClientsByProvisionShard runs the cancel function for each Maestro client entry in maestroClientsByProvisionShard.
+func cancelMaestroClientsByProvisionShard(maestroClientsByProvisionShard map[string]*shardMaestroClient) {
+	for _, entry := range maestroClientsByProvisionShard {
+		entry.maestroClientCancelFunc()
 	}
 }
 
-// buildProvisionShardServiceProviderClustersIndex builds an index of Provision Shard ID to provisionShardServiceProviderClusters.
-// The key is the Cluster Service Provision Shard ID. To achieve that the following steps are followed:
-//  1. List all the registered provision shards (currently using the Clusters Service API)
-//  2. For each provision shard, create a Maestro client.
-//  3. For each ServiceProviderCluster, get the Cluster Service Provision Shard ID associated to it (currently using the Clusters Service API) and
-//     add the ServiceProviderCluster to the corresponding provisionShardServiceProviderClusters entry in the index.
+// buildMaestroClientsByProvisionShard lists registered provision shards from Cluster Service and builds a map of
+// provision shard ID to Maestro client. The key of the map is the CS provision shard ID.
 //
-// On error the returned index may be partial (clients created before the error). The caller must close the index in all cases (e.g. defer closeMaestroClientsInIndex).
-func (c *deleteOrphanedMaestroReadonlyBundles) buildProvisionShardToServiceProviderClustersIndex(ctx context.Context, allServiceProviderClusters []*api.ServiceProviderCluster) (map[string]*provisionShardServiceProviderClusters, error) {
-	provisionShardsToServiceProviderClustersIndex := map[string]*provisionShardServiceProviderClusters{}
+// On error the returned map may be partial (clients created before the error). The caller must defer cancelMaestroClientsByProvisionShard unconditionally.
+func (c *deleteOrphanedMaestroReadonlyBundles) buildMaestroClientsByProvisionShard(ctx context.Context) (map[string]*shardMaestroClient, error) {
+	maestroClientsByProvisionShard := map[string]*shardMaestroClient{}
 
 	// TODO we list the provision shards from CS but at some point we should have
 	// the information in Cosmos and this should be changed to use that instead.
 	// TODO should we take into account the provision shard status on what to consider (active, maintenance, offline, ...)?
 	// for now we consider all provision shards independently of their status.
-	provisionShardsIterator := c.clusterServiceClient.ListProvisionShards()
-	for provisionShard := range provisionShardsIterator.Items(ctx) {
+	for provisionShard := range c.clusterServiceClient.ListProvisionShards().Items(ctx) {
 		// We create a new context with a cancel function so we can cancel the Maestro client when the sync is done.
 		// This is important to avoid leaking resources when the sync is done.
 		maestroClientCtx, cancel := context.WithCancel(ctx)
 		maestroClient, err := c.createMaestroClientFromProvisionShard(maestroClientCtx, provisionShard)
 		if err != nil {
-			cancel() // on error creating the Maestro client we ensure we cancel the just created context too
-			return provisionShardsToServiceProviderClustersIndex, utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
+			cancel() // on error creating the Maestro client we ensure we cancel the context that we just created too
+			return maestroClientsByProvisionShard, utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 		}
-		provisionShardsToServiceProviderClustersIndex[provisionShard.ID()] = &provisionShardServiceProviderClusters{
+		maestroClientsByProvisionShard[provisionShard.ID()] = &shardMaestroClient{
 			maestroClient:           maestroClient,
 			maestroClientCancelFunc: cancel,
-			serviceProviderClusters: []*api.ServiceProviderCluster{},
 		}
 	}
 
-	for _, spc := range allServiceProviderClusters {
-		clusterResourceID := spc.ResourceID.Parent
-		cluster, err := c.cosmosClient.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName).Get(ctx, clusterResourceID.Name)
-		if err != nil {
-			return provisionShardsToServiceProviderClustersIndex, utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
-		}
-		// TODO we should store the provision shard ID somewhere so we don't need to fetch it from cluster service repeatedly
-		// TODO should we take into account that at some point in the future we will implement migration between management
-		// clusters, where a cluster could have bundles allocated to different provision shards at the same time?
-		clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
-		if err != nil {
-			return provisionShardsToServiceProviderClustersIndex, utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
-		}
-
-		currentProvisionShardServiceProviderClusters, ok := provisionShardsToServiceProviderClustersIndex[clusterCSShard.ID()]
-		if !ok {
-			return provisionShardsToServiceProviderClustersIndex, utils.TrackError(fmt.Errorf("provision shard %s for cluster %s is not present in provision shards index", clusterCSShard.ID(), cluster.Name))
-		}
-		currentProvisionShardServiceProviderClusters.serviceProviderClusters = append(currentProvisionShardServiceProviderClusters.serviceProviderClusters, spc)
-	}
-
-	return provisionShardsToServiceProviderClustersIndex, nil
+	return maestroClientsByProvisionShard, nil
 }
 
-// ensureOrphanedMaestroReadonlyBundlesAreDeleted ensures that all the Maestro Readonly Bundles that are not referenced by any
-// of the ServiceProviderClusters allocated to a Provision Shard (Management Cluster) are deleted.
-// Only Maestro Readonly Bundles that are managed by the cluster scoped maestro readonly bundles controller are considered.
-func (c *deleteOrphanedMaestroReadonlyBundles) ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx context.Context, provisionShardsToServiceProviderClustersIndex map[string]*provisionShardServiceProviderClusters) error {
+// mapServiceProviderClustersByProvisionShard groups ServiceProviderClusters by Cluster Service provision shard ID.
+// Every resolved shard must exist in maestroClientsByShard (registered provision shards).
+func (c *deleteOrphanedMaestroReadonlyBundles) mapServiceProviderClustersByProvisionShard(ctx context.Context, spcs []*api.ServiceProviderCluster, maestroClientsByShard map[string]*shardMaestroClient) (map[string][]*api.ServiceProviderCluster, error) {
+	res := make(map[string][]*api.ServiceProviderCluster)
+	for _, spc := range spcs {
+		shardID, err := c.clusterProvisionShardIDForServiceProviderCluster(ctx, spc)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := maestroClientsByShard[shardID]; !ok {
+			return nil, utils.TrackError(fmt.Errorf("provision shard %s for ServiceProviderCluster %s is not present in provision shards map", shardID, spc.ResourceID.String()))
+		}
+		res[shardID] = append(res[shardID], spc)
+	}
+	return res, nil
+}
+
+// orphanReadonlyBundleDeleteCandidate is a Maestro bundle listed on a provision shard that was not referenced by the
+// initial SPC snapshot for that shard; delete still requires a fresh snapshot check.
+type orphanReadonlyBundleDeleteCandidate struct {
+	csShardID string
+	bundle    *workv1.ManifestWork
+}
+
+// ensureOrphanedMaestroReadonlyBundlesAreDeleted ensures that Maestro readonly bundles managed by the cluster-scoped
+// controller are deleted when no ServiceProviderCluster on that provision shard references them.
+//
+//  1. From initialShardToSPCs, build per-shard sets of referenced Maestro bundle names.
+//  2. For each shard with a Maestro client, list bundles (paginated) and add candidates when the bundle is not referenced on that shard.
+//  3. List all ServiceProviderClusters again (fresh), map them by shard, rebuild referenced sets.
+//  4. Delete each candidate that is still unreferenced on its shard in the fresh snapshot.
+func (c *deleteOrphanedMaestroReadonlyBundles) ensureOrphanedMaestroReadonlyBundlesAreDeleted(ctx context.Context, maestroClientsByShard map[string]*shardMaestroClient, initialShardToSPCs map[string][]*api.ServiceProviderCluster) error {
 	logger := utils.LoggerFromContext(ctx)
 	var syncErrors []error
-	// We iterate over each shard to list all the maestro bundles associated to that
-	// shard (assuming same maestro source ID) using the Maestro API
-	for csShardID, shardToSPCs := range provisionShardsToServiceProviderClustersIndex {
-		logger = logger.WithValues("csProvisionShardID", csShardID)
-		ctx = utils.ContextWithLogger(ctx, logger)
-		logger.Info("processing cluster service provision shard %s with %d ServiceProviderClusters", csShardID, len(shardToSPCs.serviceProviderClusters))
-		maestroClient := shardToSPCs.maestroClient
-		// We list all the Maestro Bundles in chunks of 400 to avoid putting
-		// too much pressure on the Maestro API.
-		// We filter the Maestro Bundles by the K8s label that indicates that the Maestro Bundle is managed by the cluster scoped maestro readonly bundles controller.
+
+	referencedByShardInitial, err := referencedMaestroAPIMaestroBundleNamesByShard(initialShardToSPCs)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("error building referenced Maestro API Maestro bundle names by shard (initial snapshot): %w", err))
+	}
+
+	var deleteCandidates []orphanReadonlyBundleDeleteCandidate
+
+	for csShardID, shardEntry := range maestroClientsByShard {
+		shardLogger := logger.WithValues("csProvisionShardID", csShardID)
+		ctxShard := utils.ContextWithLogger(ctx, shardLogger)
+		initialOnShard := initialShardToSPCs[csShardID]
+		shardLogger.Info(fmt.Sprintf("listing Maestro bundles on cluster service provision shard %s (%d ServiceProviderClusters in initial shard map)", csShardID, len(initialOnShard)))
+		maestroClient := shardEntry.maestroClient
 		listOptions := metav1.ListOptions{Limit: 400, Continue: "", LabelSelector: fmt.Sprintf("%s=%s", readonlyBundleManagedByK8sLabelKey, readonlyBundleManagedByK8sLabelValueClusterScoped)}
 		for {
-			maestroBundles, err := maestroClient.List(ctx, listOptions)
+			maestroBundles, err := maestroClient.List(ctxShard, listOptions)
 			if err != nil {
 				return utils.TrackError(fmt.Errorf("failed to list Maestro Bundles for shard %s: %w", csShardID, err))
 			}
-			// For each Maestro Bundle retrieved from the Maestro API we check if the Maestro Bundle has the K8s annotation
-			// that indicates that the Maestro Bundle is managed by the cluster scoped maestro readonly bundles controller. If it
-			// does not we filter it out. If it is then we check if the Maestro Bundle is referenced by any of the ServiceProviderClusters
-			// allocated to that shard by checking the MaestroBundleReferences in the ServiceProviderCluster status and checking if the
-			// Maestro API Maestro Bundle Name matches. If it matches, we leave it alone. If it does not match, we delete it.
-			for _, maestroBundle := range maestroBundles.Items {
+			for i := range maestroBundles.Items {
+				maestroBundle := &maestroBundles.Items[i]
 				// Even though Maestro should filter by the K8s label we specified we double check it here to be sure
 				if maestroBundle.Labels[readonlyBundleManagedByK8sLabelKey] != readonlyBundleManagedByK8sLabelValueClusterScoped {
 					continue
 				}
-
-				// We iterate over all the Maestro Bundle References among all the Service Provider Clusters allocated to that shard
-				// to check if the Maestro Bundle is referenced by any of them.
-				found := slices.ContainsFunc(shardToSPCs.serviceProviderClusters, func(spc *api.ServiceProviderCluster) bool {
-					found := slices.ContainsFunc(spc.Status.MaestroReadonlyBundles, func(ref *api.MaestroBundleReference) bool {
-						// The Maestro API Maestro Bundle Name should be unique within a given Maestro Consumer Name and Maestro Source ID.
-						// If we find a match, it means the Maestro Bundle is referenced by the ServiceProviderCluster and we should
-						// not delete it.
-						return ref.MaestroAPIMaestroBundleName == maestroBundle.Name
-					})
-					return found
+				// We check if the Maestro bundle is referenced by any of the ServiceProviderClusters on the shard in the initial snapshot.
+				// If it is referenced we skip it as it is not an orphan.
+				// The Maestro API Maestro Bundle Name should be unique within a given Maestro Consumer Name and Maestro Source ID.
+				if shardRefSet := referencedByShardInitial[csShardID]; shardRefSet != nil {
+					if _, referenced := shardRefSet[maestroBundle.Name]; referenced {
+						continue
+					}
+				}
+				deleteCandidates = append(deleteCandidates, orphanReadonlyBundleDeleteCandidate{
+					csShardID: csShardID,
+					bundle:    maestroBundle,
 				})
-				if found {
-					continue
-				}
-
-				// TODO it would be nice to be able to log the Maestro Source ID.
-				logger.Info("Deleting orphaned Maestro readonly Bundle", "maestroBundleMetadataName", maestroBundle.Name, "maestroConsumerName", maestroBundle.Namespace, "maestroBundleID", maestroBundle.UID)
-				err := maestroClient.Delete(ctx, maestroBundle.Name, metav1.DeleteOptions{})
-				if err != nil {
-					// Failure to delete does not end the sync process. We log the error and we continue with the processing
-					// of other Maestro Bundles.
-					syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to delete Maestro Bundle: %w", err)))
-				} else {
-					logger.Info("Deleted orphaned Maestro readonly Bundle", "maestroBundleMetadataName", maestroBundle.Name, "maestroConsumerName", maestroBundle.Namespace, "maestroBundleID", maestroBundle.UID)
-				}
-
 			}
 			continuationToken := maestroBundles.GetContinue()
 			if continuationToken == "" {
@@ -305,7 +287,102 @@ func (c *deleteOrphanedMaestroReadonlyBundles) ensureOrphanedMaestroReadonlyBund
 		}
 	}
 
+	freshServiceProviderClusters, err := c.getAllServiceProviderClusters(ctx)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("error getting all ServiceProviderClusters (fresh snapshot): %w", err))
+	}
+	freshShardToSPCs, err := c.mapServiceProviderClustersByProvisionShard(ctx, freshServiceProviderClusters, maestroClientsByShard)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("error mapping fresh ServiceProviderClusters to provision shards (fresh snapshot): %w", err))
+	}
+	referencedByShardFresh, err := referencedMaestroAPIMaestroBundleNamesByShard(freshShardToSPCs)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("error building referenced Maestro API Maestro bundle names by shard (fresh snapshot): %w", err))
+	}
+
+	for _, cand := range deleteCandidates {
+		csShardID := cand.csShardID
+		candidateMaestroBundle := cand.bundle
+		shardEntry, ok := maestroClientsByShard[csShardID]
+		if !ok {
+			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("no Maestro client for shard %s when deleting bundle %q", csShardID, candidateMaestroBundle.Name)))
+			continue
+		}
+		maestroClient := shardEntry.maestroClient
+
+		shardLogger := utils.LoggerFromContext(ctx).WithValues("csProvisionShardID", csShardID)
+		ctxShard := utils.ContextWithLogger(ctx, shardLogger)
+		if shardRefSet := referencedByShardFresh[csShardID]; shardRefSet != nil {
+			if _, referenced := shardRefSet[candidateMaestroBundle.Name]; referenced {
+				// If the Maestro bundle is referenced by any of the ServiceProviderClusters on the shard in the fresh snapshot we skip it as it is not an orphan.
+				continue
+			}
+		}
+
+		shardLogger.Info("Deleting orphaned Maestro readonly Bundle", "maestroConsumerName", candidateMaestroBundle.Namespace, "maestroAPIMaestroBundleName", candidateMaestroBundle.Name, "maestroAPIMaestroBundleID", candidateMaestroBundle.UID)
+		err = maestroClient.Delete(ctxShard, candidateMaestroBundle.Name, metav1.DeleteOptions{})
+		if err != nil {
+			//  Failure to delete does not end the sync process. We log the error and we continue with the processing of other Maestro bundle deletion candidates.
+			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to delete Maestro Bundle: %w", err)))
+		} else {
+			shardLogger.Info("Deleted orphaned Maestro readonly Bundle", "maestroConsumerName", candidateMaestroBundle.Namespace, "maestroAPIMaestroBundleName", candidateMaestroBundle.Name, "maestroAPIMaestroBundleID", candidateMaestroBundle.UID)
+		}
+	}
+
 	return errors.Join(syncErrors...)
+}
+
+// clusterProvisionShardIDForServiceProviderCluster returns the Cluster Service provision shard ID for the cluster that owns the SPC.
+func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForServiceProviderCluster(ctx context.Context, spc *api.ServiceProviderCluster) (string, error) {
+	clusterResourceID := spc.ResourceID.Parent
+	if clusterResourceID == nil {
+		return "", utils.TrackError(fmt.Errorf("ServiceProviderCluster %s has no parent resource ID", spc.ResourceID.String()))
+	}
+	cluster, err := c.cosmosClient.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName).Get(ctx, clusterResourceID.Name)
+	if err != nil {
+		return "", utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
+	}
+	// TODO We get the provision shard ID from CS but at some point we should have
+	// the information in Cosmos and this should be changed to use that instead.
+	// TODO should we take into account that at some point in the future we will implement migration between management
+	// clusters, where a cluster could have bundles allocated to different provision shards at the same time? For now
+	// we assume that the cluster is associated to a single provision shard at a time.
+	clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	if err != nil {
+		return "", utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
+	}
+	return clusterCSShard.ID(), nil
+}
+
+// referencedMaestroAPIMaestroBundleNamesByShard maps provision shard ID to the set of Maestro API bundle names referenced by
+// SPCs grouped under that shard (shard assignment is already resolved in spcsByShard). Nil list entries or empty
+// maestroAPIMaestroBundleName return an error so the reference set cannot silently omit in-use bundles.
+func referencedMaestroAPIMaestroBundleNamesByShard(spcsByShard map[string][]*api.ServiceProviderCluster) (map[string]map[string]struct{}, error) {
+	out := make(map[string]map[string]struct{})
+
+	for shardID, spcs := range spcsByShard {
+		// If it is the first time we are processing this shard we initialize the map entry for it
+		if out[shardID] == nil {
+			out[shardID] = make(map[string]struct{})
+		}
+		// We iterate over the ServiceProviderClusters on the shard and we add the Maestro API Maestro bundle names to the map.
+		for _, spc := range spcs {
+			if spc == nil {
+				return nil, utils.TrackError(fmt.Errorf("nil ServiceProviderCluster under provision shard %s", shardID))
+			}
+			for i, ref := range spc.Status.MaestroReadonlyBundles {
+				if ref == nil {
+					return nil, utils.TrackError(fmt.Errorf("serviceProviderCluster %s: MaestroReadonlyBundles[%d] is nil", spc.ResourceID.String(), i))
+				}
+				if ref.MaestroAPIMaestroBundleName == "" {
+					return nil, utils.TrackError(fmt.Errorf("serviceProviderCluster %s: MaestroReadonlyBundles[%d] (internal name %q) has empty maestroAPIMaestroBundleName", spc.ResourceID.String(), i, ref.Name))
+				}
+				out[shardID][ref.MaestroAPIMaestroBundleName] = struct{}{}
+			}
+		}
+	}
+
+	return out, nil
 }
 
 func (c *deleteOrphanedMaestroReadonlyBundles) Run(ctx context.Context, threadiness int) {
