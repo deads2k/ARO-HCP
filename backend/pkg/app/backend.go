@@ -315,6 +315,16 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	csStateDumpController := datadumpcontrollers.NewCSStateDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers, b.options.ClustersServiceClient)
 	billingDumpController := datadumpcontrollers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
+	dispatchRequestCredentialController := operationcontrollers.NewDispatchRequestCredentialController(
+		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		activeOperationInformer,
+	)
+	dispatchRevokeCredentialsController := operationcontrollers.NewDispatchRevokeCredentialsController(
+		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		activeOperationInformer,
+	)
 	operationClusterCreateController := operationcontrollers.NewOperationClusterCreateController(
 		b.options.CosmosDBClient,
 		b.options.ClustersServiceClient,
@@ -530,6 +540,8 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go csStateDumpController.Run(ctx, 20)
 				go billingDumpController.Run(ctx, 20)
 				go doNothingController.Run(ctx, 20)
+				go dispatchRequestCredentialController.Run(ctx, 20)
+				go dispatchRevokeCredentialsController.Run(ctx, 20)
 				go operationClusterCreateController.Run(ctx, 20)
 				go operationClusterUpdateController.Run(ctx, 20)
 				go operationClusterDeleteController.Run(ctx, 20)

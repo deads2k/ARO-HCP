@@ -1,0 +1,138 @@
+// Copyright 2026 Microsoft Corporation
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package operationcontrollers
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
+
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/database"
+	"github.com/Azure/ARO-HCP/internal/ocm"
+	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+)
+
+type dispatchRequestCredential struct {
+	cosmosClient          database.DBClient
+	clustersServiceClient ocm.ClusterServiceClientSpec
+}
+
+func NewDispatchRequestCredentialController(
+	cosmosClient database.DBClient,
+	clustersServiceClient ocm.ClusterServiceClientSpec,
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &dispatchRequestCredential{
+		cosmosClient:          cosmosClient,
+		clustersServiceClient: clustersServiceClient,
+	}
+
+	controller := NewGenericOperationController(
+		"DispatchRequestCredential",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
+}
+
+func (c *dispatchRequestCredential) ShouldProcess(ctx context.Context, operation *api.Operation) bool {
+	if operation.Status.IsTerminal() {
+		return false
+	}
+	if operation.Request != database.OperationRequestRequestCredential {
+		return false
+	}
+	if len(operation.InternalID.String()) > 0 {
+		return false
+	}
+	return true
+}
+
+func (c *dispatchRequestCredential) SynchronizeOperation(ctx context.Context, key controllerutils.OperationKey) error {
+	logger := utils.LoggerFromContext(ctx)
+	logger.Info("checking operation")
+
+	operation, err := c.cosmosClient.Operations(key.SubscriptionID).Get(ctx, key.OperationName)
+	if database.IsNotFoundError(err) {
+		return nil // no work to do
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get active operation: %w", err)
+	}
+	if !c.ShouldProcess(ctx, operation) {
+		return nil // no work to do
+	}
+
+	cluster, err := c.cosmosClient.HCPClusters(operation.ExternalID.SubscriptionID, operation.ExternalID.ResourceGroupName).Get(ctx, operation.ExternalID.Name)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	// Make sure the cluster document has a ClusterServiceID.
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return fmt.Errorf("no ClusterServiceID set")
+	}
+
+	// Cancel the operation if a revocation is in progress.
+	//
+	// The frontend cancels all active RequestCredential operations when
+	// handling a revocation request, but it cannot do so atomically. So
+	// there is a slim chance of a straggler slipping through. This is a
+	// second line of defense.
+
+	if len(cluster.ServiceProviderProperties.RevokeCredentialsOperationID) > 0 {
+		logger.Info("revocation in progress, canceling operation",
+			"revoke_credentials_operation_id", cluster.ServiceProviderProperties.RevokeCredentialsOperationID)
+
+		apihelpers.CancelOperation(operation, localClock.Now())
+
+		_, err = c.cosmosClient.Operations(key.SubscriptionID).Replace(ctx, operation, nil)
+		if err != nil {
+			return utils.TrackError(err)
+		}
+
+		return nil
+	}
+
+	// Dispatch the credential request to Clusters Service.
+
+	logger.Info("dispatching operation")
+	csBreakGlassCredential, err := c.clustersServiceClient.PostBreakGlassCredential(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	csBreakGlassCredentialID, err := api.NewInternalID(csBreakGlassCredential.HREF())
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	operation.InternalID = csBreakGlassCredentialID
+
+	_, err = c.cosmosClient.Operations(key.SubscriptionID).Replace(ctx, operation, nil)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	return nil
+}
