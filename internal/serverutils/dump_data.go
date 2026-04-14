@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -81,40 +82,36 @@ func DumpDataToLogger(ctx context.Context, cosmosClient database.DBClient, resou
 	return utils.TrackError(errors.Join(errs...))
 }
 
-// DumpBillingToLogger dumps billing documents for the given cluster resource ID to the logger.
-// Queries the subscription partition and filters in-memory for the specific cluster.
-// This includes both active and deleted billing documents for the cluster.
-// Follows best-effort semantics - errors are returned but should not fail critical operations.
+// DumpBillingToLogger dumps active billing documents for the given cluster resource ID to the logger.
 func DumpBillingToLogger(ctx context.Context, cosmosClient database.DBClient, resourceID *azcorearm.ResourceID) error {
 	logger := utils.LoggerFromContext(ctx)
 
-	// Query billing documents for this subscription (partition-scoped, not cross-partition)
-	iter, err := cosmosClient.BillingDocs(resourceID.SubscriptionID).List(ctx)
+	clusterCRUD := cosmosClient.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName)
+	existingCluster, err := clusterCRUD.Get(ctx, resourceID.Name)
+	if database.IsResponseError(err, http.StatusNotFound) {
+		return nil
+	}
 	if err != nil {
 		return utils.TrackError(err)
 	}
 
-	// Find and dump billing documents for this cluster
-	resourceIDString := strings.ToLower(resourceID.String())
-	found := false
-	for _, doc := range iter.Items(ctx) {
-		// Check if this billing document belongs to the requested cluster
-		if doc.ResourceID != nil && strings.ToLower(doc.ResourceID.String()) == resourceIDString {
-			logger.Info(fmt.Sprintf("dumping billing document for resourceID %v", doc.ResourceID),
-				"currentResourceID", doc.ResourceID.String(),
-				"content", doc,
-			)
-			found = true
-		}
+	clusterUID := existingCluster.ServiceProviderProperties.ClusterUID
+	if clusterUID == "" {
+		return nil
 	}
 
-	if err := iter.GetError(); err != nil {
+	billingDoc, err := cosmosClient.BillingDocs(resourceID.SubscriptionID).GetByID(ctx, clusterUID)
+	if database.IsResponseError(err, http.StatusNotFound) {
+		return nil
+	}
+	if err != nil {
 		return utils.TrackError(err)
 	}
 
-	if !found {
-		logger.Info("no billing document found for cluster", "resourceID", resourceID.String())
-	}
+	logger.Info(fmt.Sprintf("dumping billing document for resourceID %v", billingDoc.ResourceID),
+		"currentResourceID", billingDoc.ResourceID.String(),
+		"content", billingDoc,
+	)
 
 	return nil
 }

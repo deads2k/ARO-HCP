@@ -19,16 +19,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
+	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/databasetesting"
+	"github.com/Azure/ARO-HCP/internal/utils"
 )
 
 func TestDumpBillingToLogger(t *testing.T) {
 	ctx := context.Background()
+	ctx = utils.ContextWithLogger(ctx, testr.New(t))
 
 	cluster1ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-1")
 	require.NoError(t, err)
@@ -36,8 +41,38 @@ func TestDumpBillingToLogger(t *testing.T) {
 	cluster2ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-2/resourceGroups/rg-2/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-2")
 	require.NoError(t, err)
 
-	// Create mock DB with billing documents
-	mockDB := databasetesting.NewMockDBClient()
+	// Create HCP clusters
+	cluster1 := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   cluster1ResourceID,
+				Name: "cluster-1",
+				Type: "Microsoft.RedHatOpenShift/hcpOpenShiftClusters",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterUID:       "billing-doc-1",
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1")),
+		},
+	}
+
+	cluster2 := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   cluster2ResourceID,
+				Name: "cluster-2",
+				Type: "Microsoft.RedHatOpenShift/hcpOpenShiftClusters",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterUID:       "billing-doc-2",
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2")),
+		},
+	}
+
+	// Create mock DB with clusters
+	mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, []any{cluster1, cluster2})
+	require.NoError(t, err)
 
 	// Create billing doc for cluster-1 (active)
 	billingDoc1 := database.NewBillingDocument("billing-doc-1", cluster1ResourceID)
@@ -57,7 +92,7 @@ func TestDumpBillingToLogger(t *testing.T) {
 	err = DumpBillingToLogger(ctx, mockDB, cluster1ResourceID)
 	require.NoError(t, err)
 
-	// Test: Dump billing for cluster-2 should also find the billing document (we dump all, including deleted)
+	// Test: Dump billing for cluster-2 should skip deleted billing document
 	err = DumpBillingToLogger(ctx, mockDB, cluster2ResourceID)
 	require.NoError(t, err)
 
@@ -70,6 +105,7 @@ func TestDumpBillingToLogger(t *testing.T) {
 
 func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 	ctx := context.Background()
+	ctx = utils.ContextWithLogger(ctx, testr.New(t))
 
 	// Create clusters in different subscriptions
 	cluster1ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-1")
@@ -81,7 +117,51 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 	cluster3ResourceID, err := azcorearm.ParseResourceID("/subscriptions/sub-2/resourceGroups/rg-2/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/cluster-3")
 	require.NoError(t, err)
 
-	mockDB := databasetesting.NewMockDBClient()
+	// Create HCP clusters with ClusterUIDs
+	cluster1 := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   cluster1ResourceID,
+				Name: "cluster-1",
+				Type: "Microsoft.RedHatOpenShift/hcpOpenShiftClusters",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterUID:       "cluster-1-billing-1",
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1")),
+		},
+	}
+
+	cluster2 := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   cluster2ResourceID,
+				Name: "cluster-2",
+				Type: "Microsoft.RedHatOpenShift/hcpOpenShiftClusters",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterUID:       "cluster-2-billing-2",
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2")),
+		},
+	}
+
+	cluster3 := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   cluster3ResourceID,
+				Name: "cluster-3",
+				Type: "Microsoft.RedHatOpenShift/hcpOpenShiftClusters",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterUID:       "cluster-3-billing-3",
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-3")),
+		},
+	}
+
+	mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, []any{cluster1, cluster2, cluster3})
+	require.NoError(t, err)
 
 	// Create billing docs for all three clusters
 	for i, resourceID := range []*azcorearm.ResourceID{cluster1ResourceID, cluster2ResourceID, cluster3ResourceID} {
