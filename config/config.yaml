@@ -750,6 +750,7 @@ defaults:
   # Mise
   mise:
     deploy: true
+    applicationName: "arohcp-mise-{{ .ctx.environment }}"
     arm:
       policyLabel: "ARM Policy"
       tenantId: "{{ .ev2.entra.tenants.azure.tenantid }}"
@@ -968,6 +969,8 @@ defaults:
       operatorVersionsToMirror: "4.18,4.19,4.20,4.21"
   # Automation Account
   automationDryRun: true
+  # Entra Application Owner IDs (replaces nested ownerIds in entraApplication objects)
+  entraAppOwnerIds: ""
   # Mock Managed Identities - not relevant for most MSFT envs
   miMockClientId: ""
   miMockPrincipalId: ""
@@ -1225,12 +1228,12 @@ clouds:
       kvCertOfficerPrincipalId: 'c9b1819d-bb29-4ac2-9abe-39e4fe9b59eb'
       kvCertAccessPrincipalId: 'c9b1819d-bb29-4ac2-9abe-39e4fe9b59eb'
       kvCertAccessRoleId: ""
+      entraAppOwnerIds: "d8837611-f550-4f0a-af48-575a7178adfb,16ea1e12-7ef3-4613-bea4-3d4a20cbc38c,770ce6b0-5afe-472d-ac0d-1fae72acc4e4" # aro-github-actions-identity, bvesel, goberlec
       geneva:
         actions:
           application:
             useSNI: false
             name: "arohcp-ga-dev" # [tenant-unique]
-            ownerIds: "c209f8df-52ae-48fb-98ea-380f58b04652,16ea1e12-7ef3-4613-bea4-3d4a20cbc38c,770ce6b0-5afe-472d-ac0d-1fae72acc4e4" # openshift-release-bot, bvesel, goberlec
           keyVault:
             name: "arohcpdev-geneva-kv" # [globally-unique]
           certificate:

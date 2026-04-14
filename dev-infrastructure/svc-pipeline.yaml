@@ -29,8 +29,14 @@ resourceGroups:
     outputOnly: true
   - name: geneva-output
     action: ARM
-    template: templates/geneva-identities-lookup.bicep
+    template: templates/entra-app-lookup.bicep
     parameters: configurations/geneva-identities-lookup.tmpl.bicepparam
+    deploymentLevel: ResourceGroup
+    outputOnly: true
+  - name: mise-output
+    action: ARM
+    template: templates/entra-app-lookup.bicep
+    parameters: configurations/mise-identity-lookup.tmpl.bicepparam
     deploymentLevel: ResourceGroup
     outputOnly: true
 # Query parameters from regional deployment, e.g. Azure Monitor workspace ID
@@ -334,7 +340,7 @@ resourceGroups:
       genevaActionsAppId:
         resourceGroup: global
         step: geneva-output
-        name: genevaActionsAppId
+        name: appId
       tenantId:
         resourceGroup: global
         step: geneva-output

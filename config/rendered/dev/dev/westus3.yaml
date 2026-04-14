@@ -255,6 +255,7 @@ e2e:
   regionTest:
     gatePromotion: true
     prowJobName: ""
+entraAppOwnerIds: d8837611-f550-4f0a-af48-575a7178adfb,16ea1e12-7ef3-4613-bea4-3d4a20cbc38c,770ce6b0-5afe-472d-ac0d-1fae72acc4e4
 environmentName: dev
 ev2:
   assistedId:
@@ -308,7 +309,7 @@ geneva:
     application:
       manage: true
       name: arohcp-ga-dev
-      ownerIds: c209f8df-52ae-48fb-98ea-380f58b04652,16ea1e12-7ef3-4613-bea4-3d4a20cbc38c,770ce6b0-5afe-472d-ac0d-1fae72acc4e4
+      ownerIds: ""
       useSNI: false
     certificate:
       issuer: Self
@@ -676,6 +677,7 @@ miMockClientId: e8723db7-9b9e-46a4-9f7d-64d75c3534f0
 miMockPrincipalId: d6b62dfa-87f5-49b3-bbcb-4a687c4faa96
 miMockTenantId: 64dc69e4-d083-49fc-9569-ebece1dd1408
 mise:
+  applicationName: arohcp-mise-dev
   arm:
     applicationId: e2c2ff5c-e5b4-4e79-8c3e-1da8c48461e7
     audienceFQDN: management.azure.com
