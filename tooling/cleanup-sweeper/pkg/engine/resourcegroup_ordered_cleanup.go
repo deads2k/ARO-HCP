@@ -59,7 +59,9 @@ type WorkflowOptions struct {
 //
 // Deletes all resources in a resource group except those with locks.
 // Handles dependencies by deleting resources in the proper order:
+//
 //  1. Remove NSP associations first (with force deletion)
+//
 //  2. Delete private endpoints and DNS components (in dependency order):
 //     a. Private DNS zone groups
 //     b. Private endpoint connections
@@ -67,13 +69,22 @@ type WorkflowOptions struct {
 //     d. Private DNS zone virtual network links
 //     e. Private link services
 //     f. Private DNS zones (with verification)
+//
 //  3. Delete public DNS zones and clean up NS delegation records
-//  4. Delete application and infrastructure resources (VMs, DBs, Storage, AKS, etc.)
-//     4b. Delete public IP addresses (after AKS clusters to avoid load balancer conflicts)
-//  5. Delete monitoring resources (Data Collection Rules and Endpoints)
-//  6. Delete core networking (Virtual Networks and Network Security Groups)
-//  7. Purge soft-deleted Key Vaults
-//  8. Attempt to delete the resource group itself (with retries and warnings)
+//
+//  4. Delete compute roots (VMs/VMSS)
+//
+//  5. Delete remaining application and infrastructure resources
+//
+//  6. Delete public IP addresses (after AKS clusters to avoid load balancer conflicts)
+//
+//  7. Delete monitoring resources (Data Collection Rules and Endpoints)
+//
+//  8. Delete core networking (Virtual Networks and Network Security Groups)
+//
+//  9. Purge soft-deleted Key Vaults
+//
+// 10. Attempt to delete the resource group itself (with retries and warnings)
 func ResourceGroupOrderedCleanupWorkflow(
 	ctx context.Context,
 	resourceGroupName string,
@@ -166,57 +177,69 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpoints/privateDnsZoneGroups"}},
-				Name:              "Delete private DNS zone groups",
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+				}},
+				Name:            "Delete private DNS zone groups",
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpointConnections"}},
-				Name:              "Delete private endpoint connections",
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateEndpointConnections",
+				}},
+				Name:            "Delete private endpoint connections",
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpoints"}},
-				Name:              "Delete private endpoints",
-				Retries:           privateEndpointMaxRetries,
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateEndpoints",
+				}},
+				Name:            "Delete private endpoints",
+				Retries:         privateEndpointMaxRetries,
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateDnsZones/virtualNetworkLinks"}},
-				Name:              "Delete private DNS zone virtual network links",
-				Retries:           vnetLinkMaxRetries,
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+				}},
+				Name:            "Delete private DNS zone virtual network links",
+				Retries:         vnetLinkMaxRetries,
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateLinkServices"}},
-				Name:              "Delete private link services",
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateLinkServices",
+				}},
+				Name:            "Delete private link services",
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateDnsZones"}},
-				Name:              "Delete private DNS zones",
-				Retries:           dnsMaxRetries,
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/privateDnsZones",
+				}},
+				Name:            "Delete private DNS zones",
+				Retries:         dnsMaxRetries,
+				ContinueOnError: opts.ContinueOnError,
 				Verify: func(ctx context.Context) error {
 					return dnssteps.VerifyPrivateDNSZonesDeleted(ctx, resourcesClient, resourceGroupName)
 				},
@@ -236,10 +259,25 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Client:            resourcesClient,
 				LocksClient:       locksClient,
 				APIVersionCache:   apiVersionCache,
-				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/dnszones"}},
-				Name:              "Delete public DNS zones",
-				Retries:           dnsMaxRetries,
-				ContinueOnError:   opts.ContinueOnError,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Network/dnszones",
+				}},
+				Name:            "Delete public DNS zones",
+				Retries:         dnsMaxRetries,
+				ContinueOnError: opts.ContinueOnError,
+			}),
+			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
+				ResourceGroupName: resourceGroupName,
+				Client:            resourcesClient,
+				LocksClient:       locksClient,
+				APIVersionCache:   apiVersionCache,
+				Selector: armsteps.ResourceSelector{IncludedResourceTypes: []string{
+					"Microsoft.Compute/virtualMachines",
+					"Microsoft.Compute/virtualMachineScaleSets",
+				}},
+				Name:            "Delete compute roots",
+				Retries:         maxRetries,
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
