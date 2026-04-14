@@ -39,7 +39,7 @@ data:
         storage.path              /var/fluent-bit/flb-storage
         # If the input plugin has enabled filesystem storage type, this property sets the maximum number of Chunks that can be up in memory.
         # (default: 128)
-        storage.max_chunks_up     128
+        storage.max_chunks_up     256
         # This option configure a hint of maximum value of memory to use when processing the backlog data.
         # (default: 5M)
         storage.backlog.mem_limit 50M
@@ -71,28 +71,12 @@ data:
         DB                /var/log/flb-tail.db
         DB.sync           normal
         DB.locking        true
-        # The interval of refreshing the list of watched files in seconds.
-        # (default: 60)
         Refresh_Interval  15
-        # For new discovered files on start (without a database offset/position), read the content from the head of the file.
-        # (default: off)
         Read_from_Head    On
-        # Set the initial buffer size to read files data. This value is used to increase buffer size.
-        # (default: 32K)
         Buffer_Chunk_Size 128K
-        # Set the limit of the buffer size per monitored file. When a buffer needs to be increased (e.g: very long lines),
-        # this value is used to restrict how much the memory buffer can grow.
-        # (default: Buffer_Chunk_Size)
         Buffer_Max_Size   2M
-        # When a monitored file reach it buffer capacity due to a very long line (Buffer_Max_Size), the default behavior is to stop monitoring that file.
-        # Skip_Long_Lines alter that behavior and instruct Fluent Bit to skip long lines and continue processing other lines that fits into the buffer size.
-        # (default: Off)
         Skip_Long_Lines   On
-        # Set a limit of memory that Tail plugin can use when appending data to the Engine.
-        # If the limit is reach, it will be paused; when the data is flushed it resumes.
-        Mem_Buf_Limit     50M
         storage.type      filesystem
-        # The new threaded mechanism allows input plugins to run in a separate thread which helps to desaturate the main pipeline
         Threaded          On
 
     [INPUT]
@@ -100,12 +84,7 @@ data:
         Alias             input.forward
         Listen            0.0.0.0
         Port              24224
-        # By default, the buffer to store the incoming Forward messages, do not allocate the maximum memory allowed,
-        # instead it allocate memory when is required. The rounds of allocations are set by Buffer_Chunk_Size.
-        # (default: 32KB)
         Buffer_Chunk_Size 128K
-        # Specify the maximum buffer memory size used to receive a Forward message.
-        # (default: Buffer_Chunk_Size)
         Buffer_Max_Size   2M
         Mem_Buf_Limit     50M
 
@@ -130,6 +109,8 @@ data:
         Read_From_Tail  On
         Strip_Underscores On
         DB              /var/fluent-bit/flb-storage/flb-systemdb.db
+        Threaded          On
+        storage.type      filesystem
   filter.conf: |
     [FILTER]
         Name modify
@@ -463,7 +444,7 @@ spec:
         app: arobit-forwarder
         azure.workload.identity/use: "true"
       annotations:
-        checksum/configmap: 6c565f8cf24e82b1c51675d76905b1a1f55a5ba96e1bb26ec501f4e2256aec89
+        checksum/configmap: 9afe0b0e572704d69b07e4e38b66ed79a51a992261adcae0e6f8ca0f207442f3
     spec:
       serviceAccountName: 'arobit-forwarder'
       shareProcessNamespace: true
