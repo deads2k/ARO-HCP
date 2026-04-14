@@ -338,48 +338,8 @@ resource prometheusOperatorRules 'Microsoft.AlertsManagement/prometheusRuleGroup
           title: 'Resources rejected by Prometheus operator'
         }
         expression: 'min_over_time(prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected"}[5m]) > 0'
-        for: 'PT5M'
+        for: 'PT20M'
         severity: 3
-      }
-    ]
-    scopes: [
-      azureMonitoring
-    ]
-  }
-}
-
-resource mise 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
-  name: 'mise'
-  location: location
-  properties: {
-    interval: 'PT1M'
-    rules: [
-      {
-        actions: [
-          for g in actionGroups: {
-            actionGroupId: g
-            actionProperties: {
-              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
-              'IcM.CorrelationId': '#$.annotations.correlationId#'
-            }
-          }
-        ]
-        alert: 'MiseEnvoyScrapeDown'
-        enabled: true
-        labels: {
-          severity: 'info'
-        }
-        annotations: {
-          correlationId: 'MiseEnvoyScrapeDown/{{ $labels.cluster }}'
-          description: 'Prometheus scrape for envoy-stats job in namespace mise is failing or missing.'
-          info: 'Prometheus scrape for envoy-stats job in namespace mise is failing or missing.'
-          runbook_url: 'TBD'
-          summary: 'Envoy scrape target down for namespace=mise'
-          title: 'Envoy scrape target down for namespace=mise'
-        }
-        expression: 'group by (cluster) (up{job="kube-state-metrics", cluster=~".*-svc(-[0-9]+)?$"}) unless on(cluster) group by (cluster) (up{endpoint="http-envoy-prom", container="istio-proxy", namespace="mise"} == 1)'
-        for: 'PT5M'
-        severity: 4
       }
     ]
     scopes: [
@@ -741,7 +701,7 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
         alert: 'BackendControllerRetryHotLoop'
         enabled: true
         labels: {
-          severity: 'critical'
+          severity: 'warning'
         }
         annotations: {
           correlationId: 'BackendControllerRetryHotLoop/{{ $labels.cluster }}/{{ $labels.name }}'
@@ -780,6 +740,33 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
         }
         expression: 'max by (name, cluster) ( max without(prometheus_replica) ( workqueue_depth{namespace="aro-hcp"} ) ) > 10'
         for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'BackendControllerPanic'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'BackendControllerPanic/{{ $labels.cluster }}/{{ $labels.controller }}'
+          description: 'Backend controller {{ $labels.controller }} has panicked {{ printf "%.0f" $value }} time(s) in the last 5 minutes.'
+          info: 'Backend controller {{ $labels.controller }} has panicked {{ printf "%.0f" $value }} time(s) in the last 5 minutes.'
+          runbook_url: 'TBD'
+          summary: 'Backend controller {{ $labels.controller }} is panicking'
+          title: 'Backend controller {{ $labels.controller }} is panicking'
+        }
+        expression: 'sum by (controller, cluster) ( increase(panic_total{namespace="aro-hcp"}[5m]) ) > 0'
+        for: 'PT1M'
         severity: 3
       }
     ]
@@ -848,6 +835,127 @@ resource adminApi 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
         expression: 'otel_audit_log_connection_degraded{job="aro-hcp-admin-api-metrics"} == 1'
         for: 'PT5M'
         severity: 4
+      }
+    ]
+    scopes: [
+      azureMonitoring
+    ]
+  }
+}
+
+resource maestro 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'maestro'
+  location: location
+  properties: {
+    interval: 'PT1M'
+    rules: [
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'MaestroGRPCSourceClientExcessConnections'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'MaestroGRPCSourceClientExcessConnections/{{ $labels.cluster }}'
+          description: 'Maestro gRPC server has {{ $value }} registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
+          info: 'Maestro gRPC server has {{ $value }} registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
+          runbook_url: 'TBD'
+          summary: 'Maestro has too many gRPC source client connections'
+          title: 'Maestro has too many gRPC source client connections'
+        }
+        expression: 'sum(grpc_server_registered_source_clients{namespace="maestro"}) > 100'
+        for: 'PT10M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'MaestroRESTAPIErrorRate'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'MaestroRESTAPIErrorRate/{{ $labels.cluster }}'
+          description: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
+          info: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
+          runbook_url: 'TBD'
+          summary: 'Maestro REST API error rate is high'
+          title: 'Maestro REST API error rate is high'
+        }
+        expression: 'sum(rate(rest_api_inbound_request_count{namespace="maestro", code=~"5.."}[5m])) / sum(rate(rest_api_inbound_request_count{namespace="maestro"}[5m])) > 0.05'
+        for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'MaestroGRPCServerErrorRate'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'MaestroGRPCServerErrorRate/{{ $labels.cluster }}'
+          description: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
+          info: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
+          runbook_url: 'TBD'
+          summary: 'Maestro gRPC server error rate is high'
+          title: 'Maestro gRPC server error rate is high'
+        }
+        expression: 'sum(rate(grpc_server_processed_total{namespace="maestro", code!="OK"}[5m])) / sum(rate(grpc_server_processed_total{namespace="maestro"}[5m])) > 0.05'
+        for: 'PT5M'
+        severity: 3
+      }
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'MaestroSpecControllerReconcileErrors'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'MaestroSpecControllerReconcileErrors/{{ $labels.cluster }}'
+          description: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: {{ $value | humanizePercentage }}.'
+          info: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: {{ $value | humanizePercentage }}.'
+          runbook_url: 'TBD'
+          summary: 'Maestro spec controller reconcile error rate is high'
+          title: 'Maestro spec controller reconcile error rate is high'
+        }
+        expression: 'sum(rate(spec_controller_event_reconcile_total{namespace="maestro", status="error"}[5m])) / sum(rate(spec_controller_event_reconcile_total{namespace="maestro"}[5m])) > 0.1'
+        for: 'PT10M'
+        severity: 3
       }
     ]
     scopes: [

@@ -38,6 +38,14 @@ panels:
       ) > 0
     workspace: svc
     step: "60s"
+  - title: "Controller Panic Rate"
+    description: "Rate of panics caught by the runtime panic handler, per controller. Any non-zero rate indicates a controller is actively crashing and recovering via the panic handler."
+    query: |
+      sum by (controller, cluster) (
+        rate(panic_total{namespace="aro-hcp"}[5m])
+      ) > 0
+    workspace: svc
+    step: "60s"
 - title: "Maestro"
   queries:
   - title: "REST API Request Rate by Status"
