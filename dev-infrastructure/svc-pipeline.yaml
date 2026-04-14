@@ -345,6 +345,10 @@ resourceGroups:
         resourceGroup: global
         step: geneva-output
         name: tenantId
+      miseAppId:
+        resourceGroup: global
+        step: mise-output
+        name: appId
     automatedRetry:
       errorContainsAny:
       - "500 Internal Server Error"

@@ -2069,6 +2069,7 @@
       "required": [
         "deploy",
         "image",
+        "imageV2",
         "arm",
         "genevaActions",
         "sessiongate",

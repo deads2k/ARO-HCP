@@ -2,15 +2,15 @@
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: ext-authz
+  name: ext-authz-misev2
   namespace: '{{ .Release.Namespace }}'
 spec:
   selector:
     matchLabels:
-      app: aro-hcp-frontend
+      app: aro-hcp-frontend-v2
   action: CUSTOM
   provider:
-    name: ext-authz
+    name: ext-authz-misev2
   rules:
   - to:
     - operation:

@@ -1,4 +1,97 @@
 ---
+# Source: istio/charts/mise/templates/configmap-misev2.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: misev2-config
+  namespace: 'mise'
+data:
+  appsettings.json: |-
+    {
+      "$schema": "https://identitydivision.visualstudio.com/DevEx/_git/MISE?path=/schemas/mise-options-schema.json",
+      "MiseVersion": "2.0",
+      "AllowedHosts": "*",
+      "EnableInboundPolicyFilter": true,
+      "AzureAd": {
+        "Instance": "https://login.microsoftonline.com/",
+        "ClientId": "__miseAppId__",
+        "TenantId": "33e01921-4d64-4f8c-a055-5bdaffd5e33d",
+        "Audiences": ["api://__miseAppId__"],
+        "Logging": {
+          "LogLevel": "Information"
+        },
+        "InboundPolicies": [
+          {
+            "Label": "ARM Policy",
+            "Authority": "https://login.microsoftonline.com/33e01921-4d64-4f8c-a055-5bdaffd5e33d",
+            "Audiences": ["https://management.azure.com"],
+            "ValidApplicationIds": [
+              "e2c2ff5c-e5b4-4e79-8c3e-1da8c48461e7"
+            ],
+            "Protocols": {
+              "Pop": {
+                "TokenTypes": {
+                  "AccessToken": {
+                    "AppToken": true
+                  }
+                },
+                "SignedHttpRequestValidationParametersOptions": {
+                  "ValidateTs": true,
+                  "ValidateM": true,
+                  "ValidateU": true,
+                  "ValidateP": true
+                }
+              }
+            }
+          },
+          {
+            "Label": "Geneva Actions",
+            "Authority": "https://sts.windows.net/__tenantId__/",
+            "Audiences": ["https://management.azure.com"],
+            "ValidApplicationIds": [
+              "__genevaActionsAppId__"
+            ],
+            "Protocols": {
+              "Bearer": {
+                "TokenTypes": {
+                  "AccessToken": {
+                    "AppToken": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "Label": "Session Gate",
+            "Authority": "https://sts.windows.net/__tenantId__",
+            "Audiences": ["6dae42f8-4368-4678-94ff-3960e28e3630"],
+            "Protocols": {
+              "Bearer": {
+                "TokenTypes": {
+                  "AccessToken": {
+                    "AppToken": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Kestrel": {
+        "Endpoints": {
+          "Http": {
+            "Url": "http://0.0.0.0:8080"
+          }
+        }
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft": "Information"
+        }
+      }
+    }
+---
 # Source: istio/templates/istio-shared-configmap.yml
 kind: ConfigMap
 apiVersion: v1
@@ -14,7 +107,13 @@ data:
       envoyExtAuthzHttp:
         service: "mise/mise.mise.svc.cluster.local"
         port: "8080"
-        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter"]
+        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter", "x-ms-mise-version"]
+        pathPrefix: "/v1/EnvoyValidateRequest"
+    - name: "ext-authz-misev2"
+      envoyExtAuthzHttp:
+        service: "mise/misev2.mise.svc.cluster.local"
+        port: "8080"
+        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter", "x-ms-mise-version"]
         pathPrefix: "/v1/EnvoyValidateRequest"
 ---
 # Source: istio/templates/istio-shared-configmap.yml
@@ -32,7 +131,13 @@ data:
       envoyExtAuthzHttp:
         service: "mise/mise.mise.svc.cluster.local"
         port: "8080"
-        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter"]
+        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter", "x-ms-mise-version"]
+        pathPrefix: "/v1/EnvoyValidateRequest"
+    - name: "ext-authz-misev2"
+      envoyExtAuthzHttp:
+        service: "mise/misev2.mise.svc.cluster.local"
+        port: "8080"
+        includeRequestHeadersInCheck: ["x-ext-authz", "mise-inbound-policies-to-filter", "x-ms-mise-version"]
         pathPrefix: "/v1/EnvoyValidateRequest"
 ---
 # Source: istio/charts/mise/templates/service.yaml
@@ -48,6 +153,79 @@ spec:
   - protocol: TCP
     port: 8080
     targetPort: 8080
+---
+# Source: istio/charts/mise/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: misev2
+  namespace: 'mise'
+spec:
+  selector:
+    app: misev2
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+---
+# Source: istio/charts/mise/templates/deployment-misev2.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: misev2
+  namespace: 'mise'
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: misev2
+  template:
+    metadata:
+      annotations:
+        checksum/config: 6ca24e11919f439f8a291fb3f3134d1383ab16a6987b7c8b6aa3c20ec2a6e8ea
+      labels:
+        app: misev2
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: 'topology.kubernetes.io/zone'
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: misev2
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: misev2
+      containers:
+      - name: misev2
+        image: "arohcpsvcdev.azurecr.io/mise-1p-container-image@sha256:1234567890"
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+        volumeMounts:
+        - name: misev2-config
+          mountPath: /app/appsettings.json
+          subPath: appsettings.json
+          readOnly: true
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: ""
+        - name: OTEL_TRACES_EXPORTER
+          value: ""
+      volumes:
+      - name: misev2-config
+        configMap:
+          name: misev2-config
 ---
 # Source: istio/charts/mise/templates/deployment.yaml
 apiVersion: apps/v1
@@ -227,6 +405,7 @@ metadata:
 spec:
   hosts:
   - "mise.mise.svc.cluster.local"
+  - "misev2.mise.svc.cluster.local"
   endpoints:
   - address: "127.0.0.1"
   ports:
