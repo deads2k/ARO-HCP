@@ -72,6 +72,52 @@ module ocpCaching '../modules/acr/cache.bicep' = {
   ]
 }
 
+module ocpRedhatProdCaching '../modules/acr/cache.bicep' = {
+  name: '${ocpAcrName}-redhat-prod-caching'
+  params: {
+    acrName: ocpAcrName
+    location: location
+    quayRepositoriesToCache: [
+      {
+        ruleName: 'redhat-prod-redhat-operator-index'
+        sourceRepo: 'quay.io/redhat-prod/redhat----redhat-operator-index'
+        targetRepo: 'redhat-prod/redhat-operator-index'
+        userIdentifier: 'redhat-prod-quay-username'
+        passwordIdentifier: 'redhat-prod-quay-password'
+        loginServer: 'quay.io'
+      }
+      {
+        ruleName: 'redhat-prod-certified-operator-index'
+        sourceRepo: 'quay.io/redhat-prod/redhat----certified-operator-index'
+        targetRepo: 'redhat-prod/certified-operator-index'
+        userIdentifier: 'redhat-prod-quay-username'
+        passwordIdentifier: 'redhat-prod-quay-password'
+        loginServer: 'quay.io'
+      }
+      {
+        ruleName: 'redhat-prod-community-operator-index'
+        sourceRepo: 'quay.io/redhat-prod/redhat----community-operator-index'
+        targetRepo: 'redhat-prod/community-operator-index'
+        userIdentifier: 'redhat-prod-quay-username'
+        passwordIdentifier: 'redhat-prod-quay-password'
+        loginServer: 'quay.io'
+      }
+      {
+        ruleName: 'redhat-prod-redhat-marketplace-index'
+        sourceRepo: 'quay.io/redhat-prod/redhat----redhat-marketplace-index'
+        targetRepo: 'redhat-prod/redhat-marketplace-index'
+        userIdentifier: 'redhat-prod-quay-username'
+        passwordIdentifier: 'redhat-prod-quay-password'
+        loginServer: 'quay.io'
+      }
+    ]
+    keyVaultName: globalKeyVaultName
+  }
+  dependsOn: [
+    ocpAcr
+  ]
+}
+
 //
 //   S V C   A C R
 //
