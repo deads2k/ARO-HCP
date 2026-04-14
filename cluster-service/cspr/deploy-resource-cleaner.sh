@@ -143,7 +143,14 @@ if az identity federated-credential show \
     --name "${FEDCRED_NAME}" \
     --identity-name "${MI_NAME}" \
     --resource-group "${RESOURCE_GROUP}" &>/dev/null; then
-    echo "  ✓ Federated credential ${FEDCRED_NAME} already exists"
+    echo "  Federated credential ${FEDCRED_NAME} already exists, updating..."
+    az identity federated-credential update \
+        --name "${FEDCRED_NAME}" \
+        --identity-name "${MI_NAME}" \
+        --resource-group "${RESOURCE_GROUP}" \
+        --issuer "${ISSUER_URL}" \
+        --subject "${SUBJECT}"
+    echo "  ✓ Federated credential updated"
 else
     echo "  Creating federated credential ${FEDCRED_NAME}..."
     az identity federated-credential create \
