@@ -48,9 +48,10 @@ const (
 
 // WorkflowOptions controls runner behavior for cleanup workflows.
 type WorkflowOptions struct {
-	Wait        bool
-	DryRun      bool
-	Parallelism int
+	Wait            bool
+	DryRun          bool
+	Parallelism     int
+	ContinueOnError bool
 }
 
 // ResourceGroupOrderedCleanupWorkflow builds an ordered cleanup workflow for a
@@ -158,7 +159,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				NSPClient:         nspClient,
 				Name:              "Delete network security perimeters",
 				Retries:           maxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -167,7 +168,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				APIVersionCache:   apiVersionCache,
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpoints/privateDnsZoneGroups"}},
 				Name:              "Delete private DNS zone groups",
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -176,7 +177,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				APIVersionCache:   apiVersionCache,
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpointConnections"}},
 				Name:              "Delete private endpoint connections",
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -186,7 +187,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateEndpoints"}},
 				Name:              "Delete private endpoints",
 				Retries:           privateEndpointMaxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -196,7 +197,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateDnsZones/virtualNetworkLinks"}},
 				Name:              "Delete private DNS zone virtual network links",
 				Retries:           vnetLinkMaxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -205,7 +206,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				APIVersionCache:   apiVersionCache,
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateLinkServices"}},
 				Name:              "Delete private link services",
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -215,7 +216,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/privateDnsZones"}},
 				Name:              "Delete private DNS zones",
 				Retries:           dnsMaxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 				Verify: func(ctx context.Context) error {
 					return dnssteps.VerifyPrivateDNSZonesDeleted(ctx, resourcesClient, resourceGroupName)
 				},
@@ -228,7 +229,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				SubsClient:        subsClient,
 				Name:              "Delete parent NS delegations",
 				Retries:           1,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -238,7 +239,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/dnszones"}},
 				Name:              "Delete public DNS zones",
 				Retries:           dnsMaxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -268,7 +269,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				}},
 				Name:            "Delete non-networking resources",
 				Retries:         1,
-				ContinueOnError: true,
+				ContinueOnError: opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -278,7 +279,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.DocumentDB/databaseAccounts"}},
 				Name:              "Delete Cosmos DB accounts",
 				Retries:           cosmosMaxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -288,7 +289,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/publicIPAddresses"}},
 				Name:              "Delete public IP addresses",
 				Retries:           3,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -298,7 +299,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Insights/dataCollectionRules"}},
 				Name:              "Delete data collection rules",
 				Retries:           maxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -308,7 +309,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Insights/dataCollectionEndpoints"}},
 				Name:              "Delete data collection endpoints",
 				Retries:           maxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -317,7 +318,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 				APIVersionCache:   apiVersionCache,
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/virtualNetworks"}},
 				Name:              "Delete virtual networks",
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			armsteps.MustNewDeletionStep(armsteps.DeletionStepConfig{
 				ResourceGroupName: resourceGroupName,
@@ -326,20 +327,20 @@ func ResourceGroupOrderedCleanupWorkflow(
 				APIVersionCache:   apiVersionCache,
 				Selector:          armsteps.ResourceSelector{IncludedResourceTypes: []string{"Microsoft.Network/networkSecurityGroups"}},
 				Name:              "Delete network security groups",
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			kvsteps.MustNewPurgeDeletedStep(kvsteps.PurgeDeletedStepConfig{
 				ResourceGroupName: resourceGroupName,
 				VaultsClient:      vaultsClient,
 				Retries:           maxRetries,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 			rgsteps.MustNewDeleteStep(rgsteps.DeleteStepConfig{
 				ResourceGroupName: resourceGroupName,
 				RGClient:          rgClient,
 				LocksClient:       locksClient,
 				Retries:           5,
-				ContinueOnError:   true,
+				ContinueOnError:   opts.ContinueOnError,
 			}),
 		},
 	}, nil
