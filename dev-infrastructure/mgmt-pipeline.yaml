@@ -292,7 +292,7 @@ resourceGroups:
         name: subscriptionId
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     - resourceGroup: management
       step: infra
   - name: cluster-output
@@ -305,7 +305,7 @@ resourceGroups:
     - resourceGroup: regional
       step: output
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
   - name: exporter-permissions
     action: ARM
     template: templates/exporter-permissions.bicep
@@ -373,7 +373,7 @@ resourceGroups:
         name: prometheusUAMIClientId
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -438,7 +438,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -466,7 +466,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -492,7 +492,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -511,7 +511,7 @@ resourceGroups:
     outputOnly: true
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
   - name: arobit
     aksCluster: '{{ .mgmt.aks.name }}'
     action: Helm
@@ -566,7 +566,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: management
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
