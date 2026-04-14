@@ -14,8 +14,8 @@ echo "Checking if cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' needs upgr
 
 # Get current control plane version
 CURRENT_CP_VERSION=$(az aks show \
-    --resource-group ${RESOURCE_GROUP} \
-    --name ${CLUSTER_NAME} \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${CLUSTER_NAME}" \
     --query currentKubernetesVersion \
     --output tsv)
 
@@ -34,8 +34,8 @@ fi
 # Get node pool versions and check if any need upgrade
 echo "Checking node pool versions..."
 NODE_POOLS=$(az aks nodepool list \
-    --resource-group ${RESOURCE_GROUP} \
-    --cluster-name ${CLUSTER_NAME} \
+    --resource-group "${RESOURCE_GROUP}" \
+    --cluster-name "${CLUSTER_NAME}" \
     --query '[].{name:name,version:orchestratorVersion}' \
     --output tsv)
 
@@ -60,15 +60,15 @@ fi
 echo "Upgrading cluster '${CLUSTER_NAME}' in RG '${RESOURCE_GROUP}' to '${KUBERNETES_VERSION}'..."
 
 az aks upgrade \
-    --resource-group ${RESOURCE_GROUP} \
-    --name ${CLUSTER_NAME} \
-    --kubernetes-version ${KUBERNETES_VERSION} \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${CLUSTER_NAME}" \
+    --kubernetes-version "${KUBERNETES_VERSION}" \
     --yes
 
 echo "Waiting for upgrade to complete..."
 az aks wait \
-    --resource-group ${RESOURCE_GROUP} \
-    --name ${CLUSTER_NAME} \
+    --resource-group "${RESOURCE_GROUP}" \
+    --name "${CLUSTER_NAME}" \
     --updated \
     --timeout 3600
 
