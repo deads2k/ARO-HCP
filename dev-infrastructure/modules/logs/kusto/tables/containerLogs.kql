@@ -5,12 +5,13 @@
   cluster: string,
   namespace_name: string,
   container_name: string,
-  container_image: string,
+  container_image: string,           // fluentbit: kubernetes.container_image
   host: string,
   labels: string,
   pod_name: string,
   region: string,
-  tag: string
+  tag: string,                       // fluentbit: tag routing identifier
+  container_status_image_id: string  // fluentbit: kubernetes.container_hash (k8s status.containerStatuses.imageID)
 )
 
 .create-or-alter table containerLogs ingestion json mapping 'ingestionMapping'
@@ -22,11 +23,12 @@
   {"column":"region","Properties":{"path":"$.log.region"}},
   {"column":"cluster","Properties":{"path":"$.log.cluster"}},
   {"column":"host","Properties":{"path":"$.log.kubernetes.host"}},
-  {"column":"container_name", "Properties": {"path": "$log.kubernetes.container_name"}},
+  {"column":"container_name", "Properties": {"path": "$.log.kubernetes.container_name"}},
   {"column":"container_image","Properties":{"path":"$.log.kubernetes.container_image"}},
   {"column":"namespace_name","Properties":{"path":"$.log.kubernetes.namespace_name"}},
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
   {"column":"pod_name","Properties":{"path":"$.log.kubernetes.pod_name"}},
-  {"column":"tag","Properties":{"path":"$.tag"}}
+  {"column":"tag","Properties":{"path":"$.tag"}},
+  {"column":"container_status_image_id","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```

@@ -5,7 +5,7 @@
   cluster: string,
   namespace_name: string,
   container_name: string,
-  container_image: string,
+  container_image: string,           // fluentbit: kubernetes.container_image
   host: string,
   labels: string,
   pod_name: string,
@@ -25,7 +25,8 @@
   cluster_id: string,
   cloud_error_code: string,
   cloud_error_message: string,
-  tag: string
+  tag: string,                       // fluentbit: tag routing identifier
+  container_status_image_id: string  // fluentbit: kubernetes.container_hash (k8s status.containerStatuses.imageID)
 )
 
 .create-or-alter table backendLogs ingestion json mapping 'ingestionMapping'
@@ -37,7 +38,7 @@
   {"column":"region","Properties":{"path":"$.log.region"}},
   {"column":"cluster","Properties":{"path":"$.log.cluster"}},
   {"column":"namespace_name","Properties":{"path":"$.log.kubernetes.namespace_name"}},
-  {"column":"container_name", "Properties": {"path": "$log.kubernetes.container_name"}},
+  {"column":"container_name", "Properties": {"path": "$.log.kubernetes.container_name"}},
   {"column":"container_image","Properties":{"path":"$.log.kubernetes.container_image"}},
   {"column":"host","Properties":{"path":"$.log.kubernetes.host"}},
   {"column":"labels","Properties":{"path":"$.log.kubernetes.labels"}},
@@ -47,9 +48,9 @@
   {"column":"msg","Properties":{"path":"$.log.msg"}},
   {"column":"client_request_id","Properties":{"path":"$.log.client_request_id"}},
   {"column":"correlation_request_id","Properties":{"path":"$.log.correlation_request_id"}},
-  {"column":"subscription_id", "Properties": {"path":"$log.subscription_id"}},
-  {"column":"resource_group", "Properties": {"path":"$log.resource_group"}},
-  {"column":"cluster_name", "Properties": {"path":"$log.hcp_cluster_name"}},
+  {"column":"subscription_id", "Properties": {"path":"$.log.subscription_id"}},
+  {"column":"resource_group", "Properties": {"path":"$.log.resource_group"}},
+  {"column":"cluster_name", "Properties": {"path":"$.log.hcp_cluster_name"}},
   {"column":"resource_id","Properties":{"path":"$.log.resource_id"}},
   {"column":"resource_name","Properties":{"path":"$.log.resource_name"}},
   {"column":"operation","Properties":{"path":"$.log.operation"}},
@@ -58,5 +59,6 @@
   {"column":"cluster_id","Properties":{"path":"$.log.cluster_id"}},
   {"column":"cloud_error_code","Properties":{"path":"$.log.cloud_error_code"}},
   {"column":"cloud_error_message","Properties":{"path":"$.log.cloud_error_message"}},
+  {"column":"container_status_image_id","Properties":{"path":"$.log.kubernetes.container_hash"}}
 ]
 ```
