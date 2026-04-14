@@ -23,6 +23,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/test/pkg/logger"
 	"github.com/Azure/ARO-HCP/test/util/cleanup"
+	"github.com/Azure/ARO-HCP/test/util/cleanup/appregistrations"
 	kustoroleassignments "github.com/Azure/ARO-HCP/test/util/cleanup/kusto-role-assignments"
 	"github.com/Azure/ARO-HCP/test/util/cleanup/resourcegroups"
 )
@@ -40,12 +41,42 @@ func NewCommand() *cobra.Command {
 	cmd.PersistentFlags().IntVarP(&opt.Verbosity, "verbosity", "v", opt.Verbosity, "Log verbosity level")
 
 	cmd.AddCommand(newCleanupResourceGroupsCommand())
+	cmd.AddCommand(newCleanupAppRegistrationsCommand())
 	cmd.AddCommand(newDeleteKustoRoleAssignmentsCommand())
 
 	cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		ctx := logr.NewContext(cmd.Context(), logger.NewWithVerbosity(opt.Verbosity))
 		cmd.SetContext(ctx)
 	}
+	return cmd
+}
+
+func newCleanupAppRegistrationsCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "app-registrations",
+		Short:        "Delete expired e2e app registrations",
+		SilenceUsage: true,
+	}
+	rawOpt := appregistrations.DefaultOptions()
+	cmd.Flags().BoolVar(&rawOpt.DryRun, "dry-run", rawOpt.DryRun, "Print which app registrations would be deleted without deleting")
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt)
+		defer cancel()
+
+		validatedOpt, err := rawOpt.Validate()
+		if err != nil {
+			return err
+		}
+
+		completedOpt, err := validatedOpt.Complete(ctx)
+		if err != nil {
+			return err
+		}
+
+		return completedOpt.Run(ctx)
+	}
+
 	return cmd
 }
 

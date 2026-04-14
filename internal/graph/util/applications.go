@@ -20,14 +20,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+	abstractions "github.com/microsoft/kiota-abstractions-go"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 
 	"github.com/Azure/ARO-HCP/internal/graph/graphsdk/applications"
+	"github.com/Azure/ARO-HCP/internal/graph/graphsdk/me"
 	"github.com/Azure/ARO-HCP/internal/graph/graphsdk/models"
 	"github.com/Azure/ARO-HCP/internal/graph/graphsdk/models/odataerrors"
+	"github.com/Azure/ARO-HCP/internal/graph/graphsdk/serviceprincipals"
 )
+
+const AppRegistrationPrefix = "aro-hcp-e2e-"
 
 // Application represents a Microsoft Entra application
 type Application struct {
@@ -170,4 +177,101 @@ func (c *Client) GetApplication(ctx context.Context, appID string) (*Application
 		AppID:       *app.GetAppId(),
 		DisplayName: *app.GetDisplayName(),
 	}, nil
+}
+
+// ListOwnedExpiredApplications retrieves applications owned by the current caller
+// where all their credentials have expired and a display name starting with the e2e prefix.
+// For user credentials, this uses /me/ownedObjects. For service principal credentials,
+// this uses /servicePrincipals/{id}/ownedObjects to ensure we only return applications
+// we have permission to delete.
+func (c *Client) ListOwnedExpiredApplications(ctx context.Context) ([]Application, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+	if c.isUser {
+		logger.V(1).Info("Using /me/ownedObjects endpoint (user credential)")
+	} else {
+		logger.V(1).Info("Using /servicePrincipals/ownedObjects endpoint (service principal credential)", "objectID", c.objectID)
+	}
+
+	headers := abstractions.NewRequestHeaders()
+	headers.Add("ConsistencyLevel", "eventual")
+
+	filter := to.Ptr(fmt.Sprintf("startsWith(displayName,'%s')", AppRegistrationPrefix))
+	count := to.Ptr(true)
+
+	// Default to the service-principal-scoped /servicePrincipals/{id}/ownedObjects endpoint;
+	// when the caller is a user token, this is overridden below to use /me/ownedObjects instead.
+	getPage := func(ctx context.Context, nextLink *string) (models.ApplicationCollectionResponseable, error) {
+		builder := c.graphClient.ServicePrincipals().ByServicePrincipalId(c.objectID).OwnedObjects().GraphApplication()
+		if nextLink != nil {
+			builder = builder.WithUrl(*nextLink)
+		}
+		return builder.Get(ctx, &serviceprincipals.ItemOwnedObjectsGraphApplicationRequestBuilderGetRequestConfiguration{
+			Headers: headers,
+			QueryParameters: &serviceprincipals.ItemOwnedObjectsGraphApplicationRequestBuilderGetQueryParameters{
+				Filter: filter,
+				Count:  count,
+			},
+		})
+	}
+
+	if c.isUser {
+		getPage = func(ctx context.Context, nextLink *string) (models.ApplicationCollectionResponseable, error) {
+			builder := c.graphClient.Me().OwnedObjects().GraphApplication()
+			if nextLink != nil {
+				builder = builder.WithUrl(*nextLink)
+			}
+			return builder.Get(ctx, &me.OwnedObjectsGraphApplicationRequestBuilderGetRequestConfiguration{
+				Headers: headers,
+				QueryParameters: &me.OwnedObjectsGraphApplicationRequestBuilderGetQueryParameters{
+					Filter: filter,
+					Count:  count,
+				},
+			})
+		}
+	}
+
+	var apps []Application
+	resp, err := getPage(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list owned applications: %w", err)
+	}
+
+	now := time.Now()
+	for resp != nil {
+		for _, app := range resp.GetValue() {
+			creds := app.GetPasswordCredentials()
+			// Skip apps with no credentials - they may still be in use
+			if len(creds) == 0 {
+				continue
+			}
+
+			// Only include apps where all credentials have expired
+			allExpired := true
+			for _, cred := range creds {
+				if cred.GetEndDateTime() == nil || cred.GetEndDateTime().After(now) {
+					allExpired = false
+					break
+				}
+			}
+			if allExpired {
+				apps = append(apps, Application{
+					ID:          *app.GetId(),
+					AppID:       *app.GetAppId(),
+					DisplayName: *app.GetDisplayName(),
+				})
+			}
+		}
+
+		nextLink := resp.GetOdataNextLink()
+		if nextLink == nil || *nextLink == "" {
+			break
+		}
+
+		resp, err = getPage(ctx, nextLink)
+		if err != nil {
+			return nil, fmt.Errorf("list owned applications (next page): %w", err)
+		}
+	}
+
+	return apps, nil
 }

@@ -609,7 +609,7 @@ func (tc *perItOrDescribeTestContext) collectDebugInfoForResourceGroup(ctx conte
 }
 
 func (tc *perItOrDescribeTestContext) NewAppRegistrationWithServicePrincipal(ctx context.Context) (*graphutil.Application, *graphutil.ServicePrincipal, error) {
-	appName := fmt.Sprintf("aro-hcp-e2e-%d", rand.Int())
+	appName := fmt.Sprintf("%s%d", graphutil.AppRegistrationPrefix, rand.Int())
 	ginkgo.GinkgoLogr.Info("creating app registration", "appName", appName)
 
 	graphClient, err := tc.GetGraphClient(ctx)

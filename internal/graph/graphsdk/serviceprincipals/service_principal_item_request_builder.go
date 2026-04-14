@@ -117,6 +117,12 @@ func (m *ServicePrincipalItemRequestBuilder) Get(ctx context.Context, requestCon
 	return res.(i1064077c0deed3e13037469d51458ffc82d2db75e239cd9605f39aaa91186035.ServicePrincipalable), nil
 }
 
+// OwnedObjects the ownedObjects property
+// returns a *ItemOwnedObjectsRequestBuilder when successful
+func (m *ServicePrincipalItemRequestBuilder) OwnedObjects() *ItemOwnedObjectsRequestBuilder {
+	return NewItemOwnedObjectsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+}
+
 // Patch update entity in servicePrincipals
 // returns a ServicePrincipalable when successful
 // returns a ODataError error when the service returns a 4XX or 5XX status code

@@ -442,6 +442,68 @@ paths:
       schema:
         type: string
       x-ms-docs-key-type: application
+  /me/ownedObjects/graph.application:
+    description: Casts the previous resource to application.
+    get:
+      tags:
+      - me.directoryObject
+      summary: Get the items of type microsoft.graph.application in the microsoft.graph.directoryObject collection
+      operationId: me.ListOwnedObjects.AsApplication
+      parameters:
+      - name: ConsistencyLevel
+        in: header
+        description: "Indicates the requested consistency level. Documentation URL: https://docs.microsoft.com/graph/aad-advanced-queries"
+        schema:
+          type: string
+        examples:
+          example-1:
+            description: $search and $count queries require the client to set the ConsistencyLevel HTTP header to 'eventual'.
+            value: eventual
+      - $ref: "#/components/parameters/top"
+      - $ref: "#/components/parameters/skip"
+      - $ref: "#/components/parameters/search"
+      - $ref: "#/components/parameters/filter"
+      - $ref: "#/components/parameters/count"
+      - name: $orderby
+        in: query
+        description: Order items by property values
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      - name: $expand
+        in: query
+        description: Expand related entities
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      responses:
+        2XX:
+          $ref: "#/components/responses/microsoft.graph.applicationCollectionResponse"
+        4XX:
+          $ref: "#/components/responses/error"
+        5XX:
+          $ref: "#/components/responses/error"
+      x-ms-pageable:
+        nextLinkName: "@odata.nextLink"
+        operationName: listMore
   /servicePrincipals:
     description: Provides operations to manage the collection of servicePrincipal entities.
     get:
@@ -847,6 +909,67 @@ paths:
         5XX:
           $ref: "#/components/responses/error"
       x-ms-docs-operation-type: operation
+    parameters:
+    - name: servicePrincipal-id
+      in: path
+      description: The unique identifier of servicePrincipal
+      required: true
+      schema:
+        type: string
+      x-ms-docs-key-type: servicePrincipal
+  "/servicePrincipals/{servicePrincipal-id}/ownedObjects/graph.application":
+    description: Casts the previous resource to application.
+    get:
+      tags:
+      - servicePrincipals.directoryObject
+      summary: Get the items of type microsoft.graph.application in the microsoft.graph.directoryObject collection
+      operationId: servicePrincipals.ListOwnedObjects.AsApplication
+      parameters:
+      - $ref: '#/components/parameters/top'
+      - $ref: '#/components/parameters/skip'
+      - $ref: '#/components/parameters/search'
+      - $ref: '#/components/parameters/filter'
+      - $ref: '#/components/parameters/count'
+      - name: $orderby
+        in: query
+        description: Order items by property values
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      - name: $expand
+        in: query
+        description: Expand related entities
+        style: form
+        explode: false
+        schema:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+      responses:
+        2XX:
+          $ref: '#/components/responses/microsoft.graph.applicationCollectionResponse'
+        4XX:
+          $ref: '#/components/responses/error'
+        5XX:
+          $ref: '#/components/responses/error'
+      x-ms-pageable:
+        nextLinkName: '@odata.nextLink'
+        operationName: listMore
     parameters:
     - name: servicePrincipal-id
       in: path
