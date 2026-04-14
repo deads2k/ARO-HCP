@@ -227,7 +227,7 @@ resourceGroups:
     - resourceGroup: regional
       step: output
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
   - name: kusto-ingest-service-logs
     action: ARM
     template: templates/kusto-grant-ingest.bicep
@@ -290,7 +290,7 @@ resourceGroups:
         name: prometheusUAMIClientId
     dependsOn:
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -411,7 +411,7 @@ resourceGroups:
     outputOnly: true
     dependsOn:
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
   - name: arobit
     aksCluster: '{{ .svc.aks.name }}'
     action: Helm
@@ -466,7 +466,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
     identityFrom:
       resourceGroup: global
       step: output
@@ -511,7 +511,7 @@ resourceGroups:
     outputOnly: true
     dependsOn:
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
   - name: exporter-permissions
     action: ARM
     template: templates/exporter-permissions.bicep
@@ -541,7 +541,7 @@ resourceGroups:
     kustoTable: 'containerLogs'
     dependsOn:
     - resourceGroup: service
-      step: cluster
+      step: upgrade-aks-cluster
     - resourceGroup: service
       step: prometheus
     - resourceGroup: service
