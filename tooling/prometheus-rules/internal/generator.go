@@ -62,6 +62,7 @@ type Options struct {
 	ruleFiles               []alertingRuleFile
 	outputReplacements      []Replacements
 	regexOutputReplacements []RegexReplacements
+	groupNamePrefix         string
 }
 
 type PrometheusRulesConfig struct {
@@ -72,6 +73,7 @@ type PrometheusRulesConfig struct {
 	OutputReplacements        []Replacements `json:"outputReplacements,omitempty"`
 	RegexOutputReplacements   []Replacements `json:"regexOutputReplacements,omitempty"`
 	DefaultEvaluationInterval string         `json:"defaultEvaluationInterval,omitempty"`
+	GroupNamePrefix           string         `json:"groupNamePrefix,omitempty"`
 }
 
 type CliConfig struct {
@@ -146,6 +148,7 @@ func (o *Options) Complete(configFilePath string, forceInfoSeverity bool, promto
 	}
 
 	o.outputBicep = path.Join(baseDirectory, config.PrometheusRules.OutputBicep)
+	o.groupNamePrefix = config.PrometheusRules.GroupNamePrefix
 
 	// Convert includedAlertsByGroup to a map
 	o.includedAlerts = make(map[string][]string)
@@ -338,7 +341,7 @@ param location string = resourceGroup().location
 				}
 			}
 			armGroup := armprometheusrulegroups.PrometheusRuleGroupResource{
-				Name: ptr.To(group.Name),
+				Name: ptr.To(o.groupNamePrefix + group.Name),
 				Properties: &armprometheusrulegroups.PrometheusRuleGroupProperties{
 					Interval: parseToAzureDurationString(group.Interval),
 					Enabled:  ptr.To(true),
