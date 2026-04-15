@@ -139,7 +139,6 @@ func runHelmStep(id graph.Identifier, step *types.HelmStep, ctx context.Context,
 		KustoEndpoint:     kustoEndpointString,
 		Timeout:           5 * time.Minute,
 		KubeconfigFile:    kubeconfig,
-		DryRun:            options.DryRun,
 		RollbackOnFailure: step.RollbackOnFailure,
 	}
 
@@ -174,7 +173,6 @@ func runHelmStep(id graph.Identifier, step *types.HelmStep, ctx context.Context,
 		Values:           processed,
 		ReleaseName:      step.ReleaseName,
 		ReleaseNamespace: step.ReleaseNamespace,
-		DryRun:           options.DryRun,
 	}
 	skip, commit, err := checkSentinel(logger, inputs, options.StepCacheDir)
 	if err != nil {
@@ -209,5 +207,4 @@ type helmInputs struct {
 	Values           []byte            `json:"values"`
 	ReleaseName      string            `json:"releaseName"`
 	ReleaseNamespace string            `json:"releaseNamespace"`
-	DryRun           bool              `json:"dryRun"`
 }

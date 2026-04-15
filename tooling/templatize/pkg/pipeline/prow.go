@@ -30,10 +30,6 @@ func runProwJobStep(step *types.ProwJobStep, ctx context.Context, options *StepR
 	if err != nil {
 		return err
 	}
-	if options.DryRun {
-		logger.Info("Skipping Prow Job step for dry-run.")
-		return nil
-	}
 
 	gate, err := strconv.ParseBool(step.GatePromotion)
 	if err != nil {

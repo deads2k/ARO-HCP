@@ -126,7 +126,6 @@ func acquireOutputChainingInputs(ctx context.Context, steps []string, pipeline *
 	for _, depStep := range steps {
 		runOptions := &PipelineRunOptions{
 			BaseRunOptions: BaseRunOptions{
-				DryRun:                   true,
 				Configuration:            options.Configuration,
 				NoPersist:                true,
 				DeploymentTimeoutSeconds: 60,

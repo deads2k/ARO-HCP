@@ -46,7 +46,6 @@ func BindOptions(opts *RawOptions, cmd *cobra.Command) error {
 	cmd.Flags().StringVar(&opts.JUnitOutputFile, "junit-output", opts.JUnitOutputFile, "If provided, jUnit outputs for pipeline steps will be written to this file.")
 	cmd.Flags().StringVar(&opts.ConfigOutputFile, "config-output", opts.ConfigOutputFile, "If provided, the rendered configuration will be written to this file. Supports .gz extension for gzip compression.")
 
-	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", opts.DryRun, "validate the pipeline without executing it")
 	cmd.Flags().BoolVar(&opts.Persist, "persist-tag", opts.Persist, "toggle if persist tag should be set")
 	cmd.Flags().IntVar(&opts.DeploymentTimeoutSeconds, "deployment-timeout-seconds", opts.DeploymentTimeoutSeconds, "Timeout in Seconds to wait for previous deployments of the pipeline to finish")
 	cmd.Flags().BoolVar(&opts.AbortIfRegionalExist, "abort-if-regional-exist", opts.AbortIfRegionalExist, "Abort deployment if regional resource groups already exist (concurrent execution prevention)")
@@ -57,7 +56,6 @@ func BindOptions(opts *RawOptions, cmd *cobra.Command) error {
 type RawOptions struct {
 	*entrypointutils.RawOptions
 
-	DryRun                   bool
 	Persist                  bool
 	DeploymentTimeoutSeconds int
 	AbortIfRegionalExist     bool
@@ -82,7 +80,6 @@ type ValidatedOptions struct {
 type completedOptions struct {
 	*entrypointutils.Options
 
-	DryRun                   bool
 	NoPersist                bool
 	DeploymentTimeoutSeconds int
 	AbortIfRegionalExist     bool
@@ -121,7 +118,6 @@ func (o *ValidatedOptions) Complete(ctx context.Context) (*Options, error) {
 		completedOptions: &completedOptions{
 			Options: completed,
 
-			DryRun:                   o.DryRun,
 			NoPersist:                !o.Persist,
 			DeploymentTimeoutSeconds: o.DeploymentTimeoutSeconds,
 			AbortIfRegionalExist:     o.AbortIfRegionalExist,
@@ -158,7 +154,6 @@ func (o *Options) Run(ctx context.Context) error {
 
 	runOpts := &pipeline.PipelineRunOptions{
 		BaseRunOptions: pipeline.BaseRunOptions{
-			DryRun:                               o.DryRun,
 			Cloud:                                o.Cloud,
 			Configuration:                        o.Config,
 			NoPersist:                            o.NoPersist,

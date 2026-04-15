@@ -43,19 +43,11 @@ import (
 
 var TEST_SUBSCRIPTION_ID = "test"
 
-func createCommand(ctx context.Context, scriptCommand, pipelineWorkingDir string, dryRun *types.DryRun, envVars map[string]string) (*exec.Cmd, bool) {
-	if dryRun != nil {
-		if dryRun.Command == "" && dryRun.Variables == nil {
-			return nil, true
-		}
-		if dryRun.Command != "" {
-			scriptCommand = dryRun.Command
-		}
-	}
+func createCommand(ctx context.Context, scriptCommand, pipelineWorkingDir string, envVars map[string]string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", buildBashScript(scriptCommand))
 	cmd.Env = append(cmd.Env, utils.MapToEnvVarArray(envVars)...)
 	cmd.Dir = pipelineWorkingDir
-	return cmd, false
+	return cmd
 }
 
 func buildBashScript(command string) string {
@@ -65,19 +57,7 @@ func buildBashScript(command string) string {
 func runShellStep(id graph.Identifier, s *types.ShellStep, ctx context.Context, azureConfigDir, kubeconfigFile string, options *StepRunOptions, state *ExecutionState, outputWriter io.Writer) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
-	// set dryRun config if needed
-	var dryRun *types.DryRun
-	var dryRunVars map[string]string
 	var err error
-	if options.DryRun {
-		dryRun = &s.DryRun
-		state.RLock()
-		dryRunVars, err = mapStepVariables(id.ServiceGroup, dryRun.Variables, options.Configuration, state.Outputs)
-		state.RUnlock()
-		if err != nil {
-			return fmt.Errorf("failed to build dry run vars: %w", err)
-		}
-	}
 
 	// build ENV vars
 	state.RLock()
@@ -90,7 +70,6 @@ func runShellStep(id graph.Identifier, s *types.ShellStep, ctx context.Context, 
 	envVars := utils.GetOsVariable()
 
 	maps.Copy(envVars, stepVars)
-	maps.Copy(envVars, dryRunVars)
 
 	if kubeconfigFile != "" {
 		envVars["KUBECONFIG"] = kubeconfigFile // TODO: we need to put the kubeconfig in a deterministic place so we can omit re-runs
@@ -108,7 +87,6 @@ func runShellStep(id graph.Identifier, s *types.ShellStep, ctx context.Context, 
 		skip, commitFunc, err := checkSentinel(logger, map[string]any{
 			"command":    s.Command,
 			"workingDir": workingDir,
-			"dryRun":     dryRun,
 			"envVars":    envVars,
 		}, options.StepCacheDir)
 		if err != nil {
@@ -124,11 +102,7 @@ func runShellStep(id graph.Identifier, s *types.ShellStep, ctx context.Context, 
 		envVars["AZURE_CONFIG_DIR"] = azureConfigDir
 	}
 
-	cmd, skipCommand := createCommand(ctx, s.Command, workingDir, dryRun, envVars)
-	if skipCommand {
-		logger.V(5).Info(fmt.Sprintf("Skipping step '%s' due to missing dry-run configuration", s.Name))
-		return nil
-	}
+	cmd := createCommand(ctx, s.Command, workingDir, envVars)
 
 	logger.V(5).Info(fmt.Sprintf("Executing shell command: %s\n", s.Command), "command", s.Command)
 	output, err := cmd.CombinedOutput()
@@ -143,10 +117,6 @@ func runShellStep(id graph.Identifier, s *types.ShellStep, ctx context.Context, 
 
 func runSecretSyncStep(s *types.SecretSyncStep, ctx context.Context, options *StepRunOptions) error {
 	logger := logr.FromContextOrDiscard(ctx)
-	if options.DryRun {
-		logger.Info("Skipping secret sync step for dry-run.")
-		return nil
-	}
 	syncOpts := populate.RawOptions{
 		RawOptions: &cmdutils.RawOptions{
 			Cloud: options.Cloud,
@@ -187,10 +157,6 @@ func runSecretSyncStep(s *types.SecretSyncStep, ctx context.Context, options *St
 
 func runRegistrationStep(s *types.ProviderFeatureRegistrationStep, ctx context.Context, options *StepRunOptions, executionTarget ExecutionTarget) error {
 	logger := logr.FromContextOrDiscard(ctx)
-	if options.DryRun {
-		logger.Info("Skipping provider and feature registration step for dry-run.")
-		return nil
-	}
 
 	rawCfg, err := options.Configuration.GetByPath(s.ProviderConfigRef)
 	if err != nil {

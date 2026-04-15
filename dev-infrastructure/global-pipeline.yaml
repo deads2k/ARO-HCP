@@ -98,10 +98,6 @@ resourceGroups:
     action: Shell
     command: ./global-housekeeping.sh
     workingDir: ./scripts
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     variables:
     - name: GLOBAL_RESOURCE_GROUP
       configRef: global.rg

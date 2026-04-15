@@ -25,7 +25,7 @@ all: test lint
 # There is currently no convenient way to run tests against a whole Go workspace
 # https://github.com/golang/go/issues/50745
 test:
-	go list -f '{{.Dir}}/...' -m |RUN_TEMPLATIZE_E2E=true xargs go test -timeout 1200s -cover
+	go list -f '{{.Dir}}/...' -m | xargs go test -timeout 1200s -cover
 .PHONY: test
 
 test-unit:
@@ -299,10 +299,6 @@ services_mgmt_pipelines = secret-sync-controller acm hypershiftoperator maestro.
 	$(eval export dirname=$(subst .,/,$(basename $@)))
 	./templatize.sh $(DEPLOY_ENV) -p $(shell $(YQ) .serviceGroup ./$(dirname)/pipeline.yaml) -P run
 
-%.dry_run: $(ORAS_LINK) $(YQ)
-	$(eval export dirname=$(subst .,/,$(basename $@)))
-	./templatize.sh $(DEPLOY_ENV) -p $(shell $(YQ) .serviceGroup ./$(dirname)/pipeline.yaml) -P run -d
-
 svc.deployall: $(ORAS_LINK) $(addsuffix .deploy_pipeline, $(services_svc_pipelines)) $(addsuffix .deploy, $(services_svc))
 mgmt.deployall: $(ORAS_LINK) $(addsuffix .deploy, $(services_mgmt)) $(addsuffix .deploy_pipeline, $(services_mgmt_pipelines))
 deployall: $(ORAS_LINK) svc.deployall mgmt.deployall
@@ -447,8 +443,7 @@ pipeline/%:
 	$(MAKE) local-run WHAT="--service-group Microsoft.Azure.ARO.HCP.$(notdir $@)"
 
 LOG_LEVEL ?= 3
-DRY_RUN ?= false
-PERSIST ?= false
+PERSIST ?= "false"
 TIMING_OUTPUT ?= timing/steps.yaml
 ENTRYPOINT_JUNIT_OUTPUT ?= _artifacts/junit_entrypoint.xml
 CONFIG_OUTPUT ?= _artifacts/config.yaml
@@ -460,7 +455,6 @@ local-run: $(TEMPLATIZE)
 	                                 --dev-settings-file tooling/templatize/settings.yaml \
 	                                 --dev-environment $(DEPLOY_ENV) \
 	                                 $(WHAT) $(EXTRA_ARGS) \
-	                                 --dry-run=$(DRY_RUN) \
 	                                 --persist-tag=$(PERSIST) \
 	                                 --verbosity=$(LOG_LEVEL) \
 	                                 --timing-output=$(TIMING_OUTPUT) \

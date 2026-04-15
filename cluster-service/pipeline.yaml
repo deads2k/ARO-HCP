@@ -64,10 +64,6 @@ resourceGroups:
     action: Shell
     command: make deploy
     workingDir: ./
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     dependsOn:
     - resourceGroup: global
       step: mirror-image
@@ -224,10 +220,6 @@ resourceGroups:
     action: Shell
     command: make deploy-cs-debug-jobs
     workingDir: ./
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     dependsOn:
     - resourceGroup: service
       step: deploy

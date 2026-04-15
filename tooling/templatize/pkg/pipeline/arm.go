@@ -87,57 +87,7 @@ func (a *armClient) runArmStep(ctx context.Context, options *StepRunOptions, rgN
 		return nil, nil, fmt.Errorf("failed to ensure resource group exists: %w", err)
 	}
 
-	if !options.DryRun || (options.DryRun && step.OutputOnly) {
-		return doWaitForDeployment(ctx, a.bicepClient, a.deploymentClient, a.operationsClient, id.ServiceGroup, rgName, step, options.PipelineDirectory, options.StepCacheDir, options.Configuration, options.DeploymentTimeoutSeconds, options.RetryAttempt, state)
-	}
-
-	return doDryRun(ctx, a.bicepClient, a.deploymentClient, id.ServiceGroup, rgName, step, options.PipelineDirectory, options.StepCacheDir, options.Configuration, state)
-}
-
-func recursivePrint(level int, change *armresources.WhatIfPropertyChange) {
-	fmt.Printf("%s%s:\n", strings.Repeat("\t", level), *change.Path)
-	fmt.Printf("%s\tBefore:%s\n", strings.Repeat("\t", level), change.Before)
-	fmt.Printf("%s\tAfter:%s\n", strings.Repeat("\t", level), change.After)
-	for _, child := range change.Children {
-		level += level
-		recursivePrint(level, child)
-	}
-}
-
-func printChanges(t armresources.ChangeType, changes []*armresources.WhatIfChange) {
-	for _, change := range changes {
-		if *change.ChangeType == t {
-			fmt.Printf("%s %s\n", strings.Repeat("\t", 1), *change.ResourceID)
-			for _, delta := range change.Delta {
-				recursivePrint(2, delta)
-			}
-		}
-	}
-}
-
-func printChangeReport(changes []*armresources.WhatIfChange) {
-	fmt.Println("Change report for WhatIf deployment")
-	fmt.Println("----------")
-	fmt.Println("Creating")
-	printChanges(armresources.ChangeTypeCreate, changes)
-	fmt.Println("----------")
-	fmt.Println("Deploy")
-	printChanges(armresources.ChangeTypeDeploy, changes)
-	fmt.Println("----------")
-	fmt.Println("Modify")
-	printChanges(armresources.ChangeTypeModify, changes)
-	fmt.Println("----------")
-	fmt.Println("Delete")
-	printChanges(armresources.ChangeTypeDelete, changes)
-	fmt.Println("----------")
-	fmt.Println("Ignoring")
-	printChanges(armresources.ChangeTypeIgnore, changes)
-	fmt.Println("----------")
-	fmt.Println("NoChange")
-	printChanges(armresources.ChangeTypeNoChange, changes)
-	fmt.Println("----------")
-	fmt.Println("Unsupported")
-	printChanges(armresources.ChangeTypeUnsupported, changes)
+	return doWaitForDeployment(ctx, a.bicepClient, a.deploymentClient, a.operationsClient, id.ServiceGroup, rgName, step, options.PipelineDirectory, options.StepCacheDir, options.Configuration, options.DeploymentTimeoutSeconds, options.RetryAttempt, state)
 }
 
 func createError(errors armresources.ErrorResponse) error {
@@ -148,28 +98,6 @@ func createError(errors armresources.ErrorResponse) error {
 	return fmt.Errorf("%s", string(errB))
 }
 
-func pollAndPrint[T any](ctx context.Context, p *runtime.Poller[T]) error {
-	resp, err := p.PollUntilDone(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to wait for deployment completion: %w", err)
-	}
-	switch m := any(resp).(type) {
-	case armresources.DeploymentsClientWhatIfResponse:
-		if *m.Status == "Failed" {
-			return createError(*m.Error)
-		}
-		printChangeReport(m.Properties.Changes)
-	case armresources.DeploymentsClientWhatIfAtSubscriptionScopeResponse:
-		if *m.Status == "Failed" {
-			return createError(*m.Error)
-		}
-		printChangeReport(m.Properties.Changes)
-	default:
-		return fmt.Errorf("unknown type %T", m)
-	}
-	return nil
-}
-
 const charset = "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789"
 
 func randString() string {
@@ -178,75 +106,6 @@ func randString() string {
 		output.WriteByte(charset[rand.Intn(len(charset))])
 	}
 	return output.String()
-}
-
-func doDryRun(ctx context.Context, bicepClient *bicep.LSPClient, client *armresources.DeploymentsClient, sgName, rgName string, step *types.ARMStep, pipelineWorkingDir, stepCacheDir string, cfg configtypes.Configuration, state *ExecutionState) (Output, DetailsProducer, error) {
-	logger := logr.FromContextOrDiscard(ctx)
-
-	state.RLock()
-	inputValues, err := getInputValues(sgName, step.Variables, cfg, state.Outputs)
-	state.RUnlock()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get input values: %w", err)
-	}
-	// Transform Bicep to ARM
-	deploymentProperties, err := transformBicepToARMWhatIfDeployment(ctx, bicepClient, step.Parameters, step.DeploymentMode, pipelineWorkingDir, cfg, inputValues)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to transform Bicep to ARM: %w", err)
-	}
-
-	// Create the deployment
-	deployment := armresources.DeploymentWhatIf{
-		Properties: deploymentProperties,
-	}
-
-	inputs := whatIfInputs{
-		Properties:      deploymentProperties,
-		ResourceGroup:   rgName,
-		DeploymentLevel: step.DeploymentLevel,
-	}
-
-	skip, commit, err := checkSentinel(logger, inputs, stepCacheDir)
-	if err != nil {
-		return nil, nil, err
-	}
-	if skip {
-		return nil, nil, nil
-	}
-
-	deploymentName := randString()
-
-	if step.DeploymentLevel == "Subscription" {
-		// Hardcode until schema is adapted
-		deployment.Location = to.Ptr("eastus2")
-		poller, err := client.BeginWhatIfAtSubscriptionScope(ctx, deploymentName, deployment, nil)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create WhatIf Deployment: %w", err)
-		}
-		logger.Info("WhatIf Deployment started", "deployment", deploymentName)
-		err = pollAndPrint(ctx, poller)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to poll and print: %w", err)
-		}
-	} else {
-		poller, err := client.BeginWhatIf(ctx, rgName, deploymentName, deployment, nil)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create WhatIf Deployment: %w", err)
-		}
-		logger.Info("WhatIf Deployment started", "deployment", deploymentName)
-		err = pollAndPrint(ctx, poller)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to poll and print: %w", err)
-		}
-	}
-
-	return nil, nil, commit()
-}
-
-type whatIfInputs struct {
-	Properties      *armresources.DeploymentWhatIfProperties
-	ResourceGroup   string
-	DeploymentLevel string
 }
 
 func pollAndGetOutput[T any](ctx context.Context, p *runtime.Poller[T]) (ArmOutput, error) {

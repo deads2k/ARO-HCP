@@ -43,7 +43,6 @@ func runGrafanaDashboardsStep(id graph.Identifier, step *types.GrafanaDashboards
 	opts.GrafanaName = step.GrafanaName
 	opts.SubscriptionID = executionTarget.GetSubscriptionID()
 	opts.ResourceGroup = executionTarget.GetResourceGroup()
-	opts.DryRun = options.DryRun
 	opts.ConfigFilePath = observabilityPath
 
 	cfg, err := config.LoadFromFile(observabilityPath)
