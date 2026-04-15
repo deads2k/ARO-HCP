@@ -37,29 +37,12 @@ var _ = Describe("Customer", func() {
 		labels.High,
 		labels.Positive,
 		labels.AroRpApiCompatible,
+		labels.Slow,
 		func(ctx context.Context) {
 			const (
-				customerClusterName = "hcp-cluster-update-nodes"
-
-				scaleDownNodePoolName = "np-scale-down"
-				scaleUpNodePoolName   = "np-scale-up"
-				autoscaleNodePoolName = "np-autoscale"
-
-				deployedNodePoolsNumber = 3
-
-				scaleDownNodePoolInitialReplicas = 2
-				scaleDownNodePoolUpdatedReplicas = 1
-
-				scaleUpNodePoolInitialReplicas = 1
-				scaleUpNodePoolUpdatedReplicas = 2
-
-				autoscaleNodePoolInitialReplicas = 1
-				autoscaleNodePoolUpdatedReplicas = 0
-				autoscaleNodePoolMinReplicas     = 1
-				autoscaleNodePoolMaxReplicas     = 2
-
-				initialNodeCount = scaleDownNodePoolInitialReplicas + scaleUpNodePoolInitialReplicas + autoscaleNodePoolInitialReplicas
-				finalNodeCount   = scaleDownNodePoolUpdatedReplicas + scaleUpNodePoolUpdatedReplicas + autoscaleNodePoolMinReplicas
+				customerClusterName  = "np-update-nodes-hcp-cluster"
+				customerNodePoolName = "np-update-nodes"
+				oneNodePoolName      = "np-one-node"
 			)
 
 			tc := framework.NewTestContext()
@@ -70,7 +53,7 @@ var _ = Describe("Customer", func() {
 			}
 
 			By("creating a resource group")
-			resourceGroup, err := tc.NewResourceGroup(ctx, "rg-update-nodes", tc.Location())
+			resourceGroup, err := tc.NewResourceGroup(ctx, "nodepool-update-nodes", tc.Location())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating cluster parameters")
@@ -108,158 +91,130 @@ var _ = Describe("Customer", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating three node pools in parallel")
-			scaleDownParams := framework.NewDefaultNodePoolParams()
-			scaleDownParams.NodePoolName = scaleDownNodePoolName
-			scaleDownParams.Replicas = scaleDownNodePoolInitialReplicas
+			By("creating the node pools in parallel")
+			mainNodeCount := 2
+			oneNodeCount := 1
 
-			scaleUpParams := framework.NewDefaultNodePoolParams()
-			scaleUpParams.NodePoolName = scaleUpNodePoolName
-			scaleUpParams.Replicas = scaleUpNodePoolInitialReplicas
+			mainNodePoolParams := framework.NewDefaultNodePoolParams()
+			mainNodePoolParams.NodePoolName = customerNodePoolName
+			mainNodePoolParams.Replicas = int32(mainNodeCount)
 
-			autoscaleParams := framework.NewDefaultNodePoolParams()
-			autoscaleParams.NodePoolName = autoscaleNodePoolName
-			autoscaleParams.Replicas = autoscaleNodePoolInitialReplicas
+			oneNodePoolParams := framework.NewDefaultNodePoolParams()
+			oneNodePoolParams.NodePoolName = oneNodePoolName
+			oneNodePoolParams.Replicas = int32(oneNodeCount)
 
-			allNodePoolParams := []framework.NodePoolParams{scaleDownParams, scaleUpParams, autoscaleParams}
-			nodePoolCreateErrCh := make(chan error, deployedNodePoolsNumber)
-			nodePoolCreateGroup, nodePoolCreateGroupCtx := errgroup.WithContext(ctx)
-			for _, nodePoolParams := range allNodePoolParams {
-				nodePoolCreateGroup.Go(func() error {
+			errCh := make(chan error, 2)
+			group, groupCtx := errgroup.WithContext(ctx)
+			for _, nodePoolParams := range []framework.NodePoolParams{mainNodePoolParams, oneNodePoolParams} {
+				group.Go(func() error {
 					createErr := tc.CreateNodePoolFromParam(
-						nodePoolCreateGroupCtx,
+						groupCtx,
 						*resourceGroup.Name,
 						customerClusterName,
 						nodePoolParams,
 						45*time.Minute,
 					)
 					if createErr != nil {
-						nodePoolCreateErrCh <- createErr
+						errCh <- createErr
 					}
 					return createErr
 				})
 			}
-			_ = nodePoolCreateGroup.Wait()
-			close(nodePoolCreateErrCh)
+			_ = group.Wait()
+			close(errCh)
 			var creationErrors []error
-			for createErr := range nodePoolCreateErrCh {
+			for createErr := range errCh {
 				creationErrors = append(creationErrors, createErr)
 			}
 			Expect(creationErrors).To(BeEmpty(), "nodepool creation errors: %v", creationErrors)
 
 			By("verifying nodes count and status after initial creation")
-			Expect(verifiers.VerifyNodeCount(initialNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			totalNodeCount := mainNodeCount + oneNodeCount
+			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 
-			By("scaling down, scaling up, and enabling autoscaling in parallel")
+			By("scaling up the nodepool replicas from 2 to 3 replicas")
+			mainNodeCount = 3
+			update := hcpsdk20240610preview.NodePoolUpdate{
+				Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
+					Replicas: to.Ptr(int32(mainNodeCount)),
+				},
+			}
+			scaleUpResp, err := framework.UpdateNodePoolAndWait(ctx,
+				tc.Get20240610ClientFactoryOrDie(ctx).NewNodePoolsClient(),
+				*resourceGroup.Name,
+				customerClusterName,
+				customerNodePoolName,
+				update,
+				20*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(scaleUpResp.Properties).NotTo(BeNil(), "scale up response Properties was nil")
+			Expect(scaleUpResp.Properties.Replicas).NotTo(BeNil(), "scale up response Properties.Replicas was nil")
+			Expect(*scaleUpResp.Properties.Replicas).To(Equal(int32(mainNodeCount)))
+
+			By("verifying nodes count and status after scaling up")
+			totalNodeCount = mainNodeCount + oneNodeCount
+			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
+
 			nodePoolsClient := tc.Get20240610ClientFactoryOrDie(ctx).NewNodePoolsClient()
 
-			var scaleDownNodePoolResp, scaleUpNodePoolResp, autoscaleNodePoolResp *hcpsdk20240610preview.NodePool
-
-			nodePoolUpdateErrCh := make(chan error, deployedNodePoolsNumber)
-			nodePoolUpdateGroup, nodePoolUpdateGroupCtx := errgroup.WithContext(ctx)
-
-			// scale down
-			nodePoolUpdateGroup.Go(func() error {
-				var updateErr error
-				update := hcpsdk20240610preview.NodePoolUpdate{
-					Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
-						Replicas: to.Ptr(int32(scaleDownNodePoolUpdatedReplicas)),
-					},
-				}
-				scaleDownNodePoolResp, updateErr = framework.UpdateNodePoolAndWait(nodePoolUpdateGroupCtx,
-					nodePoolsClient,
-					*resourceGroup.Name,
-					customerClusterName,
-					scaleDownNodePoolName,
-					update,
-					20*time.Minute,
-				)
-				if updateErr != nil {
-					nodePoolUpdateErrCh <- updateErr
-				}
-				return updateErr
-			})
-
-			// scale up
-			nodePoolUpdateGroup.Go(func() error {
-				var updateErr error
-				update := hcpsdk20240610preview.NodePoolUpdate{
-					Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
-						Replicas: to.Ptr(int32(scaleUpNodePoolUpdatedReplicas)),
-					},
-				}
-				scaleUpNodePoolResp, updateErr = framework.UpdateNodePoolAndWait(nodePoolUpdateGroupCtx,
-					nodePoolsClient,
-					*resourceGroup.Name,
-					customerClusterName,
-					scaleUpNodePoolName,
-					update,
-					20*time.Minute,
-				)
-				if updateErr != nil {
-					nodePoolUpdateErrCh <- updateErr
-				}
-				return updateErr
-			})
-
-			// enable autoscaling
-			nodePoolUpdateGroup.Go(func() error {
-				var updateErr error
-				update := hcpsdk20240610preview.NodePoolUpdate{
-					Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
-						Replicas: to.Ptr(int32(autoscaleNodePoolUpdatedReplicas)),
-						AutoScaling: &hcpsdk20240610preview.NodePoolAutoScaling{
-							Min: to.Ptr(int32(autoscaleNodePoolMinReplicas)),
-							Max: to.Ptr(int32(autoscaleNodePoolMaxReplicas)),
-						},
-					},
-				}
-				autoscaleNodePoolResp, updateErr = framework.UpdateNodePoolAndWait(nodePoolUpdateGroupCtx,
-					nodePoolsClient,
-					*resourceGroup.Name,
-					customerClusterName,
-					autoscaleNodePoolName,
-					update,
-					20*time.Minute,
-				)
-				if updateErr != nil {
-					nodePoolUpdateErrCh <- updateErr
-				}
-				return updateErr
-			})
-
-			_ = nodePoolUpdateGroup.Wait()
-			close(nodePoolUpdateErrCh)
-			var nodePoolUpdateErrors []error
-			for nodePoolUpdateErr := range nodePoolUpdateErrCh {
-				nodePoolUpdateErrors = append(nodePoolUpdateErrors, nodePoolUpdateErr)
+			By("scaling down the nodepool replicas from 3 to 2 replicas")
+			mainNodeCount = 2
+			update = hcpsdk20240610preview.NodePoolUpdate{
+				Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
+					Replicas: to.Ptr(int32(mainNodeCount)),
+				},
 			}
-			Expect(nodePoolUpdateErrors).To(BeEmpty(), "nodepool update errors: %v", nodePoolUpdateErrors)
+			scaleDownResp, err := framework.UpdateNodePoolAndWait(ctx,
+				nodePoolsClient,
+				*resourceGroup.Name,
+				customerClusterName,
+				customerNodePoolName,
+				update,
+				20*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(scaleDownResp.Properties).NotTo(BeNil(), "scale down response Properties was nil")
+			Expect(scaleDownResp.Properties.Replicas).NotTo(BeNil(), "scale down response Properties.Replicas was nil")
+			Expect(*scaleDownResp.Properties.Replicas).To(Equal(int32(mainNodeCount)))
 
-			By("verifying scaling down nodepool state after update")
-			Expect(scaleDownNodePoolResp).NotTo(BeNil(), "scale down response was nil")
-			Expect(scaleDownNodePoolResp.Properties).NotTo(BeNil(), "scale down response Properties was nil")
-			Expect(scaleDownNodePoolResp.Properties.Replicas).NotTo(BeNil(), "scale down response Properties.Replicas was nil")
-			Expect(*scaleDownNodePoolResp.Properties.Replicas).To(Equal(int32(scaleDownNodePoolUpdatedReplicas)))
+			By("verifying nodes count and status after scaling down")
+			totalNodeCount = mainNodeCount + oneNodeCount
+			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 
-			By("verifying scaling up nodepool state after update")
-			Expect(scaleUpNodePoolResp).NotTo(BeNil(), "scale up response was nil")
-			Expect(scaleUpNodePoolResp.Properties).NotTo(BeNil(), "scale up response Properties was nil")
-			Expect(scaleUpNodePoolResp.Properties.Replicas).NotTo(BeNil(), "scale up response Properties.Replicas was nil")
-			Expect(*scaleUpNodePoolResp.Properties.Replicas).To(Equal(int32(scaleUpNodePoolUpdatedReplicas)))
+			By("updating the one-replica nodepool replicas to 0 and enabling autoscaling with a PATCH")
+			update = hcpsdk20240610preview.NodePoolUpdate{
+				Properties: &hcpsdk20240610preview.NodePoolPropertiesUpdate{
+					Replicas: to.Ptr(int32(0)),
+					AutoScaling: &hcpsdk20240610preview.NodePoolAutoScaling{
+						Min: to.Ptr(int32(2)),
+						Max: to.Ptr(int32(3)),
+					},
+				},
+			}
+			autoscaleResp, err := framework.UpdateNodePoolAndWait(ctx,
+				nodePoolsClient,
+				*resourceGroup.Name,
+				customerClusterName,
+				oneNodePoolName,
+				update,
+				20*time.Minute,
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(autoscaleResp.Properties).NotTo(BeNil(), "autoscale response Properties was nil")
+			Expect(autoscaleResp.Properties.AutoScaling).NotTo(BeNil(), "autoscale response Properties.AutoScaling was nil")
+			Expect(autoscaleResp.Properties.AutoScaling.Min).NotTo(BeNil(), "autoscale response Properties.AutoScaling.Min was nil")
+			Expect(autoscaleResp.Properties.AutoScaling.Max).NotTo(BeNil(), "autoscale response Properties.AutoScaling.Max was nil")
+			Expect(*autoscaleResp.Properties.AutoScaling.Min).To(Equal(int32(2)))
+			Expect(*autoscaleResp.Properties.AutoScaling.Max).To(Equal(int32(3)))
 
-			By("verifying autoscaling nodepool state after update")
-			Expect(autoscaleNodePoolResp).NotTo(BeNil(), "autoscale nodepool response was nil")
-			Expect(autoscaleNodePoolResp.Properties).NotTo(BeNil(), "autoscale nodepool response Properties was nil")
-			Expect(autoscaleNodePoolResp.Properties.AutoScaling).NotTo(BeNil(), "autoscale nodepool response Properties.AutoScaling was nil")
-			Expect(autoscaleNodePoolResp.Properties.AutoScaling.Min).NotTo(BeNil(), "autoscale nodepool response Properties.AutoScaling.Min was nil")
-			Expect(autoscaleNodePoolResp.Properties.AutoScaling.Max).NotTo(BeNil(), "autoscale nodepool response Properties.AutoScaling.Max was nil")
-			Expect(*autoscaleNodePoolResp.Properties.AutoScaling.Min).To(Equal(int32(autoscaleNodePoolMinReplicas)))
-			Expect(*autoscaleNodePoolResp.Properties.AutoScaling.Max).To(Equal(int32(autoscaleNodePoolMaxReplicas)))
-
-			By("verifying nodes count and status after all updates")
-			Expect(verifiers.VerifyNodeCount(finalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			By("verifying nodes count and status after enabling autoscaling")
+			oneNodeCount = 2
+			totalNodeCount = mainNodeCount + oneNodeCount
+			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 		})
 })
