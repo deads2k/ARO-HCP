@@ -92,13 +92,6 @@ deploy:
 	  --set csDeploymentStrategy.rollingUpdate.maxSurge=${CS_DEPLOYMENT_ROLLINGUPDATE_MAX_SURGE} \
 	  --set csDeploymentStrategy.rollingUpdate.maxUnavailable=${CS_DEPLOYMENT_ROLLINGUPDATE_MAX_UNAVAILABLE} \
 	  --set provisionShardClusterLimit=${PROVISION_SHARD_CLUSTER_LIMIT} \
-	  --set ocpVersions.defaultVersion.version=${OCP_VERSIONS_DEFAULT_VERSION_VERSION} \
-	  --set ocpVersions.channelGroups.stable.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MIN_VERSION} \
-	  --set ocpVersions.channelGroups.stable.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MAX_VERSION} \
-	  --set ocpVersions.channelGroups.candidate.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MIN_VERSION} \
-	  --set ocpVersions.channelGroups.candidate.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MAX_VERSION} \
-	  --set ocpVersions.channelGroups.nightly.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MIN_VERSION} \
-	  --set ocpVersions.channelGroups.nightly.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MAX_VERSION} \
 	  --set azureOperatorsMI.roleSetName=${OPERATOR_ROLE_SET_NAME} \
 	  --set deployment.zoneCount=${AVAILABILITY_ZONE_COUNT} \
 	  --set memoryRequest=${CS_MEMORY_REQUEST} \
@@ -177,13 +170,6 @@ local-azure-operators-managed-identities-config:
 
 local-aro-hcp-ocp-versions-config:
 	helm template helm-charts/cluster-service \
-	--set ocpVersions.defaultVersion.version=${OCP_VERSIONS_DEFAULT_VERSION_VERSION} \
-	--set ocpVersions.channelGroups.stable.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MIN_VERSION} \
-	--set ocpVersions.channelGroups.stable.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MAX_VERSION} \
-	--set ocpVersions.channelGroups.candidate.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MIN_VERSION} \
-	--set ocpVersions.channelGroups.candidate.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MAX_VERSION} \
-	--set ocpVersions.channelGroups.nightly.minVersion=${OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MIN_VERSION} \
-	--set ocpVersions.channelGroups.nightly.maxVersion=${OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MAX_VERSION} \
 	--set azureOperatorsMI.roleSetName=${OPERATOR_ROLE_SET_NAME} \
 	-s templates/aro-hcp-ocp-versions-config.configmap.yaml | yq '.data["aro-hcp-ocp-versions-config.yaml"]' > local/aro-hcp-ocp-versions-config.yaml
 .PHONY: local-aro-hcp-ocp-versions-config

@@ -935,24 +935,6 @@ defaults:
           maxSurge: 1
     azureRuntimeConfig:
       tlsCertificatesIssuer: OneCertV2-PublicCA
-    # OCP Versions configuration
-    ocpVersions:
-      defaultVersion:
-        # control plane 4.y version (different than node and contorl plane 4.y.z inside that 4.y) is set in defaulting in ARO-HCP frontend.
-        version: 4.20.8
-      channelGroups:
-        stable:
-          minVersion: 4.19.0
-          maxVersion: ""
-        candidate:
-          minVersion: 4.19.7
-          maxVersion: ""
-        nightly:
-          minVersion: 4.19.0-0.nightly-20200101
-          maxVersion: ""
-        fast:
-          minVersion: 4.19.0
-          maxVersion: ""
   # Image Sync
   imageSync:
     environmentName: aro-hcp-image-sync
