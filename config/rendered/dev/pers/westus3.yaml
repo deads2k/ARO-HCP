@@ -218,6 +218,7 @@ clustersService:
     serverVersion: "17"
     zoneRedundantMode: Auto
   provisionShardClusterLimit: 100
+  provisionShardStatus: active
   tracing:
     address: http://ingest.observability:4318
     exporter: otlp

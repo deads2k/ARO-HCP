@@ -75,6 +75,7 @@ deploy:
 	  --set shard.maestroGrpUrl="maestro-grpc.maestro.svc.cluster.local:8090" \
 	  --set shard.Id=$(PROVISION_SHARD_ID) \
 	  --set shard.aksManagementClusterResourceId=$(AKS_MGMT_CLUSTER_RESOURCE_ID) \
+	  --set shard.status=$(PROVISION_SHARD_STATUS) \
 	  --set databaseHost=$${DB_HOST} \
 	  --set azureMiMockServicePrincipalPrincipalId=${AZURE_MI_MOCK_SERVICE_PRINCIPAL_PRINCIPAL_ID} \
 	  --set azureMiMockServicePrincipalClientId=${AZURE_MI_MOCK_SERVICE_PRINCIPAL_CLIENT_ID} \

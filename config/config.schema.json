@@ -1143,6 +1143,11 @@
           "type": "integer",
           "description": "The maximum number of HCPs that can be placed on an MC, sadly not configurable per MC"
         },
+        "provisionShardStatus": {
+          "type": "string",
+          "enum": ["active", "maintenance"],
+          "description": "Status of the provision shard"
+        },
         "k8s": {
           "$ref": "#/definitions/k8sDeployment"
         },

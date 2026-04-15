@@ -891,6 +891,7 @@ defaults:
       digest: sha256:b70f064cad11f7374d475e7078826912d07451c0389dc00de21bb723ca0761c5 # 28911b36ad59807e10fb4443679ec676f206ebf2 (2026-04-09 16:18)
     # controls how many HCPs can be placed on an MC, sadly not configurable per MC
     provisionShardClusterLimit: 100
+    provisionShardStatus: active
     # batch processes
     batchProcessesDryRun: true
     batchProcesses: ""
