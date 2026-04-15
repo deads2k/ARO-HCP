@@ -35,7 +35,7 @@ adminApi:
     issuer: Self
     name: admin-api-cert-dev-usw3
   image:
-    digest: sha256:2670a25858771691403ec47ff1af8504e517a52f95505dad9ed323d889361ded
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpadminapi
   k8s:
@@ -102,7 +102,7 @@ backend:
     roleSetName: dev
   exitOnPanic: true
   image:
-    digest: sha256:1ea55edf35052e5cf1cd84aa6e877ecee49324b7b2c7ee2fa70827e79edce8f8
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpbackend
   k8s:
@@ -286,7 +286,7 @@ frontend:
     zoneRedundantMode: Disabled
   exitOnPanic: true
   image:
-    digest: sha256:63d30656f797993d4f757aee9da4166986b17bcb7b5d983747b2596e8a775166
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpfrontend
   k8s:
@@ -839,7 +839,7 @@ sessiongate:
     issuer: Self
     name: sessiongate-cert-dev-usw3
   image:
-    digest: sha256:1a0e007fa4c774e176e1638257206126699b557b5530733c898bf2367384830c
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpsessiongate
   k8s:

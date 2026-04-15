@@ -70,6 +70,7 @@ record-override: $(YQ) $(ORAS)
 
 	@DIGEST=$$($(ORAS) manifest fetch --descriptor ${BACKEND_TAGGED_IMAGE} | $(YQ) .digest); \
 	$(YQ) eval -n "\
+		.clouds.dev.environments.$(DEPLOY_ENV).defaults.backend.image.registry = \"$(ARO_HCP_IMAGE_REGISTRY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.backend.image.repository = \"$(BACKEND_GENERATED_IMAGE_REPOSITORY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.backend.image.digest = \"$$DIGEST\" \
 	" > $(OVERRIDE_CONFIG_FILE)

@@ -88,6 +88,7 @@ record-override: $(YQ) $(ORAS)
 
 	@DIGEST=$$($(ORAS) manifest fetch --descriptor ${ADMIN_API_TAGGED_IMAGE} | $(YQ) .digest); \
 	$(YQ) eval -n "\
+		.clouds.dev.environments.$(DEPLOY_ENV).defaults.adminApi.image.registry = \"$(ARO_HCP_IMAGE_REGISTRY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.adminApi.image.repository = \"$(ADMIN_API_GENERATED_IMAGE_REPOSITORY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.adminApi.image.digest = \"$$DIGEST\" \
 	" > $(OVERRIDE_CONFIG_FILE)
