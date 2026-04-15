@@ -29,7 +29,7 @@ resource approachingActiveTimeSeries 'Microsoft.Insights/metricAlerts@2018-03-01
     evaluationFrequency: 'PT5M'
     windowSize: 'PT30M'
     criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
         {
           threshold: 75
@@ -63,7 +63,7 @@ resource highRiskActiveTimeSeries 'Microsoft.Insights/metricAlerts@2018-03-01' =
     evaluationFrequency: 'PT5M'
     windowSize: 'PT30M'
     criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
         {
           threshold: 95
@@ -97,7 +97,7 @@ resource approachingEventIngestion 'Microsoft.Insights/metricAlerts@2018-03-01' 
     evaluationFrequency: 'PT5M'
     windowSize: 'PT30M'
     criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
         {
           threshold: 75
@@ -131,7 +131,7 @@ resource highRiskEventIngestion 'Microsoft.Insights/metricAlerts@2018-03-01' = {
     evaluationFrequency: 'PT5M'
     windowSize: 'PT30M'
     criteria: {
-      'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
       allOf: [
         {
           threshold: 95
