@@ -222,6 +222,7 @@ clustersService:
     address: http://ingest.observability:4318
     exporter: otlp
 customExporter:
+  enabledCollectors: service-tag-usage,kusto-logs-current
   image:
     digest: sha256:84bc2876df0dff1ee8089a585c71ddabb399ca44ba4bf5177759f9c8b36e9ebf
     registry: arohcpsvcdev.azurecr.io

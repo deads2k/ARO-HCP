@@ -2510,6 +2510,10 @@
           "type": "string",
           "description": "The name of the MSI that will be used by the exporter"
         },
+        "enabledCollectors": {
+          "type": "string",
+          "description": "The collectors to enable for the exporter. Comma separated list of collectors."
+        },
         "k8s": {
           "$ref": "#/definitions/k8sDeployment"
         }

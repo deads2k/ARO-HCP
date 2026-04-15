@@ -144,6 +144,7 @@ defaults:
   # ARO HCP Metrics Exporter
   customExporter:
     managedIdentityName: "aro-hcp-exporter"
+    enabledCollectors: "service-tag-usage,kusto-logs-current"
     k8s:
       namespace: aro-hcp-exporter
       serviceAccountName: aro-hcp-exporter
