@@ -165,9 +165,9 @@ tests:
 - interval: 1m
   input_series:
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected",controller="prometheus",resource="prometheusrule"}'
-    values: "5+0x10"
+    values: "5+0x30"
   alert_rule_test:
-  - eval_time: 5m
+  - eval_time: 25m
     alertname: PrometheusOperatorRejectedResources
     exp_alerts:
     - exp_labels:
@@ -334,11 +334,11 @@ tests:
 - interval: 1m
   input_series:
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected",controller="prometheus",resource="servicemonitor"}'
-    values: "3+0x10"
+    values: "3+0x30"
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected",controller="prometheus",resource="podmonitor"}'
-    values: "2+0x10"
+    values: "2+0x30"
   alert_rule_test:
-  - eval_time: 5m
+  - eval_time: 25m
     alertname: PrometheusOperatorRejectedResources
     exp_alerts:
     - exp_labels:
@@ -577,20 +577,20 @@ tests:
 - interval: 1m
   input_series:
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected",controller="prometheus",resource="prometheusrule"}'
-    values: "0+0x10"
+    values: "0+0x30"
   alert_rule_test:
-  - eval_time: 5m
+  - eval_time: 25m
     alertname: PrometheusOperatorRejectedResources
     exp_alerts: []
 # Test PrometheusOperatorRejectedResources with mixed states
 - interval: 1m
   input_series:
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected",controller="prometheus",resource="prometheusrule"}'
-    values: "2+0x10"
+    values: "2+0x30"
   - series: 'prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="created",controller="prometheus",resource="prometheusrule"}'
-    values: "10+0x10"
+    values: "10+0x30"
   alert_rule_test:
-  - eval_time: 5m
+  - eval_time: 25m
     alertname: PrometheusOperatorRejectedResources
     exp_alerts:
     - exp_labels:

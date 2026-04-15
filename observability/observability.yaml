@@ -1,11 +1,11 @@
 prometheusRules:
   rulesFolders:
   - ../observability/alerts/prometheus-prometheusRule.yaml
-  - ../frontend/alerts/mise-prometheusRule.yaml
   - ../frontend/alerts/frontend-prometheusRule.yaml
   - ../cluster-service/alerts/cluster-service-slo-rules.yaml
   - ../backend/alerts/backend-prometheusRule.yaml
   - ../admin/alerts/admin-prometheusRule.yaml
+  - ../maestro/alerts/maestro-prometheusRule.yaml
   - ../observability/alerts/arobit-prometheusRule.yaml
   - alerts/service-tag-public-ip-usage.yaml
   - ../observability/alerts/HCPdeletionStuck-prometheusRule.yaml

@@ -1,0 +1,112 @@
+rule_files:
+- maestro-prometheusRule.yaml
+evaluation_interval: 1m
+tests:
+# Test: MaestroGRPCSourceClientExcessConnections fires when > 100 clients for 10m
+- interval: 1m
+  input_series:
+  - series: 'grpc_server_registered_source_clients{namespace="maestro", source="maestro"}'
+    values: "125x15" # 125 clients sustained for 15 minutes
+  alert_rule_test:
+  - eval_time: 11m
+    alertname: MaestroGRPCSourceClientExcessConnections
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        description: 'Maestro gRPC server has 125 registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
+        runbook_url: 'TBD'
+        summary: 'Maestro has too many gRPC source client connections'
+# Test: MaestroGRPCSourceClientExcessConnections does not fire when <= 100
+- interval: 1m
+  input_series:
+  - series: 'grpc_server_registered_source_clients{namespace="maestro", source="maestro"}'
+    values: "50x15" # 50 clients (within normal range)
+  alert_rule_test:
+  - eval_time: 11m
+    alertname: MaestroGRPCSourceClientExcessConnections
+    exp_alerts: []
+# Test: MaestroRESTAPIErrorRate fires when 5xx rate > 5%
+- interval: 1m
+  input_series:
+  - series: 'rest_api_inbound_request_count{namespace="maestro", code="500", method="POST", path="/api/maestro/v1/resources"}'
+    values: "0+6x10" # 6 errors per minute
+  - series: 'rest_api_inbound_request_count{namespace="maestro", code="200", method="POST", path="/api/maestro/v1/resources"}'
+    values: "0+94x10" # 94 successes per minute → 6/100 = 6% error rate
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: MaestroRESTAPIErrorRate
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        description: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: 6%.'
+        runbook_url: 'TBD'
+        summary: 'Maestro REST API error rate is high'
+# Test: MaestroRESTAPIErrorRate does not fire when 5xx rate < 5%
+- interval: 1m
+  input_series:
+  - series: 'rest_api_inbound_request_count{namespace="maestro", code="500", method="POST", path="/api/maestro/v1/resources"}'
+    values: "0+2x10" # 2 errors per minute
+  - series: 'rest_api_inbound_request_count{namespace="maestro", code="200", method="POST", path="/api/maestro/v1/resources"}'
+    values: "0+98x10" # 98 successes per minute → 2/100 = 2%
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: MaestroRESTAPIErrorRate
+    exp_alerts: []
+# Test: MaestroGRPCServerErrorRate fires when error rate > 5%
+- interval: 1m
+  input_series:
+  - series: 'grpc_server_processed_total{namespace="maestro", code="Internal", type="publish", source="maestro"}'
+    values: "0+8x10" # 8 errors per minute
+  - series: 'grpc_server_processed_total{namespace="maestro", code="OK", type="publish", source="maestro"}'
+    values: "0+92x10" # 92 successes per minute → 8/100 = 8%
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: MaestroGRPCServerErrorRate
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        description: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: 8%.'
+        runbook_url: 'TBD'
+        summary: 'Maestro gRPC server error rate is high'
+# Test: MaestroGRPCServerErrorRate does not fire when error rate < 5%
+- interval: 1m
+  input_series:
+  - series: 'grpc_server_processed_total{namespace="maestro", code="Internal", type="publish", source="maestro"}'
+    values: "0+2x10" # 2 errors per minute
+  - series: 'grpc_server_processed_total{namespace="maestro", code="OK", type="publish", source="maestro"}'
+    values: "0+98x10" # 98 successes per minute → 2/100 = 2%
+  alert_rule_test:
+  - eval_time: 10m
+    alertname: MaestroGRPCServerErrorRate
+    exp_alerts: []
+# Test: MaestroSpecControllerReconcileErrors fires when error rate > 10%
+- interval: 1m
+  input_series:
+  - series: 'spec_controller_event_reconcile_total{namespace="maestro", status="error", event_type="create"}'
+    values: "0+15x20" # 15 errors per minute
+  - series: 'spec_controller_event_reconcile_total{namespace="maestro", status="success", event_type="create"}'
+    values: "0+85x20" # 85 successes per minute → 15/100 = 15%
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: MaestroSpecControllerReconcileErrors
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+      exp_annotations:
+        description: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: 15%.'
+        runbook_url: 'TBD'
+        summary: 'Maestro spec controller reconcile error rate is high'
+# Test: MaestroSpecControllerReconcileErrors does not fire when error rate < 10%
+- interval: 1m
+  input_series:
+  - series: 'spec_controller_event_reconcile_total{namespace="maestro", status="error", event_type="create"}'
+    values: "0+5x20" # 5 errors per minute
+  - series: 'spec_controller_event_reconcile_total{namespace="maestro", status="success", event_type="create"}'
+    values: "0+95x20" # 95 successes per minute → 5/100 = 5%
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: MaestroSpecControllerReconcileErrors
+    exp_alerts: []
