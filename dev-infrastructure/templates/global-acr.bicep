@@ -81,33 +81,47 @@ module ocpRedhatProdCaching '../modules/acr/cache.bicep' = {
       {
         ruleName: 'redhat-prod-redhat-operator-index'
         sourceRepo: 'quay.io/redhat-prod/redhat----redhat-operator-index'
-        targetRepo: 'redhat-prod/redhat-operator-index'
+        targetRepo: 'rrio/redhat/redhat-operator-index'
         userIdentifier: 'redhat-prod-quay-username'
         passwordIdentifier: 'redhat-prod-quay-password'
         loginServer: 'quay.io'
       }
+    ]
+    keyVaultName: globalKeyVaultName
+  }
+  dependsOn: [
+    ocpAcr
+  ]
+}
+
+module ocpRedhatPendingCaching '../modules/acr/cache.bicep' = {
+  name: '${ocpAcrName}-redhat-pending-caching'
+  params: {
+    acrName: ocpAcrName
+    location: location
+    quayRepositoriesToCache: [
       {
-        ruleName: 'redhat-prod-certified-operator-index'
-        sourceRepo: 'quay.io/redhat-prod/redhat----certified-operator-index'
-        targetRepo: 'redhat-prod/certified-operator-index'
-        userIdentifier: 'redhat-prod-quay-username'
-        passwordIdentifier: 'redhat-prod-quay-password'
+        ruleName: 'redhat-pending-certified-operator-index'
+        sourceRepo: 'quay.io/redhat-pending/redhat----certified-operator-index'
+        targetRepo: 'rrio/redhat/certified-operator-index'
+        userIdentifier: 'redhat-pending-quay-username'
+        passwordIdentifier: 'redhat-pending-quay-password'
         loginServer: 'quay.io'
       }
       {
-        ruleName: 'redhat-prod-community-operator-index'
-        sourceRepo: 'quay.io/redhat-prod/redhat----community-operator-index'
-        targetRepo: 'redhat-prod/community-operator-index'
-        userIdentifier: 'redhat-prod-quay-username'
-        passwordIdentifier: 'redhat-prod-quay-password'
+        ruleName: 'redhat-pending-community-operator-index'
+        sourceRepo: 'quay.io/redhat-pending/redhat----community-operator-index'
+        targetRepo: 'rrio/redhat/community-operator-index'
+        userIdentifier: 'redhat-pending-quay-username'
+        passwordIdentifier: 'redhat-pending-quay-password'
         loginServer: 'quay.io'
       }
       {
-        ruleName: 'redhat-prod-redhat-marketplace-index'
-        sourceRepo: 'quay.io/redhat-prod/redhat----redhat-marketplace-index'
-        targetRepo: 'redhat-prod/redhat-marketplace-index'
-        userIdentifier: 'redhat-prod-quay-username'
-        passwordIdentifier: 'redhat-prod-quay-password'
+        ruleName: 'redhat-pending-redhat-marketplace-index'
+        sourceRepo: 'quay.io/redhat-pending/redhat----redhat-marketplace-index'
+        targetRepo: 'rrio/redhat/redhat-marketplace-index'
+        userIdentifier: 'redhat-pending-quay-username'
+        passwordIdentifier: 'redhat-pending-quay-password'
         loginServer: 'quay.io'
       }
     ]
