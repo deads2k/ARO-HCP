@@ -104,3 +104,23 @@ module msftAlerts '../modules/metrics/msft-rules.bicep' = {
     actionGroups: msftActionGroups
   }
 }
+
+module svcIngestionAlerts '../modules/metrics/amw-ingestion-alerts.bicep' = {
+  name: 'svcIngestionAlerts'
+  params: {
+    azureMonitorWorkspaceId: azureMonitoringWorkspaceId
+    workspaceLabel: 'svc'
+    actionGroups: sreActionGroups
+    enabled: alertsEnabled
+  }
+}
+
+module hcpIngestionAlerts '../modules/metrics/amw-ingestion-alerts.bicep' = {
+  name: 'hcpIngestionAlerts'
+  params: {
+    azureMonitorWorkspaceId: hcpAzureMonitoringWorkspaceId
+    workspaceLabel: 'hcp'
+    actionGroups: sreActionGroups
+    enabled: alertsEnabled
+  }
+}
