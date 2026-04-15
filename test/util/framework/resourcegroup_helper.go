@@ -150,6 +150,10 @@ func DeleteResourceGroup(
 
 	poller, err := resourceGroupsClient.BeginDelete(ctx, resourceGroupName, opts)
 	if err != nil {
+		if isResourceGroupNotFoundError(err) {
+			ginkgo.GinkgoLogr.Info("resource group already deleted", "resourceGroup", resourceGroupName)
+			return nil
+		}
 		var respErr *azcore.ResponseError
 		if errors.As(err, &respErr) && respErr.StatusCode == http.StatusConflict {
 			resp, getErr := resourceGroupsClient.Get(ctx, resourceGroupName, nil)
@@ -223,6 +227,9 @@ func detachSubnetNSGs(ctx context.Context, networkClientFactory *armnetwork.Clie
 	for vnetPager.More() {
 		vnetPage, err := vnetPager.NextPage(ctx)
 		if err != nil {
+			if isResourceGroupNotFoundError(err) {
+				return nil
+			}
 			return fmt.Errorf("failed listing vnets in resource group %s: %w", resourceGroupName, err)
 		}
 

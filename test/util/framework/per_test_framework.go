@@ -226,7 +226,9 @@ func (tc *perItOrDescribeTestContext) deleteCreatedResources(ctx context.Context
 	}
 	errCleanupResourceGroups := tc.CleanupResourceGroups(ctx, opts)
 	if errCleanupResourceGroups != nil {
-		ginkgo.GinkgoLogr.Error(errCleanupResourceGroups, "at least one resource group failed to delete")
+		if !isIgnorableResourceGroupCleanupError(errCleanupResourceGroups) {
+			ginkgo.GinkgoLogr.Error(errCleanupResourceGroups, "at least one resource group failed to delete")
+		}
 	}
 
 	err = CleanupAppRegistrations(ctx, graphClient, appRegistrations)
@@ -248,11 +250,11 @@ func (tc *perItOrDescribeTestContext) deleteCreatedResources(ctx context.Context
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func isIgnorableResourceGroupCleanupError(err error) bool {
-	if err == nil {
-		return false
-	}
-
+// isResourceGroupNotFoundError returns true if the error indicates the resource
+// group does not exist (HTTP 404 or ResourceGroupNotFound/ResourceNotFound error
+// codes). This is used during cleanup and debug collection to gracefully handle
+// resource groups that have already been deleted.
+func isResourceGroupNotFoundError(err error) bool {
 	var responseErr *azcore.ResponseError
 	if errors.As(err, &responseErr) {
 		if responseErr.StatusCode == http.StatusNotFound {
@@ -266,6 +268,13 @@ func isIgnorableResourceGroupCleanupError(err error) bool {
 	}
 
 	return false
+}
+
+func isIgnorableResourceGroupCleanupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return isResourceGroupNotFoundError(err)
 }
 
 type CleanupWorkflow string
@@ -344,7 +353,9 @@ func (tc *perItOrDescribeTestContext) collectDebugInfo(ctx context.Context) {
 	}
 	if err := waitGroup.Wait(); err != nil {
 		// remember that Wait only shows the first error, not all the errors.
-		ginkgo.GinkgoLogr.Error(err, "at least one resource group failed to collect")
+		if !isResourceGroupNotFoundError(err) {
+			ginkgo.GinkgoLogr.Error(err, "at least one resource group failed to collect")
+		}
 	}
 
 	ginkgo.GinkgoLogr.Info("finished collecting debug info")
@@ -467,6 +478,9 @@ func (tc *perItOrDescribeTestContext) cleanupResourceGroup(ctx context.Context, 
 	if err := DeleteAllHCPClusters(ctx, hcpClientFactory.NewHcpOpenShiftClustersClient(), resourceGroupName, timeout); err != nil {
 		if errors.Is(err, &NonConformingClustersError{}) {
 			nonConformantErr = err
+		} else if isResourceGroupNotFoundError(err) {
+			ginkgo.GinkgoLogr.Info("resource group already deleted, skipping cleanup", "resourceGroup", resourceGroupName)
+			return nil
 		} else {
 			return fmt.Errorf("failed to cleanup resource group: %w", err)
 		}
@@ -572,6 +586,10 @@ func (tc *perItOrDescribeTestContext) collectDebugInfoForResourceGroup(ctx conte
 	ginkgo.GinkgoLogr.Info("collecting deployments", "resourceGroup", resourceGroupName)
 	allDeployments, err := ListAllDeployments(ctx, armResourceClient.NewDeploymentsClient(), resourceGroupName, 10*time.Minute)
 	if err != nil {
+		if isResourceGroupNotFoundError(err) {
+			ginkgo.GinkgoLogr.Info("resource group not found, skipping debug info collection", "resourceGroup", resourceGroupName)
+			return nil
+		}
 		return fmt.Errorf("failed to list deployments in %q: %w", resourceGroupName, err)
 	}
 	fullDeploymentListPath := filepath.Join(tc.perBinaryInvocationTestContext.artifactDir, "resourcegroups", resourceGroupName, "deployments.yaml")
