@@ -54,6 +54,10 @@ func ToNodePoolResourceIDString(subscriptionName, resourceGroupName, clusterName
 	))
 }
 
+func ToExternalAuthResourceID(subscriptionName, resourceGroupName, clusterName, externalAuthName string) (*azcorearm.ResourceID, error) {
+	return azcorearm.ParseResourceID(ToExternalAuthResourceIDString(subscriptionName, resourceGroupName, clusterName, externalAuthName))
+}
+
 func ToExternalAuthResourceIDString(subscriptionName, resourceGroupName, clusterName, externalAuthName string) string {
 	return strings.ToLower(path.Join(
 		"/subscriptions", subscriptionName,
