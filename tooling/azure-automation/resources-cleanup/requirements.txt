@@ -4,7 +4,7 @@ azure-identity==1.16.1
 azure-mgmt-core==1.4.0
 azure-mgmt-resource==23.0.1
 certifi==2024.7.4
-cffi==1.17.1
+cffi==2.0.0
 charset-normalizer==3.3.2
 cryptography==46.0.5
 exceptiongroup==1.2.0
