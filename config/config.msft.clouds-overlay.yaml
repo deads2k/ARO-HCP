@@ -47,3 +47,7 @@ clouds:
           frontend:
             audit:
               connectSocket: true
+        regions:
+          switzerlandnorth:
+            kusto:
+              kustoName: "hcp-prod-ch-2"
