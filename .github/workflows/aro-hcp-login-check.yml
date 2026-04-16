@@ -20,9 +20,6 @@ jobs:
       with:
         filters: |
           affected:
-            - '.github/workflows/aro-hcp-cd.yml'
-            - '.github/workflows/environment-infra-cd.yml'
-            - '.github/workflows/services-cd.yml'
             - 'config/config.yaml'
             - 'dev-infrastructure/**/*.bicep'
             - 'dev-infrastructure/**/*.bicepparam'
