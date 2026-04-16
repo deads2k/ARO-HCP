@@ -517,6 +517,19 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 		request.Header.Get(arm.HeaderNameClientObjectID),
 		request.Header.Get(arm.HeaderNameAsyncNotificationURI),
 		correlationData)
+
+	// XXX TEMPORARY: This must be removed along with the Clusters Service call.
+	//
+	//     For this operation type, because there is no single Clusters Service
+	//     resource to poll for completion, the operation's status field is used
+	//     for backend controller coordination. "Accepted" means the revocation
+	//     has not yet been dispatched to Clusters Service. Once dispatched, the
+	//     operation status becomes "Deleting" and is ready for status polling.
+	//
+	//     Because the credentials revocation has already been dispatched here,
+	//     set the initial operation status to "Deleting".
+	operationDoc.Status = arm.ProvisioningStateDeleting
+
 	transaction.OnSuccess(addOperationResponseHeaders(writer, request, operationDoc.NotificationURI, operationDoc.OperationID))
 	_, err = f.dbClient.Operations(operationDoc.OperationID.SubscriptionID).AddCreateToTransaction(ctx, transaction, operationDoc, nil)
 	if err != nil {
