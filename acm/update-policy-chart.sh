@@ -135,7 +135,7 @@ sed -i.bak 's|^\([[:space:]]*image:[[:space:]]*\)"{{ .Values.global.imageOverrid
 
 # the upstream helm chart renders toleration values without quotes, which causes
 # Kubernetes to interpret "true" as a boolean instead of a string.
-sed -i.bak 's|{{ if .Value }} value: {{ .Value }}|{{ if .Value }} value: "{{ .Value }}"|' "$policy_helm_charts_dir/cluster-lifecycle/templates/klusterlet-addon-deployment.yaml"
+sed -i.bak 's#{{ if .Value }} value: {{ .Value }}#{{ if .Value }} value: {{ .Value | quote }}#' "$policy_helm_charts_dir/cluster-lifecycle/templates/klusterlet-addon-deployment.yaml"
 rm -f "$policy_helm_charts_dir/cluster-lifecycle/templates/klusterlet-addon-deployment.yaml.bak"
 
 
