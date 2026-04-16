@@ -28,6 +28,7 @@ spec:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/forwarder-configmap.yaml") . | sha256sum }}
     spec:
+      priorityClassName: service-lifecycle-critical
       serviceAccountName: '{{ .Values.forwarder.serviceAccountName }}'
       shareProcessNamespace: true
       containers:

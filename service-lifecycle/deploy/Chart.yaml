@@ -1,0 +1,5 @@
+apiVersion: v2
+name: service-lifecycle
+description: Service lifecycle definitions for ARO-HCP critical workloads
+version: 0.1.0
+appVersion: "0.1.0"

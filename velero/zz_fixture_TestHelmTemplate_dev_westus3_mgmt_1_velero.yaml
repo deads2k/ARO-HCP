@@ -357,6 +357,23 @@ data:
             operator: "Equal"
             value: "true"
             effect: "NoSchedule"
+    ---
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: node-agent
+      namespace: velero
+    spec:
+      template:
+        spec:
+          priorityClassName: service-lifecycle-critical
+          nodeSelector:
+            aro-hcp.azure.com/role: infra
+          tolerations:
+          - key: "infra"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
 ---
 # Source: velero-hcp-cli/templates/install-job.yaml
 apiVersion: batch/v1
