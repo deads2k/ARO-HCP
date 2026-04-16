@@ -68,6 +68,16 @@ func (opsync *operationRevokeCredentials) ShouldProcess(ctx context.Context, ope
 	if operation.Request != database.OperationRequestRevokeCredentials {
 		return false
 	}
+	// For this operation type, because there is no guarantee of break-
+	// glass credentials being present in Clusters Service to signal when
+	// the revocation has actually been dispatched, the operation's status
+	// field is instead used for controller coordination. "Accepted" means
+	// the credential revocation has not yet been dispatched to Clusters
+	// Service. Once dispatched, the operation status becomes "Deleting"
+	// and is ready for status polling.
+	if operation.Status == arm.ProvisioningStateAccepted {
+		return false
+	}
 	return true
 }
 
