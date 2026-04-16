@@ -162,6 +162,8 @@ resourceGroups:
         resourceGroup: global
         step: output
         name: ocpAcrLoginServer
+    - name: PROVISION_SHARD_STATUS
+      configRef: clustersService.provisionShardStatus
     - name: PROVISION_SHARD_CLUSTER_LIMIT
       configRef: clustersService.provisionShardClusterLimit
     # this is maestro consumer registration stuff

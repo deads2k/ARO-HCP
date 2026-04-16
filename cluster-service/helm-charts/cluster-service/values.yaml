@@ -196,6 +196,7 @@ shard:
   maestroRestUrl: ""
   maestroGrpUrl: ""
   aksManagementClusterResourceId: ""
+  status: ""
 # ocm client id
 clientId: "foo"
 # ocm secret
