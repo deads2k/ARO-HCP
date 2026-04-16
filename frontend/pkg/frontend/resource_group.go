@@ -24,6 +24,11 @@ import (
 )
 
 // ResourceGroupChecker checks if a resource group exists in Azure.
+// In production, ARM validates resource groups before routing requests to the
+// RP, so a collection GET for a non-existent resource group never reaches the
+// frontend. In development environments there is no ARM proxy layer, so the
+// frontend must perform this check itself to return a proper 404 instead of
+// an internal server error.
 type ResourceGroupChecker interface {
 	Exists(ctx context.Context, subscriptionID, resourceGroupName string) (bool, error)
 }
