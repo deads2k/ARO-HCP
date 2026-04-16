@@ -28,7 +28,6 @@ func runGrafanaDatasourcesStep(_ graph.Identifier, step *types.GrafanaDatasource
 	opts.GrafanaName = step.GrafanaName
 	opts.SubscriptionID = executionTarget.GetSubscriptionID()
 	opts.ResourceGroup = executionTarget.GetResourceGroup()
-	opts.DryRun = options.DryRun
 
 	validated, err := opts.Validate(ctx)
 	if err != nil {
