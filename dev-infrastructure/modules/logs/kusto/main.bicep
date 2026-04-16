@@ -76,7 +76,7 @@ module serviceLogs 'database.bicep' = {
   params: {
     kustoName: kustoName
     databaseName: db.serviceLogs
-    softDeletePeriod: 'P14D'
+    softDeletePeriod: 'P90D'
     hotCachePeriod: 'P2D'
   }
   dependsOn: [cluster]
