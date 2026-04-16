@@ -92,6 +92,8 @@ var _ = Describe("Engineering", func() {
 			metricsOutput := string(body)
 			Expect(metricsOutput).To(ContainSubstring("public_ip_count_by_region_service_tag"),
 				"Expected metric 'foo_bar' not found in metrics output")
+			Expect(metricsOutput).To(ContainSubstring("kusto_logs_age_in_seconds"),
+				"Expected metric 'kusto_logs_age_in_seconds' not found in metrics output")
 		})
 })
 
