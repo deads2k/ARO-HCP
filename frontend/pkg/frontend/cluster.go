@@ -107,18 +107,6 @@ func (f *Frontend) ArmResourceListClusters(writer http.ResponseWriter, request *
 	if err != nil {
 		return utils.TrackError(err)
 	}
-
-	// When no clusters are found and a resource group is specified, verify the resource group exists. If it doesn't, return a 404.
-	if len(clustersByClusterServiceID) == 0 && resourceGroupName != "" && f.resourceGroupChecker != nil {
-		exists, rgErr := f.resourceGroupChecker.Exists(ctx, subscriptionID, resourceGroupName)
-		if rgErr != nil {
-			return utils.TrackError(rgErr)
-		}
-		if !exists {
-			return arm.NewResourceGroupNotFoundError(resourceGroupName, subscriptionID)
-		}
-	}
-
 	// MiddlewareReferer ensures Referer is present.
 	err = pagedResponse.SetNextLink(request.Referer(), internalClusterIterator.GetContinuationToken())
 	if err != nil {

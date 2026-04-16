@@ -46,7 +46,6 @@ const (
 	CloudErrorCodeInvalidSubscriptionID    = "InvalidSubscriptionID"
 	CloudErrorCodeInvalidResourceName      = "InvalidResourceName"
 	CloudErrorCodeInvalidResourceGroupName = "InvalidResourceGroupName"
-	CloudErrorCodeParentResourceNotFound   = "ParentResourceNotFound"
 	CloudErrorCodeLockContention           = "LockContention"
 	CloudErrorCodeFeatureNotEnabled        = "FeatureNotEnabled"
 )
@@ -271,27 +270,6 @@ func NewResourceNotFoundError(resourceID *azcorearm.ResourceID) *CloudError {
 // WriteResourceNotFoundError writes a nonexistent resource error to the given ResponseWriter
 func WriteResourceNotFoundError(w http.ResponseWriter, resourceID *azcorearm.ResourceID) {
 	WriteCloudError(w, NewResourceNotFoundError(resourceID))
-}
-
-// NewResourceGroupNotFoundError creates a CloudError for a nonexistent resource group.
-func NewResourceGroupNotFoundError(resourceGroupName, subscriptionID string) *CloudError {
-	return NewCloudError(
-		http.StatusNotFound,
-		CloudErrorCodeResourceGroupNotFound,
-		fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", subscriptionID, resourceGroupName),
-		"Resource group '%s' could not be found.",
-		resourceGroupName)
-}
-
-// NewParentResourceNotFoundError creates a CloudError for when a child resource
-// operation fails because the parent resource does not exist.
-func NewParentResourceNotFoundError(parentResourceID *azcorearm.ResourceID, childResourceType azcorearm.ResourceType) *CloudError {
-	return NewCloudError(
-		http.StatusNotFound,
-		CloudErrorCodeParentResourceNotFound,
-		parentResourceID.String(),
-		"Failed to perform 'read' on resource(s) of type '%s', because the parent resource '%s' could not be found.",
-		childResourceType, parentResourceID.String())
 }
 
 // NewInvalidRequestContentError creates a CloudError for an invalid request content error

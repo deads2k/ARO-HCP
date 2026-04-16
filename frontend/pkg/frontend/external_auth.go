@@ -84,21 +84,6 @@ func (f *Frontend) ArmResourceListExternalAuths(writer http.ResponseWriter, requ
 
 	internalCluster, err := f.dbClient.HCPClusters(subscriptionID, resourceGroupName).Get(ctx, resourceName)
 	if err != nil {
-		if database.IsResponseError(err, http.StatusNotFound) {
-			if f.resourceGroupChecker != nil {
-				exists, rgErr := f.resourceGroupChecker.Exists(ctx, subscriptionID, resourceGroupName)
-				if rgErr != nil {
-					return utils.TrackError(rgErr)
-				}
-				if !exists {
-					return arm.NewResourceGroupNotFoundError(resourceGroupName, subscriptionID)
-				}
-			}
-			return arm.NewParentResourceNotFoundError(
-				database.NewClusterResourceID(subscriptionID, resourceGroupName, resourceName),
-				api.ExternalAuthResourceType,
-			)
-		}
 		return utils.TrackError(err)
 	}
 

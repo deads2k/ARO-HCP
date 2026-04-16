@@ -87,21 +87,6 @@ func (f *Frontend) ArmResourceListNodePools(writer http.ResponseWriter, request 
 
 	internalCluster, err := f.dbClient.HCPClusters(subscriptionID, resourceGroupName).Get(ctx, clusterName)
 	if err != nil {
-		if database.IsResponseError(err, http.StatusNotFound) {
-			if f.resourceGroupChecker != nil {
-				exists, rgErr := f.resourceGroupChecker.Exists(ctx, subscriptionID, resourceGroupName)
-				if rgErr != nil {
-					return utils.TrackError(rgErr)
-				}
-				if !exists {
-					return arm.NewResourceGroupNotFoundError(resourceGroupName, subscriptionID)
-				}
-			}
-			return arm.NewParentResourceNotFoundError(
-				database.NewClusterResourceID(subscriptionID, resourceGroupName, clusterName),
-				api.NodePoolResourceType,
-			)
-		}
 		return utils.TrackError(err)
 	}
 

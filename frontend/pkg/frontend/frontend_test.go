@@ -104,7 +104,6 @@ func TestSubscriptionsGET(t *testing.T) {
 				mockDBClient,
 				nil,
 				newNoopAuditClient(t),
-				nil,
 				api.TestLocation,
 				"", false, false, true,
 			)
@@ -253,7 +252,6 @@ func TestSubscriptionsPUT(t *testing.T) {
 				mockDBClient,
 				nil,
 				newNoopAuditClient(t),
-				nil,
 				api.TestLocation,
 				"", false, false, true,
 			)
@@ -466,7 +464,6 @@ func TestDeploymentPreflight(t *testing.T) {
 				mockDBClient,
 				nil,
 				newNoopAuditClient(t),
-				nil,
 				api.TestLocation,
 				"", false, false, true,
 			)
@@ -593,7 +590,6 @@ func TestRequestAdminCredential(t *testing.T) {
 				mockDBClient,
 				mockCSClient,
 				newNoopAuditClient(t),
-				nil,
 				api.TestLocation,
 				"", false, false, true,
 			)
@@ -713,7 +709,6 @@ func TestRevokeCredentials(t *testing.T) {
 				mockDBClient,
 				mockCSClient,
 				newNoopAuditClient(t),
-				nil,
 				api.TestLocation,
 				"", false, false, true,
 			)

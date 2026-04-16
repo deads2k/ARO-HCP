@@ -76,8 +76,6 @@ type Frontend struct {
 
 	apiRegistry api.APIRegistry
 
-	resourceGroupChecker ResourceGroupChecker
-
 	exitOnPanic bool
 }
 
@@ -89,7 +87,6 @@ func NewFrontend(
 	dbClient database.DBClient,
 	csClient ocm.ClusterServiceClientSpec,
 	auditClient audit.Client,
-	resourceGroupChecker ResourceGroupChecker,
 	azureLocation string,
 	clusterServiceProvisionShard string,
 	clusterServiceNoopProvision bool,
@@ -129,10 +126,9 @@ func NewFrontend(
 				Help: "Reports the health status of the service (0: not healthy, 1: healthy).",
 			},
 		),
-		azureLocation:        azureLocation,
-		apiRegistry:          apiRegistry,
-		resourceGroupChecker: resourceGroupChecker,
-		exitOnPanic:          exitOnPanic,
+		azureLocation: azureLocation,
+		apiRegistry:   apiRegistry,
+		exitOnPanic:   exitOnPanic,
 	}
 
 	f.server.Handler = f.routes(registry)

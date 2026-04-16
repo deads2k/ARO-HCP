@@ -15,8 +15,10 @@
 package framework
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -28,6 +30,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 )
@@ -49,6 +52,75 @@ func (p *armSystemDataPolicy) Do(req *policy.Request) (*http.Response, error) {
 		req.Raw().Header.Set("X-Ms-Identity-Url", "https://dummyhost.identity.azure.net")
 	}
 	return req.Next()
+}
+
+// armResourceGroupValidationPolicy simulates ARM's resource group validation
+// for development environments where requests go directly to the RP frontend.
+// In production, ARM validates that the target resource group exists before
+// routing requests to the RP. This policy replicates that behavior so that
+// AroRpApiCompatible tests produce consistent results across environments.
+type armResourceGroupValidationPolicy struct {
+	cred azcore.TokenCredential
+}
+
+func (p *armResourceGroupValidationPolicy) Do(req *policy.Request) (*http.Response, error) {
+	frontendURL, err := url.Parse(frontendAddress())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse frontend address: %w", err)
+	}
+
+	if req.Raw().URL.Host != frontendURL.Host {
+		return req.Next()
+	}
+
+	subID, rgName := parseResourceGroupFromPath(req.Raw().URL.Path)
+	if subID == "" || rgName == "" {
+		return req.Next()
+	}
+
+	client, err := armresources.NewResourceGroupsClient(subID, p.cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource group client: %w", err)
+	}
+
+	_, err = client.Get(req.Raw().Context(), rgName, nil)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) && respErr.ErrorCode == "ResourceGroupNotFound" {
+			cloudErr := arm.NewCloudError(
+				http.StatusNotFound,
+				arm.CloudErrorCodeResourceGroupNotFound,
+				"",
+				"Resource group '%s' could not be found.",
+				rgName,
+			)
+			body, _ := json.Marshal(cloudErr)
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(string(body))),
+				Request:    req.Raw(),
+			}, nil
+		}
+		return nil, err
+	}
+
+	return req.Next()
+}
+
+// parseResourceGroupFromPath extracts the subscription ID and resource group
+// name from a URL path like /subscriptions/{subId}/resourceGroups/{rgName}/...
+func parseResourceGroupFromPath(path string) (subscriptionID, resourceGroupName string) {
+	parts := strings.Split(strings.ToLower(path), "/")
+	for i, part := range parts {
+		if part == "subscriptions" && i+1 < len(parts) {
+			subscriptionID = strings.Split(path, "/")[i+1]
+		}
+		if part == "resourcegroups" && i+1 < len(parts) {
+			resourceGroupName = strings.Split(path, "/")[i+1]
+		}
+	}
+	return
 }
 
 // correlationRequestIDPolicy generates a UUIDv4 correlation ID per request

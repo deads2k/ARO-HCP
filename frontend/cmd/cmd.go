@@ -33,10 +33,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/tracing/azotel"
 
 	sdk "github.com/openshift-online/ocm-sdk-go"
@@ -245,24 +243,8 @@ func (opts *FrontendOpts) Run() error {
 		utils.TracerName,
 	)
 
-	// Create Azure credentials for resource group validation.
-	azureCred, err := azidentity.NewDefaultAzureCredential(
-		&azidentity.DefaultAzureCredentialOptions{
-			ClientOptions: azcore.ClientOptions{
-				Cloud: cloud.AzurePublic,
-			},
-		})
-	if err != nil {
-		return fmt.Errorf("failed to create Azure credentials: %w", err)
-	}
-	rgChecker := frontend.NewAzureResourceGroupChecker(azureCred, &azcorearm.ClientOptions{
-		ClientOptions: azcore.ClientOptions{
-			Cloud: cloud.AzurePublic,
-		},
-	})
-
 	f := frontend.NewFrontend(
-		logger, listener, metricsListener, registry, dbClient, csClient, auditClient, rgChecker, opts.location, opts.clusterServiceProvisionShard,
+		logger, listener, metricsListener, registry, dbClient, csClient, auditClient, opts.location, opts.clusterServiceProvisionShard,
 		opts.clusterServiceNoopProvision, opts.clusterServiceNoopDeprovision, opts.exitOnPanic,
 	)
 
