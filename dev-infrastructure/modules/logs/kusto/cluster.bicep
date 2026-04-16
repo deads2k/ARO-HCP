@@ -2,6 +2,9 @@ import {
   csvToArray
 } from '../../../modules/common.bicep'
 
+@description('Azure Region Location')
+param location string = resourceGroup().location
+
 @description('Name of the Kusto cluster to create')
 param kustoName string
 
@@ -48,7 +51,7 @@ var viewerPermissions = [
 // Core Kusto cluster (no databases here; those are in separate modules)
 resource kusto 'Microsoft.Kusto/clusters@2024-04-13' = {
   name: kustoName
-  location: resourceGroup().location
+  location: location
   sku: {
     name: sku
     tier: tier

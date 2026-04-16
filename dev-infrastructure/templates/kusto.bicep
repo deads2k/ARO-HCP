@@ -37,6 +37,7 @@ param enableAutoScale bool
 module kusto '../modules/logs/kusto/main.bicep' = if (manageInstance) {
   name: 'kusto-${location}'
   params: {
+    location: location
     kustoName: kustoName
     dstsGroups: []
     sku: sku

@@ -1,5 +1,6 @@
 using '../templates/kusto.bicep'
 
+param location = '{{ .kusto.location }}'
 
 param sku = '{{ .kusto.sku }}'
 param tier = '{{ .kusto.tier }}'

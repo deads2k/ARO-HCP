@@ -1,3 +1,6 @@
+@description('Azure Region Location')
+param location string = resourceGroup().location
+
 @description('The SKU of the cluster')
 param sku string = 'Standard_D12_v2'
 
@@ -59,6 +62,7 @@ var allCustomerLogsTablesKQL = {
 module cluster 'cluster.bicep' = {
   name: 'cluster'
   params: {
+    location: location
     kustoName: kustoName
     sku: sku
     tier: tier
@@ -74,6 +78,7 @@ module cluster 'cluster.bicep' = {
 module serviceLogs 'database.bicep' = {
   name: 'servicelogs'
   params: {
+    location: location
     kustoName: kustoName
     databaseName: db.serviceLogs
     softDeletePeriod: 'P90D'
@@ -85,6 +90,7 @@ module serviceLogs 'database.bicep' = {
 module hostedControlPlaneLogs 'database.bicep' = {
   name: 'hostedControlPlaneLogs'
   params: {
+    location: location
     kustoName: kustoName
     databaseName: db.hostedControlPlaneLogs
     softDeletePeriod: 'P14D'
