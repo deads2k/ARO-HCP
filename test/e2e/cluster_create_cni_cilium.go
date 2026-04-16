@@ -16,28 +16,28 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	hcpsdk "github.com/Azure/ARO-HCP/test/sdk/resourcemanager/redhatopenshifthcp/armredhatopenshifthcp"
 	"github.com/Azure/ARO-HCP/test/util/framework"
 	"github.com/Azure/ARO-HCP/test/util/labels"
 	"github.com/Azure/ARO-HCP/test/util/verifiers"
 )
 
 var _ = Describe("Customer", func() {
-	It("should be able to create a HCP cluster without CNI",
+	It("should be able to create a HCP cluster and use cilium CNI plugin",
 		labels.RequireNothing,
 		labels.Critical,
 		labels.Positive,
 		labels.AroRpApiCompatible,
 		func(ctx context.Context) {
-			Skip("Skipping WIP test: https://issues.redhat.com/browse/ARO-20529")
 			const (
-				customerClusterName  = "no-cni-cl"
-				customerNodePoolName = "no-cni-np"
+				customerClusterName  = "cilium-cl"
+				customerNodePoolName = "cilium-np"
+				ciliumNamespace      = "kube-system"
 			)
 			tc := framework.NewTestContext()
 
@@ -47,7 +47,7 @@ var _ = Describe("Customer", func() {
 			}
 
 			By("creating a resource group")
-			resourceGroup, err := tc.NewResourceGroup(ctx, "e2e-no-cni", tc.Location())
+			resourceGroup, err := tc.NewResourceGroup(ctx, "cni-cilium", tc.Location())
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating cluster parameters")
@@ -55,6 +55,7 @@ var _ = Describe("Customer", func() {
 			clusterParams.ClusterName = customerClusterName
 			managedResourceGroupName := framework.SuffixName(*resourceGroup.Name, "-managed", 64)
 			clusterParams.ManagedResourceGroupName = managedResourceGroupName
+
 			By("setting no cni network configuration")
 			clusterParams.Network.NetworkType = "Other"
 			clusterParams.Network.PodCIDR = "10.128.0.0/14"
@@ -66,13 +67,13 @@ var _ = Describe("Customer", func() {
 			clusterParams, err = tc.CreateClusterCustomerResources(ctx,
 				resourceGroup,
 				clusterParams,
-				map[string]interface{}{},
+				map[string]any{},
 				TestArtifactsFS,
 				framework.RBACScopeResourceGroup,
 			)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating no-cni HCP cluster")
+			By("creating HCP cluster without CNI")
 			err = tc.CreateHCPClusterFromParam(
 				ctx,
 				GinkgoLogr,
@@ -93,37 +94,78 @@ var _ = Describe("Customer", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(verifiers.VerifyHCPCluster(ctx, adminRESTConfig)).To(Succeed())
 
+			By("getting kubeconfig content for Helm")
+			kubeconfigContent, err := framework.GenerateKubeconfig(adminRESTConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("installing Cilium via Helm")
+			ciliumValues := map[string]any{
+				"debug": map[string]any{
+					"enabled": true,
+				},
+				"k8s": map[string]any{
+					"requireIPv4PodCIDR": true,
+				},
+				"logSystemLoad": true,
+				"bpf": map[string]any{
+					"preallocateMaps": true,
+				},
+				"ipv4": map[string]any{
+					"enabled": true,
+				},
+				"ipv6": map[string]any{
+					"enabled": false,
+				},
+				"identityChangeGracePeriod": "0s",
+				"ipam": map[string]any{
+					"mode": "cluster-pool",
+					"operator": map[string]any{
+						"clusterPoolIPv4PodCIDRList": clusterParams.Network.PodCIDR,
+						"clusterPoolIPv4MaskSize":    clusterParams.Network.HostPrefix,
+					},
+				},
+				"endpointRoutes": map[string]any{
+					"enabled": true,
+				},
+				"tunnelPort": 4789,
+				"cni": map[string]any{
+					"binPath":      "/var/lib/cni/bin",
+					"confPath":     "/var/run/multus/cni/net.d",
+					"chainingMode": "portmap",
+				},
+				"prometheus": map[string]any{
+					"serviceMonitor": map[string]any{
+						"enabled": false,
+					},
+				},
+				"hubble": map[string]any{
+					"tls": map[string]any{
+						"enabled": false,
+					},
+				},
+			}
+			err = framework.InstallCiliumChart(ctx, "1.19.2", ciliumValues, kubeconfigContent, ciliumNamespace)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("creating the node pool")
 			nodePoolParams := framework.NewDefaultNodePoolParams()
 			nodePoolParams.NodePoolName = customerNodePoolName
-
-			err = tc.CreateNodePoolFromParam(ctx,
+			nodePoolErr := tc.CreateNodePoolFromParam(ctx,
 				*resourceGroup.Name,
 				customerClusterName,
 				nodePoolParams,
 				45*time.Minute,
 			)
-			// ARO-20829 workaround: instead of a finished and successful
-			// deployment, we expect that the provisioning is still going on
-			Expect(err).To(HaveOccurred())
-			By("expecting the node pool to be still deploying because of ARO-20829")
-			nodePool, err := framework.GetNodePool(ctx,
-				tc.Get20240610ClientFactoryOrDie(ctx).NewNodePoolsClient(),
-				*resourceGroup.Name,
-				customerClusterName,
-				customerNodePoolName,
-			)
+			// We delay checking the error on purpose to get more details
+			// about the issue by running the verifiers.
+
+			By("checking that cilium is running and nodes are in Ready state")
+			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady(), verifiers.VerifyCiliumOperational(ciliumNamespace, "k8s-app=cilium"))
+			Expect(errors.Join(err, nodePoolErr)).NotTo(HaveOccurred())
+
+			By("verifying a simple web app can run with cilium")
+			err = verifiers.VerifySimpleWebApp().Verify(ctx, adminRESTConfig)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodePool.Properties).ToNot(BeNil(), "nodepool Properties was nil")
-			Expect(nodePool.Properties.ProvisioningState).ToNot(BeNil(), "nodepool Properties.ProvisioningState was nil")
-			Expect(*nodePool.Properties.ProvisioningState).To(Equal(hcpsdk.ProvisioningStateProvisioning))
-
-			By("expecting that on a cluster without CNI plugin, nodes are in NotReady state")
-			err = verifiers.VerifyHCPCluster(ctx, adminRESTConfig, verifiers.VerifyNodesReady())
-			Expect(err).To(HaveOccurred())
-
-			// TODO: add cilium setup here, and then rerun VerifyHCPCluster
-			// with VerifyNodesReady() expecting it to pass
 		},
 	)
 })
