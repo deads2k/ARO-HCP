@@ -110,6 +110,10 @@ func NewAdminAPI(
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewCosmosDumpHandler(dbClient).ServeHTTP)),
 	)
 	middlewareMux.Handle(
+		middleware.V1HCPResourcePattern("GET", "/billingdump"),
+		hcpMiddleware.HandlerFunc(errorutils.ReportError(cosmosdump.NewBillingDumpHandler(dbClient).ServeHTTP)),
+	)
+	middlewareMux.Handle(
 		middleware.V1HCPResourcePattern("GET", "/serialconsole"),
 		hcpMiddleware.HandlerFunc(errorutils.ReportError(hcp.NewHCPSerialConsoleHandler(dbClient, fpaCredentialRetriever).ServeHTTP)),
 	)

@@ -35,12 +35,37 @@ func (h *CosmosDumpHandler) ServeHTTP(w http.ResponseWriter, request *http.Reque
 	ctx := request.Context()
 
 	// get the azure resource ID for this HCP
-	resourceID, err := utils.ResourceIDFromContext(request.Context())
+	resourceID, err := utils.ResourceIDFromContext(ctx)
 	if err != nil {
 		return utils.TrackError(err)
 	}
 
 	if err := serverutils.DumpDataToLogger(ctx, h.cosmosClient, resourceID); err != nil {
+		return utils.TrackError(err)
+	}
+
+	_, err = arm.WriteJSONResponse(w, http.StatusOK, map[string]any{})
+	return err
+}
+
+type BillingDumpHandler struct {
+	cosmosClient database.DBClient
+}
+
+func NewBillingDumpHandler(cosmosClient database.DBClient) *BillingDumpHandler {
+	return &BillingDumpHandler{cosmosClient: cosmosClient}
+}
+
+func (h *BillingDumpHandler) ServeHTTP(w http.ResponseWriter, request *http.Request) error {
+	ctx := request.Context()
+
+	// get the azure resource ID for this HCP
+	resourceID, err := utils.ResourceIDFromContext(ctx)
+	if err != nil {
+		return utils.TrackError(err)
+	}
+
+	if err := serverutils.DumpBillingToLogger(ctx, h.cosmosClient, resourceID); err != nil {
 		return utils.TrackError(err)
 	}
 

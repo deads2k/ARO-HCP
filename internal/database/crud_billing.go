@@ -1,4 +1,4 @@
-// Copyright 2025 Microsoft Corporation
+// Copyright 2026 Microsoft Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,10 @@ type BillingDocCRUD interface {
 	// GetByID retrieves a billing document by its ID
 	GetByID(ctx context.Context, billingDocID string) (*BillingDocument, error)
 
+	// List returns an iterator for all billing documents in the given subscription partition.
+	// This includes both active and deleted billing documents.
+	List(ctx context.Context) (DBClientIterator[BillingDocument], error)
+
 	// ListActive lists all active billing documents (without deletion time) for the subscription
 	ListActive(ctx context.Context) ([]*BillingDocument, error)
 
@@ -51,14 +55,21 @@ type billingDocCRUD struct {
 	subscriptionID  string
 }
 
-var _ BillingDocCRUD = &billingDocCRUD{}
-
 // NewBillingDocCRUD creates a new BillingDocCRUD instance for a subscription
 func NewBillingDocCRUD(containerClient *azcosmos.ContainerClient, subscriptionID string) BillingDocCRUD {
 	return &billingDocCRUD{
 		containerClient: containerClient,
 		subscriptionID:  subscriptionID,
 	}
+}
+
+var _ BillingDocCRUD = &billingDocCRUD{}
+
+func (b *billingDocCRUD) List(ctx context.Context) (DBClientIterator[BillingDocument], error) {
+	pk := NewPartitionKey(b.subscriptionID)
+	query := "SELECT * FROM c"
+	pager := b.containerClient.NewQueryItemsPager(query, pk, nil)
+	return newQueryBillingIterator(pager), nil
 }
 
 func (b *billingDocCRUD) Create(ctx context.Context, doc *BillingDocument) error {
