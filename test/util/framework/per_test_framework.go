@@ -248,11 +248,10 @@ func (tc *perItOrDescribeTestContext) deleteCreatedResources(ctx context.Context
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 }
 
-func isIgnorableResourceGroupCleanupError(err error) bool {
-	if err == nil {
-		return false
-	}
-
+// isResourceGroupNotFoundError returns true if the error indicates the resource
+// group does not exist (HTTP 404 or ResourceGroupNotFound/ResourceNotFound error
+// codes).
+func isResourceGroupNotFoundError(err error) bool {
 	var responseErr *azcore.ResponseError
 	if errors.As(err, &responseErr) {
 		if responseErr.StatusCode == http.StatusNotFound {
@@ -266,6 +265,21 @@ func isIgnorableResourceGroupCleanupError(err error) bool {
 	}
 
 	return false
+}
+
+func isIgnorableResourceGroupCleanupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range joined.Unwrap() {
+			if !isIgnorableResourceGroupCleanupError(e) {
+				return false
+			}
+		}
+		return true
+	}
+	return isResourceGroupNotFoundError(err)
 }
 
 type CleanupWorkflow string
