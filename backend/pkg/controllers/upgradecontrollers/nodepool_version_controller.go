@@ -26,16 +26,21 @@ import (
 	"github.com/golang/groupcache/lru"
 	"github.com/google/uuid"
 
+	"k8s.io/apimachinery/pkg/api/operation"
+
 	"github.com/openshift/cluster-version-operator/pkg/cincinnati"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
 	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/cincinatti"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
 // nodePoolVersionSyncer is a nodePool syncer that synchronizes cluster information
@@ -200,8 +205,13 @@ func (c *nodePoolVersionSyncer) SyncOnce(ctx context.Context, key controllerutil
 		return nil
 	}
 
+	subscription, err := c.cosmosClient.Subscriptions().Get(ctx, cluster.ID.SubscriptionID)
+	if err != nil {
+		return utils.TrackError(fmt.Errorf("failed to get subscription: %w", err))
+	}
+
 	// Validate the customer's desired version before setting it
-	if err := c.validateDesiredNodePoolVersion(ctx, &customerDesiredVersion, existingServiceProviderNodePool, existingServiceProviderCluster, nodePool.Properties.Version.ChannelGroup, clusterKey, clusterUUID); err != nil {
+	if err := c.validateDesiredNodePoolVersion(ctx, &customerDesiredVersion, existingServiceProviderNodePool, existingServiceProviderCluster, subscription, nodePool.Properties.Version.ChannelGroup, clusterKey, clusterUUID); err != nil {
 		return utils.TrackError(fmt.Errorf("invalid desired version: %w", err))
 	}
 
@@ -243,6 +253,7 @@ func prependActiveVersionIfChanged(currentVersions []api.HCPNodePoolActiveVersio
 // It validates:
 //   - The desired version is not less than the highest active node pool version (no downgrades)
 //   - The desired version is not greater than the lowest control plane version
+//   - No major version changes (unless FeatureExperimentalReleaseFeatures is registered)
 //   - No minor versions are skipped
 //   - An upgrade path exists from the current version (all the activeVersions) to the desired version (via Cincinnati)
 //
@@ -252,6 +263,7 @@ func (c *nodePoolVersionSyncer) validateDesiredNodePoolVersion(
 	desiredVersion *semver.Version,
 	spNodePool *api.ServiceProviderNodePool,
 	spCluster *api.ServiceProviderCluster,
+	subscription *arm.Subscription,
 	channelGroup string,
 	clusterKey controllerutils.HCPClusterKey,
 	clusterUUID uuid.UUID,
@@ -265,53 +277,16 @@ func (c *nodePoolVersionSyncer) validateDesiredNodePoolVersion(
 
 	// Get all active versions from ServiceProviderNodePool
 	nodePoolActiveVersions := spNodePool.Status.NodePoolVersion.ActiveVersions
+	lowestCPVersion, _ := apihelpers.FindLowestAndHighestClusterVersion(spCluster.Status.ControlPlaneVersion.ActiveVersions)
 
-	// If desired version is already among active versions, validation passes (upgrade already in progress or complete)
-	if isVersionInActiveVersions(desiredVersion, nodePoolActiveVersions) {
-		return nil
+	// This operation is added to normalize the use for the validations so they are shared
+	// between the frontend and the backend
+	op := operation.Operation{
+		Options: validation.AFECsToValidationOptions(subscription.GetRegisteredFeatures()),
 	}
 
-	// Get the lowest and highest node pool active versions
-	lowestNodePoolVersion, highestNodePoolVersion := api.FindNodePoolVersionBounds(nodePoolActiveVersions)
-
-	// Get the lowest control plane version (most restrictive upper bound)
-	lowestControlPlaneVersion := api.FindLowestClusterVersion(spCluster.Status.ControlPlaneVersion.ActiveVersions)
-
-	// Node pool version >= highest active version (no partial downgrades)
-	if highestNodePoolVersion != nil && desiredVersion.LT(*highestNodePoolVersion) {
-		return fmt.Errorf(
-			"invalid node pool version %s: cannot downgrade from current version %s",
-			desiredVersion.String(), highestNodePoolVersion.String(),
-		)
-	}
-
-	// Node pool version <= control plane version (check against lowest CP version)
-	// TODO: We may relax this constraint in the future
-	if lowestControlPlaneVersion != nil && desiredVersion.GT(*lowestControlPlaneVersion) {
-		return fmt.Errorf(
-			"invalid node pool version %s: cannot exceed control plane version %s",
-			desiredVersion.String(), lowestControlPlaneVersion.String(),
-		)
-	}
-
-	if lowestNodePoolVersion != nil {
-		// TODO: Add support for major version upgrades (e.g., 4.20 → 5.0) when needed
-		// No major version upgrades implemented
-		if desiredVersion.Major != lowestNodePoolVersion.Major {
-			return fmt.Errorf(
-				"invalid upgrade path from %s to %s: major version changes are not supported",
-				lowestNodePoolVersion.String(), desiredVersion.String(),
-			)
-		}
-		// Allow same minor (z-stream upgrade) or next minor (y-stream upgrade)
-		// Cannot skip minor versions (check against lowest node pool version)
-		// TODO: We will relax this constraint in the future to allow skipping minor versions
-		if desiredVersion.Minor > lowestNodePoolVersion.Minor+1 {
-			return fmt.Errorf(
-				"invalid upgrade path from %s to %s: skipping minor versions is not allowed",
-				lowestNodePoolVersion.String(), desiredVersion.String(),
-			)
-		}
+	if err := validation.ValidateNodePoolUpgrade(*desiredVersion, nodePoolActiveVersions, lowestCPVersion, op.HasOption(api.FeatureExperimentalReleaseFeatures)); err != nil {
+		return err
 	}
 
 	// Validate upgrade path exists in Cincinnati for ALL active node pool versions
@@ -324,19 +299,6 @@ func (c *nodePoolVersionSyncer) validateDesiredNodePoolVersion(
 	}
 
 	return nil
-}
-
-// isVersionInActiveVersions checks if the given version is already in the list of active versions.
-func isVersionInActiveVersions(version *semver.Version, activeVersions []api.HCPNodePoolActiveVersion) bool {
-	if version == nil {
-		return false
-	}
-	for _, av := range activeVersions {
-		if av.Version != nil && av.Version.EQ(*version) {
-			return true
-		}
-	}
-	return false
 }
 
 // validateUpgradePathAvailable checks that an upgrade path exists from current to desired version.

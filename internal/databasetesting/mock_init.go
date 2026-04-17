@@ -20,7 +20,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/api/arm"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 // NewMockDBClientWithResources creates a new MockDBClient and populates it with the given resources.
@@ -146,12 +146,12 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 	}
 	parentType := resourceID.Parent.ResourceType
 	switch {
-	case apihelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
 		clusterName := resourceID.Parent.Name
 		controllerCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).Controllers(clusterName)
 		_, err := controllerCRUD.Create(ctx, controller, nil)
 		return err
-	case apihelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
 		if resourceID.Parent.Parent == nil {
 			return fmt.Errorf("nodepool controller is missing grandparent cluster ID")
 		}
@@ -160,7 +160,7 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 		controllerCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(clusterName).Controllers(nodePoolName)
 		_, err := controllerCRUD.Create(ctx, controller, nil)
 		return err
-	case apihelpers.ResourceTypeEqual(parentType, api.ExternalAuthResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.ExternalAuthResourceType):
 		if resourceID.Parent.Parent == nil {
 			return fmt.Errorf("externalauth controller is missing grandparent cluster ID")
 		}

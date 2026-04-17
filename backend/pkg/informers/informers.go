@@ -32,7 +32,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/utils"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 const (
@@ -602,7 +602,7 @@ func findAncestorResourceID(resourceType azcorearm.ResourceType, resourceID *azc
 	if resourceID == nil {
 		return nil, nil
 	}
-	if apihelpers.ResourceTypeEqual(resourceID.ResourceType, resourceType) {
+	if armhelpers.ResourceTypeEqual(resourceID.ResourceType, resourceType) {
 		return []string{strings.ToLower(resourceID.String())}, nil
 	}
 	if resourceID.Parent == nil {

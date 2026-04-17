@@ -38,6 +38,15 @@ const (
 	OpenShiftVersionPrefix = "openshift-v"
 )
 
+// AllowedMajorUpgrades is for OpenShift cross-major upgrades (one major at a time, e.g. 4 to 5). Keys and values
+// are major.minor lines ("x.y"): the key is the current version's line, the value is the only allowed line for
+// the desired version. Used when validating version on clusters and node pools.
+// Add entries when new cross-major paths are supported.
+var AllowMajorUpgradePaths = map[string]string{
+	"4.22": "5.0",
+	"4.23": "5.1",
+}
+
 // Ptr returns a pointer to p.
 func Ptr[T any](p T) *T {
 	return &p
