@@ -270,8 +270,16 @@ type mockBillingGlobalLister struct {
 }
 
 func (l *mockBillingGlobalLister) List(ctx context.Context, options *database.DBClientListResourceDocsOptions) (database.DBClientIterator[database.BillingDocument], error) {
-	// Billing documents are stored directly (not wrapped in TypedDocument)
-	// For the mock, we'll return an empty iterator since billing documents
-	// aren't typically stored in the mock client's document map in the same way
-	return newMockIterator[database.BillingDocument](nil, nil), nil
+	l.client.mu.RLock()
+	defer l.client.mu.RUnlock()
+
+	var ids []string
+	var items []*database.BillingDocument
+
+	for id, doc := range l.client.billing {
+		ids = append(ids, id)
+		items = append(items, doc)
+	}
+
+	return newMockIterator(ids, items), nil
 }

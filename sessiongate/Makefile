@@ -70,6 +70,7 @@ record-override: $(YQ) $(ORAS)
 
 	@DIGEST=$$($(ORAS) manifest fetch --descriptor ${SESSION_GATE_TAGGED_IMAGE} | $(YQ) .digest); \
 	$(YQ) eval -n "\
+		.clouds.dev.environments.$(DEPLOY_ENV).defaults.sessiongate.image.registry = \"$(ARO_HCP_IMAGE_REGISTRY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.sessiongate.image.repository = \"$(SESSION_GATE_GENERATED_IMAGE_REPOSITORY)\" | \
 		.clouds.dev.environments.$(DEPLOY_ENV).defaults.sessiongate.image.digest = \"$$DIGEST\" \
 	" > $(OVERRIDE_CONFIG_FILE)

@@ -1,5 +1,17 @@
 panels:
-- title: "Backend"
+- title: "Frontend Metrics"
+  queries:
+  - title: "Frontend Request Latency"
+    description: "Latency of frontend requests, measured as the 95th percentile of request duration. High latency indicates performance issues."
+    query: |
+      histogram_quantile(0.95,
+        sum by (le, route, method) (
+            rate(frontend_http_requests_duration_seconds_bucket[5m])
+          )
+      ) > 0
+    workspace: svc
+    step: "60s"
+- title: "Backend Metrics"
   queries:
   - title: "Controller Workqueue Retry Ratio"
     description: "Ratio of items re-queued for retry vs items initially added, per controller workqueue. High ratios indicate controllers are repeatedly failing to reconcile. Each backend operation type (ClusterCreate, ClusterDelete, NodePoolCreate, etc.) has its own workqueue."
@@ -38,7 +50,15 @@ panels:
       ) > 0
     workspace: svc
     step: "60s"
-- title: "Maestro"
+  - title: "Controller Panic Rate"
+    description: "Rate of panics caught by the runtime panic handler, per controller. Any non-zero rate indicates a controller is actively crashing and recovering via the panic handler."
+    query: |
+      sum by (controller, cluster) (
+        rate(panic_total{namespace="aro-hcp"}[5m])
+      ) > 0
+    workspace: svc
+    step: "60s"
+- title: "Maestro Metrics"
   queries:
   - title: "REST API Request Rate by Status"
     description: "Rate of REST API requests grouped by HTTP status code. Clusters-service and backend use this API for resource CRUD. Non-2xx codes indicate client errors (4xx) or server failures (5xx)."

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -40,6 +41,8 @@ import (
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/clusterpropertiescontroller"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/datadumpcontrollers"
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/externalauthpropertiescontroller"
+	"github.com/Azure/ARO-HCP/backend/pkg/controllers/metricscontrollers"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/mismatchcontrollers"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/nodepoolpropertiescontroller"
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/operationcontrollers"
@@ -65,7 +68,10 @@ type BackendOptions struct {
 	LeaderElectionLock                 resourcelock.Interface
 	CosmosDBClient                     database.DBClient
 	ClustersServiceClient              ocm.ClusterServiceClientSpec
+	MetricsRegisterer                  prometheus.Registerer
+	MetricsGatherer                    prometheus.Gatherer
 	MetricsServerListenAddress         string
+	MetricsServerListener              net.Listener
 	HealthzServerListenAddress         string
 	TracerProviderShutdownFunc         func(context.Context) error
 	MaestroSourceEnvironmentIdentifier string
@@ -101,6 +107,20 @@ func (o *BackendOptions) RunBackend(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (o *BackendOptions) metricsRegisterer() prometheus.Registerer {
+	if o.MetricsRegisterer != nil {
+		return o.MetricsRegisterer
+	}
+	return legacyregistry.Registerer()
+}
+
+func (o *BackendOptions) metricsGatherer() prometheus.Gatherer {
+	if o.MetricsGatherer != nil {
+		return o.MetricsGatherer
+	}
+	return legacyregistry.DefaultGatherer
 }
 
 func NewBackend(options *BackendOptions) *Backend {
@@ -158,7 +178,7 @@ func (b *Backend) Run(ctx context.Context) error {
 
 	// Handle requests directly for /healthz endpoint
 	if b.options.HealthzServerListenAddress != "" {
-		backendHealthGauge := promauto.With(legacyregistry.Registerer()).NewGauge(prometheus.GaugeOpts{Name: "backend_health", Help: "backend_health is 1 when healthy"})
+		backendHealthGauge := promauto.With(b.options.metricsRegisterer()).NewGauge(prometheus.GaugeOpts{Name: "backend_health", Help: "backend_health is 1 when healthy"})
 
 		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 
@@ -182,21 +202,29 @@ func (b *Backend) Run(ctx context.Context) error {
 		}()
 	}
 
-	if b.options.MetricsServerListenAddress != "" {
+	if b.options.MetricsServerListenAddress != "" || b.options.MetricsServerListener != nil {
 		http.Handle("/metrics", promhttp.InstrumentMetricHandler(
-			legacyregistry.Registerer(),
+			b.options.metricsRegisterer(),
 			promhttp.HandlerFor(
-				prometheus.Gatherers{legacyregistry.DefaultGatherer},
+				prometheus.Gatherers{b.options.metricsGatherer()},
 				promhttp.HandlerOpts{},
 			),
 		))
 
-		metricsServer = &http.Server{Addr: b.options.MetricsServerListenAddress}
+		metricsAddr := b.options.MetricsServerListenAddress
+		if b.options.MetricsServerListener != nil {
+			metricsAddr = b.options.MetricsServerListener.Addr().String()
+		}
+		metricsServer = &http.Server{Addr: metricsAddr}
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			logger.Info(fmt.Sprintf("metrics server listening on %s", b.options.MetricsServerListenAddress))
+			logger.Info(fmt.Sprintf("metrics server listening on %s", metricsAddr))
+			if b.options.MetricsServerListener != nil {
+				errCh <- metricsServer.Serve(b.options.MetricsServerListener)
+				return
+			}
 			errCh <- metricsServer.ListenAndServe()
 		}()
 	}
@@ -263,14 +291,29 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	_, subscriptionLister := backendInformers.Subscriptions()
 	activeOperationInformer, activeOperationLister := backendInformers.ActiveOperations()
 
-	_, clusterLister := backendInformers.Clusters()
+	operationPhaseMetricsController := metricscontrollers.NewController(
+		"OperationPhaseMetrics", backendInformers.AllOperations(), metricscontrollers.NewOperationPhaseMetricsHandler(b.options.metricsRegisterer()))
+
+	clusterInformer, clusterLister := backendInformers.Clusters()
+	clusterMetricsController := metricscontrollers.NewController(
+		"ClusterMetrics", clusterInformer, metricscontrollers.NewClusterMetricsHandler(b.options.metricsRegisterer()))
+
 	_, billingLister := backendInformers.BillingDocs()
+
+	nodePoolInformer, _ := backendInformers.NodePools()
+	nodePoolMetricsController := metricscontrollers.NewController(
+		"NodePoolMetrics", nodePoolInformer, metricscontrollers.NewNodePoolMetricsHandler(b.options.metricsRegisterer()))
+
+	externalAuthInformer, _ := backendInformers.ExternalAuths()
+	externalAuthMetricsController := metricscontrollers.NewController(
+		"ExternalAuthMetrics", externalAuthInformer, metricscontrollers.NewExternalAuthMetricsHandler(b.options.metricsRegisterer()))
 
 	maestroClientBuilder := maestro.NewMaestroClientBuilder()
 
 	subscriptionNonClusterDataDumpController := datadumpcontrollers.NewSubscriptionNonClusterDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	clusterRecursiveDataDumpController := datadumpcontrollers.NewClusterRecursiveDataDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	csStateDumpController := datadumpcontrollers.NewCSStateDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers, b.options.ClustersServiceClient)
+	billingDumpController := datadumpcontrollers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
 	operationClusterCreateController := operationcontrollers.NewGenericOperationController(
 		"OperationClusterCreate",
@@ -514,6 +557,13 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		backendInformers,
 	)
 
+	externalAuthCustomerPropertiesMigrationController := externalauthpropertiescontroller.NewExternalAuthCustomerPropertiesMigrationController(
+		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		activeOperationLister,
+		backendInformers,
+	)
+
 	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 		Lock:          b.options.LeaderElectionLock,
 		LeaseDuration: leaderElectionLeaseDuration,
@@ -527,6 +577,7 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go subscriptionNonClusterDataDumpController.Run(ctx, 20)
 				go clusterRecursiveDataDumpController.Run(ctx, 20)
 				go csStateDumpController.Run(ctx, 20)
+				go billingDumpController.Run(ctx, 20)
 				go doNothingController.Run(ctx, 20)
 				go operationClusterCreateController.Run(ctx, 20)
 				go operationClusterUpdateController.Run(ctx, 20)
@@ -564,6 +615,11 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go triggerNodePoolUpgradeController.Run(ctx, 20)
 				go nodePoolPropertiesSyncController.Run(ctx, 20)
 				go nodePoolCustomerPropertiesMigrationController.Run(ctx, 20)
+				go externalAuthCustomerPropertiesMigrationController.Run(ctx, 20)
+				go operationPhaseMetricsController.Run(ctx, 1)
+				go clusterMetricsController.Run(ctx, 1)
+				go nodePoolMetricsController.Run(ctx, 1)
+				go externalAuthMetricsController.Run(ctx, 1)
 			},
 			OnStoppedLeading: func() {
 				// This needs to be defined even though it does nothing.

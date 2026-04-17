@@ -691,6 +691,7 @@ spec:
             --hypershift-image arohcpsvcdev.azurecr.io/redhat-services-prod/crt-redhat-acm-tenant/hypershift/hypershift-operator@sha256:1234567890 \
             --platform-monitoring=None \
             --enable-size-tagging=true \
+            --limit-crd-install=Azure \
             --enable-cpo-overrides
       restartPolicy: Never
       serviceAccountName: hypershift-installer

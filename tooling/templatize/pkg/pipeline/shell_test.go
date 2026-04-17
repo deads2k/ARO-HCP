@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -36,12 +35,10 @@ func TestCreateCommand(t *testing.T) {
 	testCases := []struct {
 		name           string
 		step           *types.ShellStep
-		dryRun         bool
 		envVars        map[string]string
 		expectedScript string
 		expectedEnv    string
 		configuration  configtypes.Configuration
-		skipCommand    bool
 	}{
 		{
 			name: "basic",
@@ -50,82 +47,11 @@ func TestCreateCommand(t *testing.T) {
 			},
 			expectedScript: buildBashScript("/bin/echo hello"),
 		},
-		{
-			name: "dry-run",
-			step: &types.ShellStep{
-				Command: "/bin/echo hello",
-				DryRun: types.DryRun{
-					Command: "/bin/echo dry-run",
-				},
-			},
-			dryRun:         true,
-			expectedScript: buildBashScript("/bin/echo dry-run"),
-		},
-		{
-			name: "dry-run-env",
-			step: &types.ShellStep{
-				Command: "/bin/echo",
-				DryRun: types.DryRun{
-					Variables: []types.Variable{
-						{
-							Name: "DRY_RUN",
-							Value: types.Value{
-								Value: "true",
-							},
-						},
-					},
-				},
-			},
-			dryRun:         true,
-			expectedScript: buildBashScript("/bin/echo"),
-			envVars:        map[string]string{},
-			expectedEnv:    "DRY_RUN=true",
-		},
-		{
-			name: "dry-run-configref",
-			step: &types.ShellStep{
-				Command: "/bin/echo",
-				DryRun: types.DryRun{
-					Variables: []types.Variable{
-						{
-							Name: "DRY_RUN",
-							Value: types.Value{
-								ConfigRef: "test",
-							},
-						},
-					},
-				},
-			},
-			dryRun:         true,
-			expectedScript: buildBashScript("/bin/echo"),
-			envVars:        map[string]string{},
-			configuration:  configtypes.Configuration{"test": "foobar"},
-			expectedEnv:    "DRY_RUN=foobar",
-		},
-		{
-			name: "dry-run fail",
-			step: &types.ShellStep{
-				Command: "/bin/echo",
-			},
-			dryRun:      true,
-			skipCommand: true,
-		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var dryRun *types.DryRun
-			if tc.dryRun {
-				dryRun = &tc.step.DryRun
-			}
-			dryRunVars, err := mapStepVariables("Microsoft.Azure.ARO.Whatever", tc.step.DryRun.Variables, tc.configuration, Outputs{})
-			assert.NoError(t, err)
-			maps.Copy(tc.envVars, dryRunVars)
-
-			cmd, skipCommand := createCommand(ctx, tc.step.Command, "", dryRun, tc.envVars)
-			assert.Empty(t, cmp.Diff(skipCommand, tc.skipCommand))
-			if !tc.skipCommand {
-				assert.Equal(t, strings.Join(cmd.Args, " "), fmt.Sprintf("/bin/bash -c %s", tc.expectedScript))
-			}
+			cmd := createCommand(ctx, tc.step.Command, "", tc.envVars)
+			assert.Equal(t, strings.Join(cmd.Args, " "), fmt.Sprintf("/bin/bash -c %s", tc.expectedScript))
 			if tc.expectedEnv != "" {
 				assert.Contains(t, cmd.Env, tc.expectedEnv)
 			}

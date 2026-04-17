@@ -74,7 +74,6 @@ type PipelineRunOptions struct {
 }
 
 type BaseRunOptions struct {
-	DryRun                   bool
 	Cloud                    string
 	Configuration            configtypes.Configuration
 	NoPersist                bool
@@ -739,9 +738,6 @@ func shouldRetryError(logger logr.Logger, step types.Step, err error) bool {
 
 func RunStep(id graph.Identifier, s types.Step, ctx context.Context, executionTarget ExecutionTarget, options *StepRunOptions, state *ExecutionState) (Output, DetailsProducer, error) {
 	logger := logr.FromContextOrDiscard(ctx)
-	if options.DryRun {
-		logger.Info("This is a dry run!")
-	}
 	logger.Info("Running step.", "description", s.Description())
 
 	switch step := s.(type) {
@@ -809,6 +805,11 @@ func RunStep(id graph.Identifier, s types.Step, ctx context.Context, executionTa
 	case *types.GrafanaDashboardsStep:
 		if err := runGrafanaDashboardsStep(id, step, ctx, options, executionTarget, state); err != nil {
 			return nil, nil, fmt.Errorf("error running Grafana Dashboard Upsert Step, %v", err)
+		}
+		return nil, nil, nil
+	case *types.GrafanaDatasourcesStep:
+		if err := runGrafanaDatasourcesStep(id, step, ctx, options, executionTarget, state); err != nil {
+			return nil, nil, fmt.Errorf("error running Grafana Datasources Step, %v", err)
 		}
 		return nil, nil, nil
 	case *types.ARMStep:

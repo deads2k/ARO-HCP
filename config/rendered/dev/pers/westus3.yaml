@@ -35,7 +35,7 @@ adminApi:
     issuer: Self
     name: admin-api-cert-pers-usw3test
   image:
-    digest: sha256:2670a25858771691403ec47ff1af8504e517a52f95505dad9ed323d889361ded
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpadminapi
   k8s:
@@ -102,7 +102,7 @@ backend:
     roleSetName: dev
   exitOnPanic: true
   image:
-    digest: sha256:1ea55edf35052e5cf1cd84aa6e877ecee49324b7b2c7ee2fa70827e79edce8f8
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpbackend
   k8s:
@@ -185,22 +185,6 @@ clustersService:
         memory: 150Mi
     serviceAccountName: clusters-service
   managedIdentityName: clusters-service
-  ocpVersions:
-    channelGroups:
-      candidate:
-        maxVersion: ""
-        minVersion: 4.19.7
-      fast:
-        maxVersion: ""
-        minVersion: 4.19.0
-      nightly:
-        maxVersion: ""
-        minVersion: 4.19.0-0.nightly-20200101
-      stable:
-        maxVersion: ""
-        minVersion: 4.19.0
-    defaultVersion:
-      version: 4.20.8
   postgres:
     backupRetentionDays: 7
     containerizedDb:
@@ -218,10 +202,12 @@ clustersService:
     serverVersion: "17"
     zoneRedundantMode: Auto
   provisionShardClusterLimit: 100
+  provisionShardStatus: active
   tracing:
     address: http://ingest.observability:4318
     exporter: otlp
 customExporter:
+  enabledCollectors: service-tag-usage,kusto-logs-current
   image:
     digest: sha256:84bc2876df0dff1ee8089a585c71ddabb399ca44ba4bf5177759f9c8b36e9ebf
     registry: arohcpsvcdev.azurecr.io
@@ -286,7 +272,7 @@ frontend:
     zoneRedundantMode: Disabled
   exitOnPanic: true
   image:
-    digest: sha256:63d30656f797993d4f757aee9da4166986b17bcb7b5d983747b2596e8a775166
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpfrontend
   k8s:
@@ -841,7 +827,7 @@ sessiongate:
     issuer: Self
     name: sessiongate-cert-pers-usw3test
   image:
-    digest: sha256:1a0e007fa4c774e176e1638257206126699b557b5530733c898bf2367384830c
+    digest: ""
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpsessiongate
   k8s:

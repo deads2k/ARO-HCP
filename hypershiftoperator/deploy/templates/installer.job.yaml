@@ -28,6 +28,7 @@ spec:
             --hypershift-image {{ .Values.image }}@{{ .Values.imageDigest }} \
             --platform-monitoring=None \
             --enable-size-tagging=true \
+            --limit-crd-install=Azure \
             {{- if .Values.operatorEnvVars.sharedIngressIPTag }}
             --additional-operator-env-vars SHARED_INGRESS_AZURE_PIP_IP_TAGS={{ .Values.operatorEnvVars.sharedIngressIPTag }} \
             {{- end }}

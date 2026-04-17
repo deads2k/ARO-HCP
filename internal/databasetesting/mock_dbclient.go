@@ -571,6 +571,24 @@ func (m *mockBillingDocCRUD) GetByID(ctx context.Context, billingDocID string) (
 	return doc, nil
 }
 
+func (m *mockBillingDocCRUD) List(ctx context.Context) (database.DBClientIterator[database.BillingDocument], error) {
+	m.mockDB.mu.RLock()
+	defer m.mockDB.mu.RUnlock()
+
+	var ids []string
+	var items []*database.BillingDocument
+
+	// Filter billing documents by subscription ID (partition key)
+	for id, doc := range m.mockDB.billing {
+		if strings.EqualFold(doc.SubscriptionID, m.subscriptionID) {
+			ids = append(ids, id)
+			items = append(items, doc)
+		}
+	}
+
+	return newMockIterator(ids, items), nil
+}
+
 func (m *mockBillingDocCRUD) ListActive(ctx context.Context) ([]*database.BillingDocument, error) {
 	m.mockDB.mu.RLock()
 	defer m.mockDB.mu.RUnlock()

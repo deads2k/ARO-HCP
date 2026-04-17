@@ -1363,7 +1363,7 @@ resource msftPrometheusOperatorRules 'Microsoft.AlertsManagement/prometheusRuleG
           title: 'Resources rejected by Prometheus operator'
         }
         expression: 'min_over_time(prometheus_operator_managed_resources{job="prometheus-operator",namespace="prometheus",state="rejected"}[5m]) > 0'
-        for: 'PT5M'
+        for: 'PT20M'
         severity: 3
       }
     ]

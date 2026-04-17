@@ -26,7 +26,3 @@ resourceGroups:
         resourceGroup: global
         step: output
         name: globalMSIId
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"

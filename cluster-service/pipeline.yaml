@@ -64,10 +64,6 @@ resourceGroups:
     action: Shell
     command: make deploy
     workingDir: ./
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     dependsOn:
     - resourceGroup: global
       step: mirror-image
@@ -166,22 +162,10 @@ resourceGroups:
         resourceGroup: global
         step: output
         name: ocpAcrLoginServer
+    - name: PROVISION_SHARD_STATUS
+      configRef: clustersService.provisionShardStatus
     - name: PROVISION_SHARD_CLUSTER_LIMIT
       configRef: clustersService.provisionShardClusterLimit
-    - name: OCP_VERSIONS_DEFAULT_VERSION_VERSION
-      configRef: clustersService.ocpVersions.defaultVersion.version
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MIN_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.stable.minVersion
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_STABLE_MAX_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.stable.maxVersion
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MIN_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.candidate.minVersion
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_CANDIDATE_MAX_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.candidate.maxVersion
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MIN_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.nightly.minVersion
-    - name: OCP_VERSIONS_CHANNEL_GROUPS_NIGHTLY_MAX_VERSION
-      configRef: clustersService.ocpVersions.channelGroups.nightly.maxVersion
     # this is maestro consumer registration stuff
     # this goes away when we have a real registration process
     - name: CONSUMER_NAME
@@ -224,10 +208,6 @@ resourceGroups:
     action: Shell
     command: make deploy-cs-debug-jobs
     workingDir: ./
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     dependsOn:
     - resourceGroup: service
       step: deploy

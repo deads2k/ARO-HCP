@@ -144,6 +144,7 @@ defaults:
   # ARO HCP Metrics Exporter
   customExporter:
     managedIdentityName: "aro-hcp-exporter"
+    enabledCollectors: "service-tag-usage,kusto-logs-current"
     k8s:
       namespace: aro-hcp-exporter
       serviceAccountName: aro-hcp-exporter
@@ -618,7 +619,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpbackend
-      digest: sha256:1ea55edf35052e5cf1cd84aa6e877ecee49324b7b2c7ee2fa70827e79edce8f8 # 6324ed1 (2026-04-10 21:21)
+      digest: ""
     tracing:
       address: ""
       exporter: ""
@@ -647,7 +648,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpadminapi
-      digest: sha256:2670a25858771691403ec47ff1af8504e517a52f95505dad9ed323d889361ded # 6324ed1 (2026-04-10 21:20)
+      digest: ""
     managedIdentityName: admin-api
     k8s:
       replicas: 2
@@ -666,7 +667,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpsessiongate
-      digest: sha256:1a0e007fa4c774e176e1638257206126699b557b5530733c898bf2367384830c # 6324ed1 (2026-04-10 21:20)
+      digest: ""
     managedIdentityName: sessiongate
     k8s:
       replicas: 2
@@ -691,7 +692,7 @@ defaults:
     image:
       registry: arohcpsvcdev.azurecr.io
       repository: arohcpfrontend
-      digest: sha256:63d30656f797993d4f757aee9da4166986b17bcb7b5d983747b2596e8a775166 # 6324ed1 (2026-04-10 21:19)
+      digest: ""
     tracing:
       address: ""
       exporter: ""
@@ -891,6 +892,7 @@ defaults:
       digest: sha256:b70f064cad11f7374d475e7078826912d07451c0389dc00de21bb723ca0761c5 # 28911b36ad59807e10fb4443679ec676f206ebf2 (2026-04-09 16:18)
     # controls how many HCPs can be placed on an MC, sadly not configurable per MC
     provisionShardClusterLimit: 100
+    provisionShardStatus: active
     # batch processes
     batchProcessesDryRun: true
     batchProcesses: ""
@@ -934,24 +936,6 @@ defaults:
           maxSurge: 1
     azureRuntimeConfig:
       tlsCertificatesIssuer: OneCertV2-PublicCA
-    # OCP Versions configuration
-    ocpVersions:
-      defaultVersion:
-        # control plane 4.y version (different than node and contorl plane 4.y.z inside that 4.y) is set in defaulting in ARO-HCP frontend.
-        version: 4.20.8
-      channelGroups:
-        stable:
-          minVersion: 4.19.0
-          maxVersion: ""
-        candidate:
-          minVersion: 4.19.7
-          maxVersion: ""
-        nightly:
-          minVersion: 4.19.0-0.nightly-20200101
-          maxVersion: ""
-        fast:
-          minVersion: 4.19.0
-          maxVersion: ""
   # Image Sync
   imageSync:
     environmentName: aro-hcp-image-sync

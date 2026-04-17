@@ -29,6 +29,7 @@ resource eventHubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = if (mana
     capacity: 1
   }
   properties: {
+    disableLocalAuth: true
     minimumTlsVersion: '1.2'
     publicNetworkAccess: 'Disabled'
   }

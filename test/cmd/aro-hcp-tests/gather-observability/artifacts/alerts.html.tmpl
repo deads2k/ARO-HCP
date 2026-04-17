@@ -159,6 +159,53 @@
       color: #58a6ff;
     }
 
+    /* Collapsible known-issue alerts */
+    details.alert-card-known {
+      list-style: none;
+    }
+    details.alert-card-known > summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+    }
+    details.alert-card-known > summary::-webkit-details-marker { display: none; }
+    details.alert-card-known > summary::before {
+      content: "\25B6";
+      font-size: 10px;
+      color: #8b949e;
+      transition: transform 0.15s;
+    }
+    details[open].alert-card-known > summary::before {
+      transform: rotate(90deg);
+    }
+    details.alert-card-known > summary .badge { padding: 2px 8px; font-size: 12px; }
+    .alert-title-inline {
+      font-size: 15px;
+      font-weight: 700;
+      color: #e6edf3;
+    }
+    .known-reason-inline {
+      font-size: 13px;
+      color: #d29922;
+      margin-left: auto;
+    }
+    .known-reason-inline strong {
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      font-size: 11px;
+      background: rgba(158, 106, 3, 0.15);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #9e6a03;
+    }
+    .alert-details-body {
+      margin-top: 12px;
+    }
+
     /* Collapsible PromQL */
     details.query-details {
       margin-top: 8px;
@@ -219,7 +266,42 @@
   </div>
 
   {{range .Alerts}}
-  <div class="alert-card{{if .Metadata.KnownIssue}} alert-card-known{{end}}">
+  {{if .Metadata.KnownIssue}}
+  <details class="alert-card alert-card-known">
+    <summary>
+      <span class="badge {{severityClass .Alert.Severity}}">{{.Alert.Severity}}</span>
+      <span class="{{conditionClass .Alert.Condition}}">{{.Alert.Condition}}</span>
+      <span class="alert-title-inline">{{.Alert.Name}}</span>
+      <span class="known-reason-inline">{{.Metadata.KnownIssueReason}} <strong>Known Issue</strong></span>
+    </summary>
+    <div class="alert-details-body">
+      <div class="alert-header">
+        <span class="alert-time">
+          Fired: {{formatTime .Alert.StartsAt}} {{relativeTime $.TimeWindow.Start .Alert.StartsAt}}{{if .Alert.EndsAt}} &middot; Resolved: {{formatTime .Alert.EndsAt}} {{relativeTime $.TimeWindow.Start .Alert.EndsAt}}{{end}}
+        </span>
+      </div>
+      {{if .Alert.Description}}<div class="alert-description">{{.Alert.Description}}</div>{{end}}
+
+      {{if .Alert.Labels}}
+      <div class="alert-labels">
+        {{range $k, $v := .Alert.Labels}}<span class="label-chip"><span class="label-key">{{$k}}</span>=<span>{{$v}}</span></span>{{end}}
+      </div>
+      {{end}}
+
+      {{with annotation .Alert.Annotations "runbook_url"}}{{if ne . "TBD"}}
+      <div class="alert-links"><a href="{{.}}" target="_blank" rel="noopener">View Runbook &rarr;</a></div>
+      {{end}}{{end}}
+
+      {{if .Alert.Expression}}
+      <details class="query-details">
+        <summary>View PromQL Query</summary>
+        <div class="alert-expr">{{.Alert.Expression}}</div>
+      </details>
+      {{end}}
+    </div>
+  </details>
+  {{else}}
+  <div class="alert-card">
     <div class="alert-header">
       <span class="badge {{severityClass .Alert.Severity}}">{{.Alert.Severity}}</span>
       <span class="{{conditionClass .Alert.Condition}}">{{.Alert.Condition}}</span>
@@ -228,9 +310,6 @@
       </span>
     </div>
     <div class="alert-title">{{.Alert.Name}}</div>
-    {{if .Metadata.KnownIssueReason}}
-    <div class="known-reason"><strong>Known Issue:</strong> {{.Metadata.KnownIssueReason}}</div>
-    {{end}}
     {{if .Alert.Description}}<div class="alert-description">{{.Alert.Description}}</div>{{end}}
 
     {{if .Alert.Labels}}
@@ -250,6 +329,7 @@
     </details>
     {{end}}
   </div>
+  {{end}}
   {{end}}
 
   {{if not .HasUnknownAlerts}}

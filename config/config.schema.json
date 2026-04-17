@@ -1143,6 +1143,11 @@
           "type": "integer",
           "description": "The maximum number of HCPs that can be placed on an MC, sadly not configurable per MC"
         },
+        "provisionShardStatus": {
+          "type": "string",
+          "enum": ["active", "maintenance"],
+          "description": "Status of the provision shard"
+        },
         "k8s": {
           "$ref": "#/definitions/k8sDeployment"
         },
@@ -1186,149 +1191,6 @@
           "required": [
             "tlsCertificatesIssuer"
           ]
-        },
-        "ocpVersions": {
-          "type": "object",
-          "properties": {
-            "defaultVersion": {
-              "type": "object",
-              "properties": {
-                "version": {
-                  "$ref": "#/definitions/semVer"
-                }
-              },
-              "required": [
-                "version"
-              ],
-              "additionalProperties": false
-            },
-            "channelGroups": {
-              "type": "object",
-              "properties": {
-                "stable": {
-                  "type": "object",
-                  "properties": {
-                    "minVersion": {
-                      "$ref": "#/definitions/semVer"
-                    },
-                    "maxVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVer"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "minVersion",
-                    "maxVersion"
-                  ],
-                  "additionalProperties": false
-                },
-                "fast": {
-                  "type": "object",
-                  "properties": {
-                    "minVersion": {
-                      "$ref": "#/definitions/semVer"
-                    },
-                    "maxVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVer"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "minVersion",
-                    "maxVersion"
-                  ],
-                  "additionalProperties": false
-                },
-                "candidate": {
-                  "type": "object",
-                  "properties": {
-                    "minVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVerWithPrerelease"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    },
-                    "maxVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVerWithPrerelease"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "minVersion",
-                    "maxVersion"
-                  ],
-                  "additionalProperties": false
-                },
-                "nightly": {
-                  "type": "object",
-                  "properties": {
-                    "minVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVerWithPrerelease"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    },
-                    "maxVersion": {
-                      "oneOf": [
-                        {
-                          "$ref": "#/definitions/semVerWithPrerelease"
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^$"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "minVersion",
-                    "maxVersion"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "stable"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "defaultVersion",
-            "channelGroups"
-          ],
-          "additionalProperties": false
         }
       },
       "additionalProperties": false,
@@ -1341,8 +1203,7 @@
         "azureOperatorsManagedIdentities",
         "postgres",
         "tracing",
-        "azureRuntimeConfig",
-        "ocpVersions"
+        "azureRuntimeConfig"
       ]
     },
     "cxKeyVault": {
@@ -2197,6 +2058,9 @@
         "image": {
           "$ref": "#/definitions/containerImage"
         },
+        "imageV2": {
+          "$ref": "#/definitions/containerImage"
+        },
         "tracing": {
           "$ref": "#/definitions/tracing",
           "description": "Tracing configuration for OTLP traces."
@@ -2509,6 +2373,10 @@
         "managedIdentityName": {
           "type": "string",
           "description": "The name of the MSI that will be used by the exporter"
+        },
+        "enabledCollectors": {
+          "type": "string",
+          "description": "The collectors to enable for the exporter. Comma separated list of collectors."
         },
         "k8s": {
           "$ref": "#/definitions/k8sDeployment"

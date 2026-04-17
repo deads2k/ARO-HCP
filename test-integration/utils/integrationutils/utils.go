@@ -66,6 +66,8 @@ func VerifyNoNewGoLeaks(t *testing.T) {
 		goleak.IgnoreTopFunction("github.com/golang/glog.(*fileSink).flushDaemon"),
 		// stop the bleeding so we don't make it worse.  There is a shutdownWithDrain on workqueues
 		goleak.IgnoreTopFunction("k8s.io/client-go/util/workqueue.(*delayingType[...]).waitingLoop"),
+		// workqueue internal goroutine that may outlive ShutDown() briefly
+		goleak.IgnoreTopFunction("k8s.io/client-go/util/workqueue.(*Typed[...]).updateUnfinishedWorkLoop"),
 	)
 }
 

@@ -20,10 +20,6 @@ resourceGroups:
     aksCluster: '{{ .svc.aks.name }}'
     action: Shell
     command: make deploy
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     shellIdentity:
       input:
         resourceGroup: global
@@ -37,10 +33,6 @@ resourceGroups:
     aksCluster: '{{ .mgmt.aks.name }}'
     action: Shell
     command: make deploy
-    dryRun:
-      variables:
-      - name: DRY_RUN
-        value: "true"
     shellIdentity:
       input:
         resourceGroup: global
