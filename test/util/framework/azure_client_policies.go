@@ -86,7 +86,7 @@ func (p *armResourceGroupValidationPolicy) Do(req *policy.Request) (*http.Respon
 	_, err = client.Get(req.Raw().Context(), rgName, nil)
 	if err != nil {
 		var respErr *azcore.ResponseError
-		if errors.As(err, &respErr) && respErr.ErrorCode == "ResourceGroupNotFound" {
+		if errors.As(err, &respErr) && respErr.ErrorCode == arm.CloudErrorCodeResourceGroupNotFound {
 			cloudErr := arm.NewCloudError(
 				http.StatusNotFound,
 				arm.CloudErrorCodeResourceGroupNotFound,
@@ -111,13 +111,13 @@ func (p *armResourceGroupValidationPolicy) Do(req *policy.Request) (*http.Respon
 // parseResourceGroupFromPath extracts the subscription ID and resource group
 // name from a URL path like /subscriptions/{subId}/resourceGroups/{rgName}/...
 func parseResourceGroupFromPath(path string) (subscriptionID, resourceGroupName string) {
-	parts := strings.Split(strings.ToLower(path), "/")
+	parts := strings.Split(path, "/")
 	for i, part := range parts {
-		if part == "subscriptions" && i+1 < len(parts) {
-			subscriptionID = strings.Split(path, "/")[i+1]
+		if strings.EqualFold(part, "subscriptions") && i+1 < len(parts) {
+			subscriptionID = parts[i+1]
 		}
-		if part == "resourcegroups" && i+1 < len(parts) {
-			resourceGroupName = strings.Split(path, "/")[i+1]
+		if strings.EqualFold(part, "resourcegroups") && i+1 < len(parts) {
+			resourceGroupName = parts[i+1]
 		}
 	}
 	return
