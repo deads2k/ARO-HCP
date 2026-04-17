@@ -92,26 +92,33 @@ func (opsync *operationRevokeCredentials) nextOperationStatus(ctx context.Contex
 	iterator := opsync.clusterServiceClient.ListBreakGlassCredentials(operation.InternalID, "")
 
 	for breakGlassCredential := range iterator.Items(ctx) {
-		// An expired credential is as good as a removed credential
-		// for this operation, regardless of the credential status.
-		if breakGlassCredential.ExpirationTimestamp().After(time.Now()) {
-			switch status := breakGlassCredential.Status(); status {
-			case cmv1.BreakGlassCredentialStatusAwaitingRevocation:
-				// Operation is non-terminal; no need to check the rest.
-				return arm.ProvisioningStateDeleting, nil, nil
-			case cmv1.BreakGlassCredentialStatusRevoked:
-				// Successful revocation so far; continue looping.
-			case cmv1.BreakGlassCredentialStatusFailed:
-				// XXX Cluster Service does not provide a reason for the failure,
-				//     so we have no choice but to use a generic error message.
-				opError := &arm.CloudErrorBody{
-					Code:    arm.CloudErrorCodeInternalServerError,
-					Message: "Failed to revoke cluster credential",
-				}
-				return arm.ProvisioningStateFailed, opError, nil
-			default:
-				return "", nil, fmt.Errorf("unhandled BreakGlassCredentialStatus '%s'", status)
+		switch status := breakGlassCredential.Status(); status {
+		case cmv1.BreakGlassCredentialStatusAwaitingRevocation:
+			// Operation is non-terminal; no need to check the rest.
+			return arm.ProvisioningStateDeleting, nil, nil
+		case cmv1.BreakGlassCredentialStatusRevoked:
+			// Successful revocation so far; continue looping.
+		case cmv1.BreakGlassCredentialStatusExpired:
+			// Expired credentials are not revoked; continue looping.
+		case cmv1.BreakGlassCredentialStatusFailed:
+			// XXX Cluster Service does not provide a reason for the failure,
+			//     so we have no choice but to use a generic error message.
+			opError := &arm.CloudErrorBody{
+				Code:    arm.CloudErrorCodeInternalServerError,
+				Message: "Failed to revoke cluster credential",
 			}
+			return arm.ProvisioningStateFailed, opError, nil
+		case cmv1.BreakGlassCredentialStatusCreated,
+			cmv1.BreakGlassCredentialStatusIssued:
+			// These are valid statuses but we should not be seeing them
+			// during a credential revocation. Don't fail but log a warning.
+			logger := utils.LoggerFromContext(ctx)
+			logger.Info("unexpected BreakGlassCredentialStatus", "status", status)
+			// We may be in a stuck state here, but continue polling
+			// in hopes of the credential eventually getting revoked.
+			return arm.ProvisioningStateDeleting, nil, nil
+		default:
+			return "", nil, fmt.Errorf("unhandled BreakGlassCredentialStatus '%s'", status)
 		}
 	}
 
