@@ -90,6 +90,10 @@ func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) SyncOn
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get NodePool: %w", err))
 	}
+	if len(existingNodePool.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+		// TODO remove this once we have the information all in cosmos.
+		return nil
+	}
 
 	existingServiceProviderNodePool, err := database.GetOrCreateServiceProviderNodePool(ctx, c.cosmosClient, key.GetResourceID())
 	if err != nil {

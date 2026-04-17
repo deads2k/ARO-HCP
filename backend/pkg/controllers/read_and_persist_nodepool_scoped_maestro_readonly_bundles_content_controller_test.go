@@ -84,6 +84,62 @@ func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnc
 	assert.NoError(t, err)
 }
 
+func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnce_EmptyClusterServiceID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	ctx := context.Background()
+
+	mockDBClient := databasetesting.NewMockDBClient()
+	mockClusterService := ocm.NewMockClusterServiceClientSpec(ctrl)
+
+	syncer := &readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer{
+		cooldownChecker:      &alwaysSyncCooldownChecker{},
+		cosmosClient:         mockDBClient,
+		clusterServiceClient: mockClusterService,
+	}
+
+	key := controllerutils.HCPNodePoolKey{
+		SubscriptionID:    "test-sub",
+		ResourceGroupName: "test-rg",
+		HCPClusterName:    "test-cluster",
+		HCPNodePoolName:   "test-nodepool",
+	}
+
+	nodepoolResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool"))
+	nodepool := &api.HCPOpenShiftClusterNodePool{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   nodepoolResourceID,
+				Name: "test-nodepool",
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterNodePoolServiceProviderProperties{
+			ClusterServiceID: api.InternalID{},
+		},
+	}
+	nodepoolsCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName)
+	_, err := nodepoolsCRUD.Create(ctx, nodepool, nil)
+	require.NoError(t, err)
+
+	bundleInternalName := api.MaestroBundleInternalNameReadonlyHypershiftNodePool
+	spnpResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster/nodePools/test-nodepool/serviceProviderNodePools/default"))
+	spnp := &api.ServiceProviderNodePool{
+		CosmosMetadata: arm.CosmosMetadata{ResourceID: spnpResourceID},
+		ResourceID:     *spnpResourceID,
+		Status: api.ServiceProviderNodePoolStatus{
+			MaestroReadonlyBundles: api.MaestroBundleReferenceList{
+				{Name: bundleInternalName, MaestroAPIMaestroBundleName: "bundle-name"},
+			},
+		},
+	}
+	spnpCRUD := mockDBClient.ServiceProviderNodePools(key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName, key.HCPNodePoolName)
+	_, err = spnpCRUD.Create(ctx, spnp, nil)
+	require.NoError(t, err)
+
+	// Cluster service ID not yet populated: skip sync (no OCM / Maestro calls).
+	err = syncer.SyncOnce(ctx, key)
+	assert.NoError(t, err)
+}
+
 func TestReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer_SyncOnce_GetServiceProviderNodePoolError(t *testing.T) {
 	ctx := context.Background()
 
