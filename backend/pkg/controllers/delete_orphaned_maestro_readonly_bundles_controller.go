@@ -218,12 +218,21 @@ func (c *deleteOrphanedMaestroReadonlyBundles) buildMaestroClientsByProvisionSha
 
 // mapServiceProviderClustersByProvisionShard groups ServiceProviderClusters by Cluster Service provision shard ID.
 // Every resolved shard must exist in maestroClientsByShard (registered provision shards).
+// ServiceProviderClusters whose parent cluster has no ClusterServiceID yet (pre–Cluster Service registration) are skipped
+// so the syncer doesn't fail if there are some resources that still don't have it set
 func (c *deleteOrphanedMaestroReadonlyBundles) mapServiceProviderClustersByProvisionShard(ctx context.Context, spcs []*api.ServiceProviderCluster, maestroClientsByShard map[string]*shardMaestroClient) (map[string][]*api.ServiceProviderCluster, error) {
 	res := make(map[string][]*api.ServiceProviderCluster)
 	for _, spc := range spcs {
-		shardID, err := c.clusterProvisionShardIDForServiceProviderCluster(ctx, spc)
+		shardID, skip, err := c.clusterProvisionShardIDForServiceProviderCluster(ctx, spc)
 		if err != nil {
 			return nil, err
+		}
+		if skip {
+			// It should be safe to skip those because if a maestro bundle in the maestro API exists it means that there should be a corresponding Cosmos
+			// resource with a maestro bundle reference. If for some reason during the orphan calculation inbetween the first read of cosmos
+			// resources and the read in the Maestro api there's a new bundle in maestro, the second read of cosmos resources will catch that
+			// and prevent accidental deletion.
+			continue
 		}
 		if _, ok := maestroClientsByShard[shardID]; !ok {
 			return nil, utils.TrackError(fmt.Errorf("provision shard %s for ServiceProviderCluster %s is not present in provision shards map", shardID, spc.ResourceID.String()))
@@ -235,12 +244,21 @@ func (c *deleteOrphanedMaestroReadonlyBundles) mapServiceProviderClustersByProvi
 
 // mapServiceProviderNodePoolsByProvisionShard groups ServiceProviderNodePools by Cluster Service provision shard ID
 // of their owning cluster. Every resolved shard must exist in maestroClientsByShard (registered provision shards).
+// ServiceProviderNodePools whose parent cluster has no ClusterServiceID yet (pre–Cluster Service registration) are skipped
+// so the syncer doesn't fail if there are some resources that still don't have it set.
 func (c *deleteOrphanedMaestroReadonlyBundles) mapServiceProviderNodePoolsByProvisionShard(ctx context.Context, spnps []*api.ServiceProviderNodePool, maestroClientsByShard map[string]*shardMaestroClient) (map[string][]*api.ServiceProviderNodePool, error) {
 	res := make(map[string][]*api.ServiceProviderNodePool)
 	for _, spnp := range spnps {
-		shardID, err := c.clusterProvisionShardIDForServiceProviderNodePool(ctx, spnp)
+		shardID, skip, err := c.clusterProvisionShardIDForServiceProviderNodePool(ctx, spnp)
 		if err != nil {
 			return nil, err
+		}
+		if skip {
+			// It should be safe to skip those because if a maestro bundle in the maestro API exists it means that there should be a corresponding Cosmos
+			// resource with a maestro bundle reference. If for some reason during the orphan calculation inbetween the first read of cosmos
+			// resources and the read in the Maestro api there's a new bundle in maestro, the second read of cosmos resources will catch that
+			// and prevent accidental deletion.
+			continue
 		}
 		if _, ok := maestroClientsByShard[shardID]; !ok {
 			return nil, utils.TrackError(fmt.Errorf("provision shard %s for ServiceProviderNodePool %s is not present in provision shards map", shardID, spnp.ResourceID.String()))
@@ -426,14 +444,42 @@ func (c *deleteOrphanedMaestroReadonlyBundles) conditionallyDeleteOrphanReadonly
 }
 
 // clusterProvisionShardIDForServiceProviderCluster returns the Cluster Service provision shard ID for the cluster that owns the SPC.
-func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForServiceProviderCluster(ctx context.Context, spc *api.ServiceProviderCluster) (string, error) {
+// skip is true when the parent cluster has no ClusterServiceID yet.
+func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForServiceProviderCluster(ctx context.Context, spc *api.ServiceProviderCluster) (shardID string, skip bool, err error) {
 	clusterResourceID := spc.ResourceID.Parent
 	if clusterResourceID == nil {
-		return "", utils.TrackError(fmt.Errorf("ServiceProviderCluster %s has no parent resource ID", spc.ResourceID.String()))
+		return "", false, utils.TrackError(fmt.Errorf("ServiceProviderCluster %s has no parent resource ID", spc.ResourceID.String()))
 	}
 	cluster, err := c.cosmosClient.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName).Get(ctx, clusterResourceID.Name)
 	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
+		return "", false, utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
+	}
+	return c.provisionShardIDFromCluster(ctx, cluster)
+}
+
+// clusterProvisionShardIDForServiceProviderNodePool returns the Cluster Service provision shard ID for the cluster that owns the node pool.
+// skip is true when the parent cluster has no ClusterServiceID yet.
+func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForServiceProviderNodePool(ctx context.Context, spnp *api.ServiceProviderNodePool) (shardID string, skip bool, err error) {
+	nodePoolResourceID := spnp.ResourceID.Parent
+	if nodePoolResourceID == nil {
+		return "", false, utils.TrackError(fmt.Errorf("ServiceProviderNodePool %s has no parent resource ID", spnp.ResourceID.String()))
+	}
+	clusterResourceID := nodePoolResourceID.Parent
+	if clusterResourceID == nil {
+		return "", false, utils.TrackError(fmt.Errorf("ServiceProviderNodePool %s has no grandparent cluster resource ID", spnp.ResourceID.String()))
+	}
+	cluster, err := c.cosmosClient.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName).Get(ctx, clusterResourceID.Name)
+	if err != nil {
+		return "", false, utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
+	}
+	return c.provisionShardIDFromCluster(ctx, cluster)
+}
+
+// provisionShardIDFromCluster resolves the provision shard for a Cosmos cluster document. skip is true when ClusterServiceID
+// is unset so the cluster is not yet registered with Cluster Service (same gate as create-*-scoped Maestro bundle controllers).
+func (c *deleteOrphanedMaestroReadonlyBundles) provisionShardIDFromCluster(ctx context.Context, cluster *api.HCPOpenShiftCluster) (shardID string, skip bool, err error) {
+	if len(cluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+		return "", true, nil
 	}
 	// TODO We get the provision shard ID from CS but at some point we should have
 	// the information in Cosmos and this should be changed to use that instead.
@@ -442,30 +488,9 @@ func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForService
 	// we assume that the cluster is associated to a single provision shard at a time.
 	clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
+		return "", false, utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
 	}
-	return clusterCSShard.ID(), nil
-}
-
-// clusterProvisionShardIDForServiceProviderNodePool returns the Cluster Service provision shard ID for the cluster that owns the node pool.
-func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForServiceProviderNodePool(ctx context.Context, spnp *api.ServiceProviderNodePool) (string, error) {
-	nodePoolResourceID := spnp.ResourceID.Parent
-	if nodePoolResourceID == nil {
-		return "", utils.TrackError(fmt.Errorf("ServiceProviderNodePool %s has no parent resource ID", spnp.ResourceID.String()))
-	}
-	clusterResourceID := nodePoolResourceID.Parent
-	if clusterResourceID == nil {
-		return "", utils.TrackError(fmt.Errorf("ServiceProviderNodePool %s has no grandparent cluster resource ID", spnp.ResourceID.String()))
-	}
-	cluster, err := c.cosmosClient.HCPClusters(clusterResourceID.SubscriptionID, clusterResourceID.ResourceGroupName).Get(ctx, clusterResourceID.Name)
-	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
-	}
-	clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
-	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
-	}
-	return clusterCSShard.ID(), nil
+	return clusterCSShard.ID(), false, nil
 }
 
 // buildClusterScopedMaestroAPIMaestroBundleNamesByShard maps provision shard ID to the set of Maestro API bundle names referenced by

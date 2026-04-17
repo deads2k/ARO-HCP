@@ -947,6 +947,43 @@ func TestDeleteOrphanedMaestroReadonlyBundles_mapServiceProviderClustersByProvis
 	}
 }
 
+func TestDeleteOrphanedMaestroReadonlyBundles_provisionShardIDFromCluster(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("skip when ClusterServiceID is empty", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+		c := &deleteOrphanedMaestroReadonlyBundles{clusterServiceClient: mockCS}
+		cluster := &api.HCPOpenShiftCluster{
+			ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+				ClusterServiceID: api.InternalID{},
+			},
+		}
+		shardID, skip, err := c.provisionShardIDFromCluster(ctx, cluster)
+		require.NoError(t, err)
+		assert.True(t, skip)
+		assert.Empty(t, shardID)
+	})
+
+	t.Run("returns shard ID when ClusterServiceID is set", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockCS := ocm.NewMockClusterServiceClientSpec(ctrl)
+		c := &deleteOrphanedMaestroReadonlyBundles{clusterServiceClient: mockCS}
+		csID := api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/csid"))
+		cluster := &api.HCPOpenShiftCluster{
+			ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+				ClusterServiceID: csID,
+			},
+		}
+		provisionShard := buildTestProvisionShard("consumer")
+		mockCS.EXPECT().GetClusterProvisionShard(gomock.Any(), csID).Return(provisionShard, nil)
+		shardID, skip, err := c.provisionShardIDFromCluster(ctx, cluster)
+		require.NoError(t, err)
+		assert.False(t, skip)
+		assert.Equal(t, provisionShard.ID(), shardID)
+	})
+}
+
 func TestDeleteOrphanedMaestroReadonlyBundles_mapServiceProviderNodePoolsByProvisionShard(t *testing.T) {
 	ctx := context.Background()
 	// mapServiceProviderNodePoolsByProvisionShard does not use the Maestro client; tests only need shard IDs in the map.
