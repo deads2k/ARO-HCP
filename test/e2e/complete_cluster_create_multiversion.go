@@ -55,36 +55,32 @@ var _ = Describe("ARO-HCP", func() {
 			customerVnetSubnetName := "customer-vnet-subnet-" + channelGroup + "-"
 			customerClusterNamePrefix := "cluster-" + channelGroup + "-"
 
-			tc := framework.NewTestContext()
-			if tc.UsePooledIdentities() {
-				err := tc.AssignIdentityContainers(ctx, 1, 60*time.Second)
-				Expect(err).NotTo(HaveOccurred())
-			}
-
 			versionLabel := strings.ReplaceAll(version, ".", "-") // e.g. "4.20" -> "4-20"
 			suffix := rand.String(6)
 			clusterName := customerClusterNamePrefix + versionLabel + "-" + suffix
 			clusterParams := framework.NewDefaultClusterParams()
 			clusterParams.ClusterName = clusterName
 			clusterParams.OpenshiftVersionId = version
-			// For nightly channel, calculate the latest version for the default Y stream
-			if clusterParams.ChannelGroup == "nightly" {
-				var err error
-				clusterParams.OpenshiftVersionId, err = framework.GetLatestInstallVersionForNightlyChannel(version)
-				if err != nil {
-					if errors.Is(err, framework.ErrNightlyReleaseStreamNotFound) || errors.Is(err, framework.ErrNoAcceptedNightlyTags) {
-						Skip(fmt.Sprintf("No node pool install version found for %s in nightly channel (%s)", version, err.Error()))
-					} else {
-						Fail(fmt.Sprintf("failed to get latest node pool install version for nightly channel: %s", err.Error()))
-					}
+			openShiftControlPlaneVersion, err := framework.GetLatestInstallVersion(ctx, clusterParams.ChannelGroup, version)
+			if err != nil {
+				if errors.Is(err, framework.ErrNightlyReleaseStreamNotFound) || errors.Is(err, framework.ErrNoAcceptedNightlyTags) || errors.Is(err, framework.ErrVersionNotFound) {
+					Skip(fmt.Sprintf("No install version found for %s in %s channel (%s)", version, clusterParams.ChannelGroup, err.Error()))
+				} else {
+					Fail(fmt.Sprintf("failed to get latest install version for %s channel: %s", clusterParams.ChannelGroup, err.Error()))
 				}
 			}
-
-			// TODO: remove this filter when https://redhat.atlassian.net/browse/ARO-25490 and https://redhat.atlassian.net/browse/ARO-24955 are closed
+			// TODO: remove this filter when https://redhat.atlassian.net/browse/OCPBUGS-83564 is fixed
 			calculatedControlPlaneSemver, err := semver.ParseTolerant(clusterParams.OpenshiftVersionId)
 			Expect(err).NotTo(HaveOccurred(), "calculated control plane version was not semver parseable")
-			if calculatedControlPlaneSemver.Major > 4 || (calculatedControlPlaneSemver.Major == 4 && calculatedControlPlaneSemver.Minor >= 21) {
-				Skip(fmt.Sprintf("Skipping test for control plane version %s: versions >= 4.21 are not supported by this test", clusterParams.OpenshiftVersionId))
+			if calculatedControlPlaneSemver.Major == 5 {
+				Skip(fmt.Sprintf("Skipping test for control plane version %s: versions >= 5.0 are not yet supported by this test", clusterParams.OpenshiftVersionId))
+			}
+			clusterParams.OpenshiftVersionId = openShiftControlPlaneVersion
+
+			tc := framework.NewTestContext()
+			if tc.UsePooledIdentities() {
+				err := tc.AssignIdentityContainers(ctx, 1, 60*time.Second)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			By("creating resource group")
