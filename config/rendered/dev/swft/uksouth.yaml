@@ -1,12 +1,12 @@
 acm:
   mce:
     bundle:
-      digest: sha256:f10859d80b6a2829fbfe865e45672b36213766a4a35a0590fdf57b7a0caa6e96
+      digest: sha256:763431cb765236eade5183b15340de94f77ae1451f45db0c7ed1f732dbc932e3
       registry: quay.io
       repository: redhat-user-workloads/crt-redhat-acm-tenant/mce-operator-bundle-mce-211
   operator:
     bundle:
-      digest: sha256:d14bce61d1f4608f64555174bdfce833865dec4316888f0f6eaa58e9aba38433
+      digest: sha256:b0e1a81a8add467e9525310b99da5dd6c4cefc0f6c0fc3f6d290485d3cf1bc09
       registry: quay.io
       repository: redhat-user-workloads/crt-redhat-acm-tenant/acm-operator-bundle-acm-216
 acr:
@@ -35,7 +35,7 @@ adminApi:
     issuer: Self
     name: admin-api-cert-swft-lnstest
   image:
-    digest: sha256:6484fde2aded5e6303468ec4de20e8c4157c46380afac6e329722a0f62502bb1
+    digest: sha256:5ba9271402782ec304f376dfa2c864084faa1ba41507ba2ee74039418887c80f
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpadminapi
   k8s:
@@ -102,7 +102,7 @@ backend:
     roleSetName: dev
   exitOnPanic: true
   image:
-    digest: sha256:84c4c01f60fa28c0978bbb490fc2411bde3bf52ef24b9ea089f7e20e5623a38b
+    digest: sha256:aa2e457b79896fb7bc77132685f7a2f9bd93d351576c396e67c09943f61a346a
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpbackend
   k8s:
@@ -167,7 +167,7 @@ clustersService:
   deployDebugJobs: false
   environment: arohcpswft
   image:
-    digest: sha256:777029ed83edc1c0bc5435f598b0f2bea5e6cfd82d6756ab453356bd4c18158e
+    digest: sha256:f9586c08cfd6ae55d2988352218680bc0b6f0bfb46808e696d665312ad603421
     registry: quay.io
     repository: app-sre/aro-hcp-clusters-service
   k8s:
@@ -209,7 +209,7 @@ clustersService:
 customExporter:
   enabledCollectors: service-tag-usage,kusto-logs-current
   image:
-    digest: sha256:77f62e95cad0c11193f1568dc060fa01d8ea85c2246e1366923e0e1e067510dd
+    digest: sha256:0f6bb4c8958810f54267a22e8ba80bb4cba9e7243dd54d5aee5359fc285158da
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpmetrics
   k8s:
@@ -272,7 +272,7 @@ frontend:
     zoneRedundantMode: Disabled
   exitOnPanic: true
   image:
-    digest: sha256:38a217f8531a55bff6bcde9f5fb0842a8bfdc7f5c4e3115e98283bcb1af81d91
+    digest: sha256:ec9a72dc798899ef873e2290cfd8502657f08a39715e851ed59fc53bdf108506
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpfrontend
   k8s:
@@ -414,7 +414,7 @@ imageSync:
   ocMirror:
     enabled: true
     image:
-      digest: sha256:2bbbf9bc554933875feeef2e53a904e53287dcafd060bc061f022c6c65ab335b
+      digest: sha256:a32122dcb2543c23d2a8b6d448ce3ffe026f0aee80057d1bf181e72f55ad34bc
       registry: arohcpsvcdev.azurecr.io
       repository: image-sync/oc-mirror
     jobNamePrefix: ""
@@ -827,7 +827,7 @@ sessiongate:
     issuer: Self
     name: sessiongate-cert-swft-lnstest
   image:
-    digest: sha256:a0cbfdc280d83f9abdd6d00c25572b9751c4e3410b59d63d0c81e8eea476ca2d
+    digest: sha256:82db3bb397fd376b109b135434a8f61e39ff0158446783454c08111e8d38ff1c
     registry: arohcpsvcdev.azurecr.io
     repository: arohcpsessiongate
   k8s:
