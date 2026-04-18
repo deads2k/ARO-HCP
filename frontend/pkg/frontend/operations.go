@@ -30,6 +30,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
 
 // AddAsyncOperationHeader adds an "Azure-AsyncOperation" header to the ResponseWriter
@@ -96,12 +97,7 @@ func (f *Frontend) CancelActiveOperations(ctx context.Context, transaction datab
 	iterator := f.dbClient.Operations(subscriptionID).ListActiveOperations(opts)
 	for _, operation := range iterator.Items(ctx) {
 		operationToWrite := operation.DeepCopy()
-		operationToWrite.LastTransitionTime = now
-		operationToWrite.Status = arm.ProvisioningStateCanceled
-		operationToWrite.Error = &arm.CloudErrorBody{
-			Code:    arm.CloudErrorCodeCanceled,
-			Message: "This operation was superseded by another",
-		}
+		apihelpers.CancelOperation(operationToWrite, now)
 
 		_, err := f.dbClient.Operations(subscriptionID).AddReplaceToTransaction(ctx, transaction, operationToWrite, nil)
 		if err != nil {
