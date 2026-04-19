@@ -219,7 +219,8 @@ func (d *cosmosDBClient) GlobalListers() GlobalListers {
 func NewCosmosDatabaseClient(url string, dbName string, clientOptions azcore.ClientOptions) (*azcosmos.DatabaseClient, error) {
 	credential, err := azidentity.NewDefaultAzureCredential(
 		&azidentity.DefaultAzureCredentialOptions{
-			ClientOptions: clientOptions,
+			ClientOptions:                clientOptions,
+			RequireAzureTokenCredentials: true,
 		})
 	if err != nil {
 		return nil, utils.TrackError(err)
