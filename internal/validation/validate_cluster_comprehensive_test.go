@@ -152,7 +152,7 @@ func TestValidateClusterCreate(t *testing.T) {
 				return c
 			}(),
 			expectErrors: []expectedError{
-				{message: "Unsupported value", fieldPath: "customerProperties.api.visiblity"},
+				{message: "Unsupported value", fieldPath: "customerProperties.api.visibility"},
 			},
 		},
 		{
@@ -586,7 +586,7 @@ func TestValidateClusterCreate(t *testing.T) {
 			expectErrors: []expectedError{
 				{message: "must be a valid DNS RFC 1035 label", fieldPath: "customerProperties.dns.baseDomainPrefix"},
 				{message: "Unsupported value", fieldPath: "customerProperties.network.networkType"},
-				{message: "Unsupported value", fieldPath: "customerProperties.api.visiblity"},
+				{message: "Unsupported value", fieldPath: "customerProperties.api.visibility"},
 			},
 		},
 		// Tests for validateOperatorAuthenticationAgainstIdentities
@@ -1495,7 +1495,7 @@ func TestValidateClusterUpdate(t *testing.T) {
 				return c
 			}(),
 			expectErrors: []expectedError{
-				{message: "field is immutable", fieldPath: "customerProperties.api.visiblity"},
+				{message: "field is immutable", fieldPath: "customerProperties.api.visibility"},
 			},
 		},
 		{
@@ -1972,7 +1972,7 @@ func TestValidateClusterUpdate(t *testing.T) {
 			expectErrors: []expectedError{
 				{message: "field is immutable", fieldPath: "customerProperties.version.id"},
 				{message: "field is immutable", fieldPath: "customerProperties.dns.baseDomainPrefix"},
-				{message: "field is immutable", fieldPath: "customerProperties.api.visiblity"},
+				{message: "field is immutable", fieldPath: "customerProperties.api.visibility"},
 				{message: "field is immutable", fieldPath: "serviceProviderProperties.managedIdentitiesDataPlaneIdentityURL"},
 			},
 		},

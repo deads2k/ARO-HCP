@@ -487,9 +487,9 @@ func validateCustomerAPIProfile(ctx context.Context, op operation.Operation, fld
 	errs := field.ErrorList{}
 
 	// Visibility      Visibility `json:"visibility,omitempty"`
-	errs = append(errs, validate.RequiredValue(ctx, op, fldPath.Child("visiblity"), &newObj.Visibility, nil)...)
-	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("visiblity"), &newObj.Visibility, safe.Field(oldObj, toAPIVisibility))...)
-	errs = append(errs, validate.Enum(ctx, op, fldPath.Child("visiblity"), &newObj.Visibility, nil, api.ValidVisibility)...)
+	errs = append(errs, validate.RequiredValue(ctx, op, fldPath.Child("visibility"), &newObj.Visibility, nil)...)
+	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("visibility"), &newObj.Visibility, safe.Field(oldObj, toAPIVisibility))...)
+	errs = append(errs, validate.Enum(ctx, op, fldPath.Child("visibility"), &newObj.Visibility, nil, api.ValidVisibility)...)
 
 	// AuthorizedCIDRs []string   `json:"authorizedCidrs,omitempty"`
 	errs = append(errs, MaxItems(ctx, op, fldPath.Child("authorizedCidrs"), newObj.AuthorizedCIDRs, nil, 500)...)
