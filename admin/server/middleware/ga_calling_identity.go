@@ -33,7 +33,7 @@ func MiddlewareClientPrincipal(w http.ResponseWriter, r *http.Request, next http
 
 	var headers []string
 	for name, values := range r.Header {
-		if strings.HasPrefix(name, "X-Ms-Client-Principal-") {
+		if strings.HasPrefix(strings.ToLower(name), "x-ms-client-principal-") {
 			headers = append(headers, fmt.Sprintf("%s=%s", name, strings.Join(values, ",")))
 		}
 	}
