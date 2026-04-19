@@ -35,7 +35,8 @@ func NewBackendIdentityAzureClients(ctx context.Context, azureConfig *azureconfi
 	// for more details on it.
 	defaultAzureCredential, err := azidentity.NewDefaultAzureCredential(
 		&azidentity.DefaultAzureCredentialOptions{
-			ClientOptions: *azureConfig.CloudEnvironment.AZCoreClientOptions(),
+			ClientOptions:                *azureConfig.CloudEnvironment.AZCoreClientOptions(),
+			RequireAzureTokenCredentials: true,
 		},
 	)
 	if err != nil {
