@@ -108,6 +108,7 @@ func (d *operationCRUD) ListActiveOperations(options *DBClientListActiveOperatio
 type HCPClusterCRUD interface {
 	ResourceCRUD[api.HCPOpenShiftCluster]
 	ControllerContainer
+	ManagementClusterContentContainer
 
 	ExternalAuth(hcpClusterID string) ExternalAuthsCRUD
 	NodePools(hcpClusterID string) NodePoolsCRUD
@@ -133,6 +134,7 @@ func NewHCPClusterCRUD(containerClient *azcosmos.ContainerClient, subscriptionID
 type NodePoolsCRUD interface {
 	ResourceCRUD[api.HCPOpenShiftClusterNodePool]
 	ControllerContainer
+	ManagementClusterContentContainer
 }
 
 type ExternalAuthsCRUD interface {
@@ -193,6 +195,22 @@ func (h *hcpClusterCRUD) Controllers(hcpClusterName string) ResourceCRUD[api.Con
 	return NewControllerCRUD(h.containerClient, parentResourceID, api.ClusterControllerResourceType)
 }
 
+func (h *hcpClusterCRUD) ManagementClusterContents(hcpClusterName string) ManagementClusterContentCRUD {
+	parentResourceID := api.Must(azcorearm.ParseResourceID(
+		path.Join(
+			h.parentResourceID.String(),
+			"providers",
+			h.resourceType.Namespace,
+			h.resourceType.Type,
+			hcpClusterName)))
+
+	return NewCosmosResourceCRUD[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]](
+		h.containerClient,
+		parentResourceID,
+		api.ClusterScopedManagementClusterContentResourceType,
+	)
+}
+
 type externalAuthCRUD struct {
 	*nestedCosmosResourceCRUD[api.HCPOpenShiftClusterExternalAuth, ExternalAuth]
 }
@@ -221,6 +239,21 @@ func (h *nodePoolsCRUD) Controllers(nodePoolName string) ResourceCRUD[api.Contro
 		)))
 
 	return NewControllerCRUD(h.containerClient, parentResourceID, api.NodePoolControllerResourceType)
+}
+
+func (h *nodePoolsCRUD) ManagementClusterContents(nodePoolName string) ManagementClusterContentCRUD {
+	parentResourceID := api.Must(azcorearm.ParseResourceID(
+		path.Join(
+			h.parentResourceID.String(),
+			h.resourceType.Types[len(h.resourceType.Types)-1],
+			nodePoolName,
+		)))
+
+	return NewCosmosResourceCRUD[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]](
+		h.containerClient,
+		parentResourceID,
+		api.NodePoolScopedManagementClusterContentResourceType,
+	)
 }
 
 func NewControllerCRUD(

@@ -24,20 +24,21 @@ import (
 	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/backend/pkg/listers"
 	"github.com/Azure/ARO-HCP/backend/pkg/maestro"
+	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
 )
 
-// readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer is a controller that reads the Maestro readonly bundles
-// references stored in the ServiceProviderCluster resource, retrieves the Maestro readonly bundles using those
+// readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer is a controller that reads the Maestro readonly bundles
+// references stored in the ServiceProviderNodePool resource, retrieves the Maestro readonly bundles using those
 // references, extracts the content of the Maestro readonly bundles and persists them in Cosmos.
 // It is not responsible for creating the Maestro readonly bundles themselves. That is the responsibility of
-// the createMaestroReadonlyBundlesSyncer controller.
-// As of now we support reading the content of the Maestro readonly bundle of the Hypershift's HostedCluster associated
+// the createNodePoolScopedMaestroReadonlyBundlesSyncer controller.
+// As of now we support reading the content of the Maestro readonly bundle of the Hypershift's NodePools associated
 // to the Cluster.
 // This controller assumes that it has full ownership of the ManagementClusterContent resource.
-type readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer struct {
+type readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer struct {
 	cooldownChecker controllerutils.CooldownChecker
 
 	activeOperationLister listers.ActiveOperationLister
@@ -50,9 +51,9 @@ type readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer struct {
 	maestroClientBuilder               maestro.MaestroClientBuilder
 }
 
-var _ controllerutils.ClusterSyncer = (*readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer)(nil)
+var _ controllerutils.NodePoolSyncer = (*readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer)(nil)
 
-func NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
+func NewReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentController(
 	activeOperationLister listers.ActiveOperationLister,
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
@@ -61,7 +62,7 @@ func NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
 	maestroClientBuilder maestro.MaestroClientBuilder,
 ) controllerutils.Controller {
 
-	syncer := &readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer{
+	syncer := &readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer{
 		cooldownChecker:                    controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
 		cosmosClient:                       cosmosClient,
 		clusterServiceClient:               clusterServiceClient,
@@ -70,8 +71,8 @@ func NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
 		maestroClientBuilder:               maestroClientBuilder,
 	}
 
-	controller := controllerutils.NewClusterWatchingController(
-		"ReadAndPersistClusterScopedMaestroReadonlyBundlesContent",
+	controller := controllerutils.NewNodePoolWatchingController(
+		"ReadAndPersistNodePoolScopedMaestroReadonlyBundlesContent",
 		cosmosClient,
 		informers,
 		1*time.Minute,
@@ -81,22 +82,26 @@ func NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
 	return controller
 }
 
-func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPClusterKey) error {
-	existingCluster, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).Get(ctx, key.HCPClusterName)
+func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) SyncOnce(ctx context.Context, key controllerutils.HCPNodePoolKey) error {
+	existingNodePool, err := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).Get(ctx, key.HCPNodePoolName)
 	if database.IsResponseError(err, http.StatusNotFound) {
-		return nil // cluster doesn't exist, no work to do
+		return nil // nodepool doesn't exist, no work to do
 	}
 	if err != nil {
-		return utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
+		return utils.TrackError(fmt.Errorf("failed to get NodePool: %w", err))
+	}
+	if len(existingNodePool.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+		// TODO remove this once we have the information all in cosmos.
+		return nil
 	}
 
-	existingServiceProviderCluster, err := database.GetOrCreateServiceProviderCluster(ctx, c.cosmosClient, key.GetResourceID())
+	existingServiceProviderNodePool, err := database.GetOrCreateServiceProviderNodePool(ctx, c.cosmosClient, key.GetResourceID())
 	if err != nil {
-		return utils.TrackError(fmt.Errorf("failed to get or create ServiceProviderCluster: %w", err))
+		return utils.TrackError(fmt.Errorf("failed to get or create ServiceProviderNodePool: %w", err))
 	}
 
 	// We return early if there are no Maestro Bundle references to process.
-	if len(existingServiceProviderCluster.Status.MaestroReadonlyBundles) == 0 {
+	if len(existingServiceProviderNodePool.Status.MaestroReadonlyBundles) == 0 {
 		return nil
 	}
 
@@ -105,11 +110,13 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 	// we are guaranteed to have a shard allocated for the cluster. If this changes in the future
 	// we would need to change the logic in controllers to check that the retrieved cluster has a
 	// shard allocated.
-	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	csClusterID := existingNodePool.ServiceProviderProperties.ClusterServiceID.ClusterID()
+	csClusterHREF := ocm.GenerateAROHCPClusterHREF(csClusterID)
+	csClusterInternalID := api.Must(api.NewInternalID(csClusterHREF))
+	clusterProvisionShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, csClusterInternalID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard from Cluster Service: %w", err))
 	}
-
 	// We create a new context with a cancel function so we can cancel the Maestro client when the sync is done.
 	// This is important to avoid leaking resources when the sync is done.
 	ctx, cancel := context.WithCancel(ctx)
@@ -119,13 +126,13 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
 
-	managementClusterContentsDBClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).ManagementClusterContents(key.HCPClusterName)
+	managementClusterContentsDBClient := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName).ManagementClusterContents(key.HCPNodePoolName)
 
 	var syncErrors []error
-	for _, maestroBundleReference := range existingServiceProviderCluster.Status.MaestroReadonlyBundles {
-		err = readAndPersistMaestroReadonlyBundleContent(ctx, existingCluster.ID, maestroBundleReference, maestroClient, managementClusterContentsDBClient)
+	for _, maestroBundleReference := range existingServiceProviderNodePool.Status.MaestroReadonlyBundles {
+		err = readAndPersistMaestroReadonlyBundleContent(ctx, existingNodePool.ID, maestroBundleReference, maestroClient, managementClusterContentsDBClient)
 		if err != nil {
-			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to read and persist HostedCluster: %w", err)))
+			syncErrors = append(syncErrors, utils.TrackError(fmt.Errorf("failed to read and persist NodePool: %w", err)))
 		}
 
 	}
@@ -133,6 +140,6 @@ func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) SyncOnc
 	return utils.TrackError(errors.Join(syncErrors...))
 }
 
-func (c *readAndPersistClusterScopedMaestroReadonlyBundlesContentSyncer) CooldownChecker() controllerutils.CooldownChecker {
+func (c *readAndPersistNodePoolScopedMaestroReadonlyBundlesContentSyncer) CooldownChecker() controllerutils.CooldownChecker {
 	return c.cooldownChecker
 }

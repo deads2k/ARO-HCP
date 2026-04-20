@@ -84,9 +84,12 @@ func (g *mockGlobalListers) Controllers() database.GlobalLister[api.Controller] 
 }
 
 func (g *mockGlobalListers) ManagementClusterContents() database.GlobalLister[api.ManagementClusterContent] {
-	return &mockTypedGlobalLister[api.ManagementClusterContent, database.GenericDocument[api.ManagementClusterContent]]{
-		client:       g.client,
-		resourceType: api.ManagementClusterContentResourceType,
+	return &mockManagementClusterContentGlobalLister{
+		client: g.client,
+		resourceTypes: []azcorearm.ResourceType{
+			api.ClusterScopedManagementClusterContentResourceType,
+			api.NodePoolScopedManagementClusterContentResourceType,
+		},
 	}
 }
 
@@ -279,6 +282,52 @@ func (l *mockBillingGlobalLister) List(ctx context.Context, options *database.DB
 	for id, doc := range l.client.billing {
 		ids = append(ids, id)
 		items = append(items, doc)
+	}
+
+	return newMockIterator(ids, items), nil
+}
+
+// mockManagementClusterContentGlobalLister lists management cluster content for cluster-scoped and node-pool-scoped documents.
+type mockManagementClusterContentGlobalLister struct {
+	client        *MockDBClient
+	resourceTypes []azcorearm.ResourceType
+}
+
+func (l *mockManagementClusterContentGlobalLister) List(ctx context.Context, options *database.DBClientListResourceDocsOptions) (database.DBClientIterator[api.ManagementClusterContent], error) {
+	allDocs := l.client.GetAllDocuments()
+
+	var ids []string
+	var items []*api.ManagementClusterContent
+
+	for _, data := range allDocs {
+		var typedDoc database.TypedDocument
+		if err := json.Unmarshal(data, &typedDoc); err != nil {
+			continue
+		}
+
+		resourceTypeMatches := false
+		for _, resourceType := range l.resourceTypes {
+			if strings.EqualFold(typedDoc.ResourceType, resourceType.String()) {
+				resourceTypeMatches = true
+				break
+			}
+		}
+		if !resourceTypeMatches {
+			continue
+		}
+
+		var cosmosObj database.GenericDocument[api.ManagementClusterContent]
+		if err := json.Unmarshal(data, &cosmosObj); err != nil {
+			continue
+		}
+
+		internalObj, err := database.CosmosGenericToInternal(&cosmosObj)
+		if err != nil {
+			continue
+		}
+
+		ids = append(ids, typedDoc.ID)
+		items = append(items, internalObj)
 	}
 
 	return newMockIterator(ids, items), nil

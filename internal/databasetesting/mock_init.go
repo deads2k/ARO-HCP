@@ -32,6 +32,7 @@ import (
 //   - *api.ServiceProviderCluster
 //   - *arm.Subscription
 //   - *api.Controller
+//   - *api.ManagementClusterContent
 //
 // Returns an error if any resource cannot be created or if an unsupported type is encountered.
 func NewMockDBClientWithResources(ctx context.Context, resources []any) (*MockDBClient, error) {
@@ -63,6 +64,8 @@ func (m *MockDBClient) addResource(ctx context.Context, resource any) error {
 		return m.addSubscription(ctx, r)
 	case *api.Controller:
 		return m.addController(ctx, r)
+	case *api.ManagementClusterContent:
+		return m.addManagementClusterContent(ctx, r)
 	default:
 		return fmt.Errorf("unsupported resource type: %T", resource)
 	}
@@ -171,4 +174,33 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 		return err
 	}
 	return fmt.Errorf("unsupported parent resource type: %s", parentType)
+}
+
+func (m *MockDBClient) addManagementClusterContent(ctx context.Context, mcc *api.ManagementClusterContent) error {
+	resourceID := mcc.GetResourceID()
+	if resourceID == nil {
+		return fmt.Errorf("management cluster content is missing resource ID")
+	}
+	if resourceID.Parent == nil {
+		return fmt.Errorf("management cluster content is missing parent ID")
+	}
+	parentType := resourceID.Parent.ResourceType
+	switch {
+	case armhelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
+		clusterName := resourceID.Parent.Name
+		mccCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).ManagementClusterContents(clusterName)
+		_, err := mccCRUD.Create(ctx, mcc, nil)
+		return err
+	case armhelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
+		if resourceID.Parent.Parent == nil {
+			return fmt.Errorf("node pool management cluster content is missing grandparent cluster ID")
+		}
+		clusterName := resourceID.Parent.Parent.Name
+		nodePoolName := resourceID.Parent.Name
+		mccCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(clusterName).ManagementClusterContents(nodePoolName)
+		_, err := mccCRUD.Create(ctx, mcc, nil)
+		return err
+	default:
+		return fmt.Errorf("unsupported parent resource type for management cluster content: %s", parentType)
+	}
 }

@@ -67,6 +67,13 @@ func NewNodePoolWatchingController(
 		if err != nil {
 			panic(err) // coding error
 		}
+
+		managementClusterContentInformer, _ := informers.ManagementClusterContents()
+		// Limit the max depth of ManagementClusterContent to 1 to only consider the nodepool-scoped ManagementClusterContents
+		err = nodePoolController.QueueForInformersWithMaxDepth(resyncDuration, 1, managementClusterContentInformer)
+		if err != nil {
+			panic(err) // coding error
+		}
 	}
 
 	return nodePoolController

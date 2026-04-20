@@ -248,6 +248,46 @@ func (l *DBControllerLister) listWithPrefix(ctx context.Context, prefix string) 
 	return result, nil
 }
 
+// DBManagementClusterContentLister implements listers.ManagementClusterContentLister backed by a database.DBClient.
+type DBManagementClusterContentLister struct {
+	DBClient database.DBClient
+}
+
+var _ listers.ManagementClusterContentLister = &DBManagementClusterContentLister{}
+
+func (l *DBManagementClusterContentLister) List(ctx context.Context) ([]*api.ManagementClusterContent, error) {
+	iter, err := l.DBClient.GlobalListers().ManagementClusterContents().List(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	return collectFromIterator(ctx, iter)
+}
+
+func (l *DBManagementClusterContentLister) ListForCluster(ctx context.Context, subscriptionID, resourceGroupName, clusterName string) ([]*api.ManagementClusterContent, error) {
+	prefix := api.ToClusterResourceIDString(subscriptionID, resourceGroupName, clusterName)
+	return l.listMCCWithPrefix(ctx, prefix)
+}
+
+func (l *DBManagementClusterContentLister) ListForNodePool(ctx context.Context, subscriptionName, resourceGroupName, clusterName, nodePoolName string) ([]*api.ManagementClusterContent, error) {
+	prefix := api.ToNodePoolResourceIDString(subscriptionName, resourceGroupName, clusterName, nodePoolName)
+	return l.listMCCWithPrefix(ctx, prefix)
+}
+
+func (l *DBManagementClusterContentLister) listMCCWithPrefix(ctx context.Context, prefix string) ([]*api.ManagementClusterContent, error) {
+	all, err := l.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var result []*api.ManagementClusterContent
+	for _, mcc := range all {
+		rid := mcc.GetResourceID()
+		if rid != nil && strings.HasPrefix(strings.ToLower(rid.String()), strings.ToLower(prefix)) {
+			result = append(result, mcc)
+		}
+	}
+	return result, nil
+}
+
 // DBSubscriptionLister implements listers.SubscriptionLister backed by a database.DBClient.
 type DBSubscriptionLister struct {
 	DBClient database.DBClient

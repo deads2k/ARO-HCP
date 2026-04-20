@@ -459,3 +459,30 @@ func newTestSubscription(subscriptionID string) *arm.Subscription {
 		ResourceID: resourceID,
 	}
 }
+
+func newTestClusterScopedManagementClusterContent(subscriptionID, resourceGroupName, clusterName, mccName string) *api.ManagementClusterContent {
+	resourceID := api.Must(azcorearm.ParseResourceID(
+		"/subscriptions/" + subscriptionID +
+			"/resourceGroups/" + resourceGroupName +
+			"/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/" + clusterName +
+			"/managementClusterContents/" + mccName,
+	))
+	return &api.ManagementClusterContent{
+		CosmosMetadata: arm.CosmosMetadata{ResourceID: resourceID},
+		ResourceID:     *resourceID,
+	}
+}
+
+func newTestNodePoolScopedManagementClusterContent(subscriptionID, resourceGroupName, clusterName, nodePoolName, mccName string) *api.ManagementClusterContent {
+	resourceID := api.Must(azcorearm.ParseResourceID(
+		"/subscriptions/" + subscriptionID +
+			"/resourceGroups/" + resourceGroupName +
+			"/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/" + clusterName +
+			"/nodePools/" + nodePoolName +
+			"/managementClusterContents/" + mccName,
+	))
+	return &api.ManagementClusterContent{
+		CosmosMetadata: arm.CosmosMetadata{ResourceID: resourceID},
+		ResourceID:     *resourceID,
+	}
+}

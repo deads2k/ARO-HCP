@@ -36,6 +36,8 @@ type BackendInformers interface {
 	ServiceProviderClusters() (cache.SharedIndexInformer, listers.ServiceProviderClusterLister)
 	ServiceProviderNodePools() (cache.SharedIndexInformer, listers.ServiceProviderNodePoolLister)
 	Controllers() (cache.SharedIndexInformer, listers.ControllerLister)
+	// ManagementClusterContents is the single shared informer for all managementClusterContents documents belonging
+	// to different resource types.
 	ManagementClusterContents() (cache.SharedIndexInformer, listers.ManagementClusterContentLister)
 	BillingDocs() (cache.SharedIndexInformer, listers.BillingLister)
 
