@@ -163,7 +163,7 @@ make update GROUPS=hypershift-stack,velero
 make update GROUPS=hypershift-stack EXCLUDE_COMPONENTS=maestro-agent-sidecar
 ```
 
-Available groups: `aro-rp`, `cs`, `aro-deps`, `hypershift-stack`, `prom-stack`, `obs-agents`, `velero`, `platform-utils`.
+Example groups include `aro-rp`, `cs`, `aro-deps`, `hypershift-stack`, `prom-stack`, `obs-agents`, `velero`, and `platform-utils`. For the complete, current set of supported groups, refer to `config.yaml`.
 
 ### Output to File
 
@@ -252,7 +252,7 @@ images:
   # Pinned to specific version
   hypershift:
     source:
-      image: quay.io/acm-d/rhtap-hypershift-operator
+      image: quay.io/example/hypershift-operator
       tag: "v1.0.0"  # Exact version (useful for rollbacks)
     targets:
     - jsonPath: defaults.hypershift.image.digest
@@ -275,7 +275,7 @@ images:
 ```yaml
 hypershift:
   source:
-    image: quay.io/acm-d/rhtap-hypershift-operator
+    image: quay.io/example/hypershift-operator
     tagPattern: "^v\\d+\\.\\d+\\.\\d+$"  # Semantic versions
   targets:
   - jsonPath: defaults.hypershift.image.digest
@@ -338,7 +338,7 @@ acrPull:
 ```yaml
 hypershift:
   source:
-    image: quay.io/acm-d/rhtap-hypershift-operator
+    image: quay.io/example/hypershift-operator
     tagPattern: "^sha256-[a-f0-9]{64}$"
     architecture: amd64  # Defaults to amd64, can use arm64, etc.
   targets:
@@ -452,7 +452,7 @@ Use when you need a specific version:
 
 ```yaml
 source:
-  image: quay.io/acm-d/rhtap-hypershift-operator
+  image: quay.io/example/hypershift-operator
   tag: "v1.0.0"  # Exact tag name
 ```
 
@@ -466,7 +466,7 @@ Use regex to automatically select the latest matching tag:
 
 ```yaml
 source:
-  image: quay.io/acm-d/rhtap-hypershift-operator
+  image: quay.io/example/hypershift-operator
   tagPattern: "^v\\d+\\.\\d+\\.\\d+$"  # Match semver tags
 ```
 
