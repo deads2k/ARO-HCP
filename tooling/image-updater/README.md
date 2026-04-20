@@ -163,7 +163,7 @@ make update GROUPS=hypershift-stack,velero
 make update GROUPS=hypershift-stack EXCLUDE_COMPONENTS=maestro-agent-sidecar
 ```
 
-Available groups: `aro-rp`, `cs`, `aro-deps`, `hypershift-stack`, `pko`, `prom-stack`, `obs-agents`, `velero`, `platform-utils`.
+Available groups: `aro-rp`, `cs`, `aro-deps`, `hypershift-stack`, `prom-stack`, `obs-agents`, `velero`, `platform-utils`.
 
 ### Output to File
 
@@ -250,12 +250,12 @@ images:
       filePath: ../../config/config.yaml
 
   # Pinned to specific version
-  pko-manager:
+  hypershift:
     source:
-      image: quay.io/package-operator/package-operator-manager
-      tag: "v1.18.3"  # Exact version (useful for rollbacks)
+      image: quay.io/acm-d/rhtap-hypershift-operator
+      tag: "v1.0.0"  # Exact version (useful for rollbacks)
     targets:
-    - jsonPath: defaults.pko.imageManager.digest
+    - jsonPath: defaults.hypershift.image.digest
       filePath: ../../config/config.yaml
 
   # Using generic tag with version label
@@ -273,12 +273,12 @@ images:
 
 **Quay.io (Public)**:
 ```yaml
-pko-package:
+hypershift:
   source:
-    image: quay.io/package-operator/package-operator-package
+    image: quay.io/acm-d/rhtap-hypershift-operator
     tagPattern: "^v\\d+\\.\\d+\\.\\d+$"  # Semantic versions
   targets:
-  - jsonPath: defaults.pko.imagePackage.digest
+  - jsonPath: defaults.hypershift.image.digest
     filePath: ../../config/config.yaml
 ```
 
@@ -452,8 +452,8 @@ Use when you need a specific version:
 
 ```yaml
 source:
-  image: quay.io/package-operator/package-operator-package
-  tag: "v1.18.3"  # Exact tag name
+  image: quay.io/acm-d/rhtap-hypershift-operator
+  tag: "v1.0.0"  # Exact tag name
 ```
 
 **Benefits**:
@@ -466,7 +466,7 @@ Use regex to automatically select the latest matching tag:
 
 ```yaml
 source:
-  image: quay.io/package-operator/package-operator-package
+  image: quay.io/acm-d/rhtap-hypershift-operator
   tagPattern: "^v\\d+\\.\\d+\\.\\d+$"  # Match semver tags
 ```
 
@@ -532,9 +532,9 @@ The tool adds version and timestamp comments to YAML files:
 
 ```yaml
 defaults:
-  pko:
-    imagePackage:
-      digest: sha256:abc123... # v1.18.4 (2025-11-24 14:30)
+  hypershift:
+    image:
+      digest: sha256:abc123... # v1.2.3 (2025-11-24 14:30)
 ```
 
 - **Version**: From container label (e.g., commit hash) or tag name
