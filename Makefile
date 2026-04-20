@@ -379,14 +379,20 @@ record-services-override: $(YQ) $(ORAS)
 # One-Step Personal Dev Environment
 #
 ifeq ($(DEPLOY_ENV),$(filter $(DEPLOY_ENV),pers swft))
-personal-dev-env: install-tools build-services record-services-override
+personal-dev-env: install-tools
+	$(MAKE) entrypoint/Region
+	$(MAKE) infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
+
+personal-dev-env-images: install-tools build-services record-services-override
 	$(MAKE) entrypoint/Region OVERRIDE_CONFIG_FILE=$(PERS_OVERRIDE_FILE)
 	$(MAKE) infra.svc.aks.kubeconfig infra.mgmt.aks.kubeconfig infra.tracing infra.cosmos.access
 else
 personal-dev-env:
 	$(error personal-dev-env: DEPLOY_ENV must be set to "pers" or "swft", not "$(DEPLOY_ENV)")
+personal-dev-env-images:
+	$(error personal-dev-env-images: DEPLOY_ENV must be set to "pers" or "swft", not "$(DEPLOY_ENV)")
 endif
-.PHONY: personal-dev-env
+.PHONY: personal-dev-env personal-dev-env-images
 
 #
 # Opstool topology local run

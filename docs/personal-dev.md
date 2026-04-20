@@ -53,6 +53,14 @@ This command creates a personal DEV environment with a unique name that is deriv
 > This command can be used to update your personal DEV environment as well. It will apply the latest changes to the infrastructure and services. Steps are cached, so it's quick and safe to re-run the entire environment setup.
 > If you only want to update individual aspects of the environment, follow the [partial setup](#partial-personal-dev-environment-setup) instructions.
 
+If you need to build and deploy custom images for the in-repo services (frontend, backend, admin, sessiongate), use:
+
+   ```bash
+   make personal-dev-env-images
+   ```
+
+This builds and pushes all service images from your local checkout, then deploys with those images instead of the defaults from `config.yaml`.
+
 ### Local Cluster Service Development Setup
 
 If you plan to run the Cluster Service locally (not deployed to Kubernetes) for development, use the following command instead:
