@@ -100,11 +100,11 @@ func TestClusterRequired(t *testing.T) {
 				},
 				{
 					message:   "Required value",
-					fieldPath: "customerProperties.api.visiblity",
+					fieldPath: "customerProperties.api.visibility",
 				},
 				{
 					message:   "Unsupported value",
-					fieldPath: "customerProperties.api.visiblity",
+					fieldPath: "customerProperties.api.visibility",
 				},
 				{
 					message:   "Required value",
@@ -492,7 +492,7 @@ func TestClusterValidate(t *testing.T) {
 			expectErrors: []expectedError{
 				{
 					message:   "supported values: \"Private\", \"Public\"",
-					fieldPath: "customerProperties.api.visiblity",
+					fieldPath: "customerProperties.api.visibility",
 				},
 			},
 		},
