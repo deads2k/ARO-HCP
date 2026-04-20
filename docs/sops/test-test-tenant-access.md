@@ -332,28 +332,26 @@ High-volume E2E testing can hit the Entra ID directory object limit (500,000) du
 
 Both STAGE and PROD subscriptions have automated cleanup enabled to prevent resource accumulation and quota limits.
 
-### Automation Accounts
+### Prow Periodic Cleanup Jobs
 
-| Environment | Resource Group | Automation Account Name |
-|-------------|----------------|-------------------------|
-| STAGE | `hcp-stage-automation-account` | `hcp-stage-automation` |
-| PROD | `hcp-prod-automation-account` | `hcp-prod-automation` |
+Cleanup now runs via `cleanup-sweeper` periodic Prow jobs (not Azure Automation runbooks):
 
-### Cleanup Schedules
+- **RG ordered cleanup**:
+  - Job: `periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-rg-ordered`
+  - Purpose: resource-group cleanup across subscriptions using the policy workflow
+- **Shared leftovers cleanup**:
+  - Job: `periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-shared-leftovers`
+  - Purpose: remove shared leftovers such as orphaned role assignments
 
-**Role Assignment Cleanup** (PowerShell):
-- **Schedule**: Nightly at midnight UTC
-- **Purpose**: Removes orphaned role assignments (where the principal/identity has been deleted)
-- **Runbook**: `hcp-{env}-automation_roleAssignmentsCleanup`
+Job configuration lives in [`openshift/release` → `ci-operator/config/Azure/ARO-HCP/Azure-ARO-HCP-main__periodic.yaml`](https://github.com/openshift/release/blob/master/ci-operator/config/Azure/ARO-HCP/Azure-ARO-HCP-main__periodic.yaml), and the reusable step is in [`openshift/release` → `ci-operator/step-registry/aro-hcp/deprovision/cleanup-sweeper/`](https://github.com/openshift/release/tree/master/ci-operator/step-registry/aro-hcp/deprovision/cleanup-sweeper).
 
 ### Manual Testing
 
-To manually trigger cleanup (e.g., after large test runs):
+To manually test cleanup behavior:
 
-1. Go to Azure Portal → Automation Accounts → `hcp-{env}-automation` → Runbooks
-2. Select the runbook to test
-3. Click "Start"
-4. Monitor the job output
+1. Trigger the relevant periodic-style job from a PR with `/test` (or run locally with the same `cleanup-sweeper` workflow and flags).
+2. Monitor Prow job output in the test logs.
+3. Verify target subscriptions/resource groups after the run.
 
 ## Troubleshooting
 
