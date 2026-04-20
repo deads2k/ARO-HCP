@@ -18,9 +18,15 @@ NAMESPACE="package-operator-system"
 
 echo "Checking for Package Operator (PKO) leftovers..."
 
+# Always clean up cluster-scoped resources first, even if the namespace is
+# already gone.  PKO's CRB grants cluster-admin, so we must not leave it
+# orphaned.
+echo "Removing cluster-scoped resources..."
+kubectl delete clusterrolebinding package-operator --ignore-not-found
+
 # Check if the namespace exists at all
 if ! kubectl get namespace "${NAMESPACE}" &>/dev/null; then
-  echo "Namespace ${NAMESPACE} does not exist. Nothing to clean up."
+  echo "Namespace ${NAMESPACE} does not exist. Nothing else to clean up."
   exit 0
 fi
 
@@ -34,11 +40,6 @@ if helm status package-operator -n "${NAMESPACE}" &>/dev/null; then
 else
   echo "No Helm release 'package-operator' found."
 fi
-
-# Remove cluster-scoped resources
-echo "Removing cluster-scoped resources..."
-kubectl delete clusterrolebinding package-operator --ignore-not-found
-kubectl delete clusterrole package-operator --ignore-not-found
 
 # Remove the namespace
 echo "Removing namespace ${NAMESPACE}..."
