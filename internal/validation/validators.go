@@ -236,7 +236,7 @@ var (
 	clusterResourceNameRegex       = regexp.MustCompile(clusterResourceName)
 	clusterResourceNameErrorString = `(must be a valid DNS RFC 1035 label)`
 
-	nodePoolResourceName            = `^[a-zA-Z][-a-zA-Z0-9]{1,13}[a-z-A-Z0-9]$`
+	nodePoolResourceName            = `^[a-zA-Z][-a-zA-Z0-9]{1,13}[a-zA-Z0-9]$`
 	nodePoolResourceNameRegex       = regexp.MustCompile(nodePoolResourceName)
 	nodePoolResourceNameErrorString = `(must be a valid DNS RFC 1035 label)`
 

@@ -944,6 +944,18 @@ func TestValidateClusterCreate(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid cluster resource name - ends with hyphen",
+			cluster: func() *api.HCPOpenShiftCluster {
+				c := createValidCluster()
+				c.ID.Name = "my-cluster-"
+				c.Name = "my-cluster-"
+				return c
+			}(),
+			expectErrors: []expectedError{
+				{message: "must be a valid DNS RFC 1035 label", fieldPath: "id"},
+			},
+		},
+		{
 			name: "invalid cluster resource name - too long",
 			cluster: func() *api.HCPOpenShiftCluster {
 				c := createValidCluster()
