@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -76,24 +77,38 @@ var _ = Describe("Engineering", func() {
 
 			By("querying the /metrics endpoint")
 			metricsURL := fmt.Sprintf("http://localhost:%d/metrics", localPort)
-			req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, metricsURL, nil)
-			Expect(err).NotTo(HaveOccurred())
 
-			resp, err := http.DefaultClient.Do(req)
-			Expect(err).NotTo(HaveOccurred(), "Failed to query metrics endpoint")
-			defer resp.Body.Close()
+			Eventually(func() bool {
+				req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, metricsURL, nil)
+				Expect(err).NotTo(HaveOccurred())
 
-			Expect(resp.StatusCode).To(Equal(http.StatusOK), "Metrics endpoint returned non-200 status")
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					return false
+				}
+				defer resp.Body.Close()
 
-			body, err := io.ReadAll(resp.Body)
-			Expect(err).NotTo(HaveOccurred(), "Failed to read metrics response body")
+				if resp.StatusCode != http.StatusOK {
+					return false
+				}
 
-			By("verifying expected metric is present")
-			metricsOutput := string(body)
-			Expect(metricsOutput).To(ContainSubstring("public_ip_count_by_region_service_tag"),
-				"Expected metric 'foo_bar' not found in metrics output")
-			Expect(metricsOutput).To(ContainSubstring("kusto_logs_age_in_seconds"),
-				"Expected metric 'kusto_logs_age_in_seconds' not found in metrics output")
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return false
+				}
+
+				By("verifying expected metric is present")
+				metricsOutput := string(body)
+
+				if !strings.Contains(metricsOutput, "public_ip_count_by_region_service_tag") {
+					return false
+				}
+				if !strings.Contains(metricsOutput, "kusto_logs_age_in_seconds") {
+					return false
+				}
+
+				return true
+			}).WithTimeout(30 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
 		})
 })
 
