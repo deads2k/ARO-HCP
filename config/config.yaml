@@ -264,6 +264,8 @@ defaults:
     hostedControlPlaneLogsDatabase: "HostedControlPlaneLogs"
     adminGroups: ""
     viewerGroups: ""
+    crossClusterServiceLogsScript: ""
+    crossClusterHostedControlPlaneLogsScript: ""
     sku: ""
     tier: ""
   auditLogsEventHub:
