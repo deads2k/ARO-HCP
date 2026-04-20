@@ -18,10 +18,9 @@ package v1alpha1
 import (
 	http "net/http"
 
-	rest "k8s.io/client-go/rest"
-
 	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
 	scheme "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/clientset/versioned/scheme"
+	rest "k8s.io/client-go/rest"
 )
 
 type SessiongateV1alpha1Interface interface {

@@ -19,15 +19,14 @@ import (
 	context "context"
 	time "time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	cache "k8s.io/client-go/tools/cache"
-
 	apissessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
 	versioned "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/informers/externalversions/internalinterfaces"
 	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/listers/sessiongate/v1alpha1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	watch "k8s.io/apimachinery/pkg/watch"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // SessionInformer provides access to a shared informer and lister for

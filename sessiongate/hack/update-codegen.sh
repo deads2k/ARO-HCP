@@ -29,6 +29,14 @@ kube::codegen::gen_helpers \
     --boilerplate "${SESSIONGATE_ROOT}/hack/boilerplate.go.txt" \
     "${SESSIONGATE_ROOT}/pkg/apis"
 
+kube::codegen::gen_openapi \
+    --output-dir "${SESSIONGATE_ROOT}/pkg/generated/openapi" \
+    --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
+    --report-filename "${SESSIONGATE_ROOT}/hack/openapi-violations.list" \
+    --update-report \
+    --boilerplate "${SESSIONGATE_ROOT}/hack/boilerplate.go.txt" \
+    "${SESSIONGATE_ROOT}/pkg/apis"
+
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
