@@ -36,7 +36,7 @@ spec:
 {{- if contains "kusto-logs-current" .Values.enabledCollectors }}
         - --cluster-names={{ .Values.clusterNames }}
         - --kusto-cluster={{ .Values.kustoCluster }}
-        - --kusto-region={{ .Values.kustoRegion }}
+        - --kusto-region={{ .Values.kustoRegion | replace " " "" | lower }}
 {{- end }}
         ports:
         - name: metrics
