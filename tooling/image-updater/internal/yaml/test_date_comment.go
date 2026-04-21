@@ -21,8 +21,8 @@ import (
 
 func TestCommentWithDate(t *testing.T) {
 	content := `defaults:
-  pko:
-    imagePackage:
+  example:
+    image:
       digest: sha256:olddigest123
 `
 	tmpfile, _ := os.CreateTemp("", "test-*.yaml")
@@ -50,8 +50,8 @@ func TestCommentWithDate(t *testing.T) {
 
 	result, _ := os.ReadFile(tmpfile.Name())
 	expected := `defaults:
-  pko:
-    imagePackage:
+  example:
+    image:
       digest: sha256:newdigest456 # v1.18.4 (2025-11-24 14:30)
 `
 	if string(result) != expected {
