@@ -9,5 +9,5 @@ azureKeyVaultClientId: "__csiSecretStoreClientId__"
 additionalArgs: "{{ .hypershift.additionalInstallArg }}"
 operatorEnvVars:
   sharedIngressIPTag: "{{ .hypershift.sharedIngressIPTag }}"
-  sharedIngressImage: "{{ .acr.svc.name }}.{{ .acrDNSSuffix }}/{{ .hypershift.sharedIngressImage.repository }}@{{ .hypershift.sharedIngressImage.digest }}"
+  sharedIngressImage: "{{ .acr.ocp.name }}.{{ .acrDNSSuffix }}/{{ .hypershift.sharedIngressImage.repository }}@{{ .hypershift.sharedIngressImage.digest }}"
 limitClusterSizes: {{ .hypershift.limitClusterSizes }}

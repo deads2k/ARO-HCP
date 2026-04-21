@@ -41,7 +41,7 @@ resourceGroups:
   - name: mirror-shared-ingress-image
     action: ImageMirror
     targetACR:
-      configRef: 'acr.svc.name'
+      configRef: 'acr.ocp.name'
     sourceRegistry:
       configRef: hypershift.sharedIngressImage.registry
     repository:
