@@ -2,10 +2,6 @@
 
 The CS PR check environment is used as a sandbox environment to test changes to Clusters Service in the context of PR checks.
 
-## Differences to the Integrated DEV environment
-
-TBD
-
 ## CI/CD
 
 All changes to the infrastructure definitions, configuration and service manifests are PR checked towards the CS PR environment. The driver for such deployments is the [ARO HCP Continous Deployment GitHub Action Workflow](../.github/workflows/aro-hcp-cd.yml). On PR merge, this Workflow will exeecute the immediate deployment of these changes to the CS PR environment.

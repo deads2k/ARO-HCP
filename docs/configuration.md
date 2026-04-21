@@ -183,7 +183,6 @@ By enforcing a schema, configuration files remain predictable and can be automat
 ## Current Configuration Files
 
 - **[config.yaml](../config/config.yaml)** - Contains the baseline configuration for all ARO HCP environments and Red Hat development environment specific configuration under `clouds.dev`
-  - **dev**: integrated DEV environment - the first environment where all services are deployed together.
   - **cspr**: CS PR environment - a dedicated environment for testing Cluster Service PRs.
   - **pers**: personal DEV environment - used by developers to create new personal ARO HCP instances.
   - **perf**: personal perfscale environment - used by the perfscale team to create new ARO HCP instances with production grade management cluster settings
