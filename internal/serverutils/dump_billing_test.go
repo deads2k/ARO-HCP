@@ -52,7 +52,7 @@ func TestDumpBillingToLogger(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ClusterUID:       "billing-doc-1",
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1"))),
 		},
 	}
 
@@ -66,7 +66,7 @@ func TestDumpBillingToLogger(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ClusterUID:       "billing-doc-2",
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2"))),
 		},
 	}
 
@@ -128,7 +128,7 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ClusterUID:       "cluster-1-billing-1",
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-1"))),
 		},
 	}
 
@@ -142,7 +142,7 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ClusterUID:       "cluster-2-billing-2",
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-2"))),
 		},
 	}
 
@@ -156,7 +156,7 @@ func TestDumpBillingToLogger_PartitionScoping(t *testing.T) {
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ClusterUID:       "cluster-3-billing-3",
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-3")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster-3"))),
 		},
 	}
 

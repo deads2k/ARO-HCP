@@ -139,7 +139,7 @@ func TestOrphanedBillingCleanup_SyncOnce(t *testing.T) {
 					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 						ProvisioningState: arm.ProvisioningStateSucceeded,
 						ClusterUID:        "billing-doc-2",
-						ClusterServiceID:  api.Must(api.NewInternalID(testClusterServiceIDStr)),
+						ClusterServiceID:  api.Ptr(api.Must(api.NewInternalID(testClusterServiceIDStr))),
 					},
 				},
 			},
