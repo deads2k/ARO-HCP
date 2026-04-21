@@ -44,7 +44,7 @@ jobs:
       run: |
         cd tooling/azure-automation/resources-cleanup
         pip install -r requirements.txt
-        pip install pylint pytest
+        pip install pylint
     - name: Lint Python runbooks
       run: |
         cd tooling/azure-automation/resources-cleanup/src
