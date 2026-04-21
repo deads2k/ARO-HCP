@@ -78,11 +78,14 @@ var _ = Describe("Engineering", func() {
 			By("querying the /metrics endpoint")
 			metricsURL := fmt.Sprintf("http://localhost:%d/metrics", localPort)
 
+			httpClient := http.Client{
+				Timeout: 30 * time.Second,
+			}
 			Eventually(func() bool {
 				req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, metricsURL, nil)
 				Expect(err).NotTo(HaveOccurred())
 
-				resp, err := http.DefaultClient.Do(req)
+				resp, err := httpClient.Do(req)
 				if err != nil {
 					return false
 				}
