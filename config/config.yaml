@@ -1594,6 +1594,7 @@ clouds:
                 secondaryNicCount: 7
               infraAgentPool:
                 vmSize: Standard_D4ds_v5
+                osDiskSizeGB: 64
               enableSwiftV2Nodepools: true
               enableSwiftV2Vnet: true
             jaeger:

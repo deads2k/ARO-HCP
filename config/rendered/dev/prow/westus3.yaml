@@ -540,7 +540,7 @@ mgmt:
       maxCount: 3
       minCount: 1
       name: infra
-      osDiskSizeGB: 32
+      osDiskSizeGB: 64
       poolCount: 2
       vmSize: Standard_D4ds_v5
       zoneRedundantMode: Auto
