@@ -47,19 +47,11 @@ The creation process can take up to 20 minutes.
    make personal-dev-env
    ```
 
-This command creates a personal DEV environment with a unique name that is derived from your username and deploys all required infrastructure components.
+This command creates a personal DEV environment with a unique name that is derived from your username. It builds and pushes all in-repo service images (frontend, backend, admin, sessiongate) from your local checkout and deploys them along with all required infrastructure components.
 
 > [!TIP]
 > This command can be used to update your personal DEV environment as well. It will apply the latest changes to the infrastructure and services. Steps are cached, so it's quick and safe to re-run the entire environment setup.
 > If you only want to update individual aspects of the environment, follow the [partial setup](#partial-personal-dev-environment-setup) instructions.
-
-If you need to build and deploy custom images for the in-repo services (frontend, backend, admin, sessiongate), use:
-
-   ```bash
-   make personal-dev-env-images
-   ```
-
-This builds and pushes all service images from your local checkout, then deploys with those images instead of the defaults from `config.yaml`.
 
 ### Local Cluster Service Development Setup
 
