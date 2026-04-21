@@ -102,6 +102,12 @@ type ServiceProviderNodePoolStatus struct {
 	//   }
 	// }
 	NodePoolVersion ServiceProviderNodePoolStatusVersion `json:"nodePoolVersion,omitempty"`
+
+	// MaestroReadonlyBundles contains a list of Maestro readonly bundles references.
+	// These bundles are used to retrieve particular K8s resources from the Management Cluster.
+	// The reference contains a mapping between the logical name we give to the Maestro bundle internally
+	// and the Maestro Bundle Name and ID at the Maestro API level.
+	MaestroReadonlyBundles MaestroBundleReferenceList `json:"maestroReadonlyBundles,omitempty"`
 }
 
 // ServiceProviderNodePoolStatusVersion contains the actual version information.
@@ -111,23 +117,14 @@ type ServiceProviderNodePoolStatusVersion struct {
 	ActiveVersions []HCPNodePoolActiveVersion `json:"activeVersions,omitempty"`
 }
 
+const (
+	// MaestroBundleInternalNameReadonlyHypershiftNodePool is the internal name of the Maestro Bundle that represents
+	// the NodePool's Hypershift's NodePool K8s resource.
+	MaestroBundleInternalNameReadonlyHypershiftNodePool MaestroBundleInternalName = "readonlyHypershiftNodePool"
+)
+
 // HCPNodePoolActiveVersion represents a single version active in the nodepool.
 type HCPNodePoolActiveVersion struct {
 	// Version is the full version in x.y.z format (e.g., "4.19.2")
 	Version *semver.Version `json:"version,omitempty"`
-}
-
-// FindNodePoolVersionBounds returns the lowest and highest versions from the node pool active versions.
-// ActiveVersions can be in any order, so we iterate to find the actual minimum and maximum.
-func FindNodePoolVersionBounds(activeVersions []HCPNodePoolActiveVersion) (*semver.Version, *semver.Version) {
-	var lowest, highest *semver.Version
-	for _, av := range activeVersions {
-		if lowest == nil || av.Version.LT(*lowest) {
-			lowest = av.Version
-		}
-		if highest == nil || av.Version.GT(*highest) {
-			highest = av.Version
-		}
-	}
-	return lowest, highest
 }

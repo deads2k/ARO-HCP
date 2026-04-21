@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
@@ -38,7 +39,10 @@ var (
 	ErrNightlyReleaseStreamNotFound = errors.New("nightly release stream not found")
 	ErrNoAcceptedNightlyTags        = errors.New("no accepted nightly tags found")
 	ErrNoParseableNightlyTags       = errors.New("no parseable nightly tags found")
+	ErrVersionNotFound              = errors.New("no graph nodes found")
 )
+
+const graphAPIRequestTimeout = 30 * time.Second
 
 // GetInstallVersionForZStreamUpgrade returns the version to install the cluster with when testing
 // a z-stream upgrade, and whether that version has an available z-stream upgrade path. It uses
@@ -196,6 +200,81 @@ func GetUpgradeCandidatesInMaxMinorFromCincinnati(ctx context.Context, channelGr
 		return out[i].LT(out[j])
 	})
 	return out, nil
+}
+
+// GetLatestInstallVersion returns the latest install version for the given channel group and version
+// For nightly channels, it returns the latest accepted nightly tag.
+// For all other channels, it returns the latest version in the minor.
+func GetLatestInstallVersion(ctx context.Context, channelGroup string, version string) (string, error) {
+	if channelGroup == "nightly" {
+		return GetLatestInstallVersionForNightlyChannel(version)
+	}
+	return GetLatestInstallVersionForGraphChannel(ctx, channelGroup, version)
+}
+
+// Note that this function is different from GetLatestVersionInMinor because it will return also engineering candidate versions.
+func GetLatestInstallVersionForGraphChannel(ctx context.Context, channelGroup string, version string) (string, error) {
+	channel := fmt.Sprintf("%s-%s", channelGroup, version)
+	graphURL := fmt.Sprintf("https://api.openshift.com/api/upgrades_info/v1/graph?channel=%s", url.QueryEscape(channel))
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, graphURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("create %s graph request for %s: %w", channelGroup, channel, err)
+	}
+
+	client := &http.Client{Timeout: graphAPIRequestTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("query %s graph for %s: %w", channelGroup, channel, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("query %s graph for %s returned %s: %s", channelGroup, channel, resp.Status, strings.TrimSpace(string(body)))
+	}
+
+	var payload struct {
+		Nodes []struct {
+			Version string `json:"version"`
+		} `json:"nodes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode %s graph response for %s: %w", channelGroup, channel, err)
+	}
+	if len(payload.Nodes) == 0 {
+		return "", fmt.Errorf("%w for %s", ErrVersionNotFound, channel)
+	}
+
+	requestedMinor, err := semver.ParseTolerant(version)
+	if err != nil {
+		return "", fmt.Errorf("parse requested %s minor %q: %w", channelGroup, version, err)
+	}
+
+	var latestVersion semver.Version
+	latestVersionID := ""
+	for _, node := range payload.Nodes {
+		nodeVersion, parseErr := semver.ParseTolerant(node.Version)
+		if parseErr != nil {
+			continue
+		}
+		if nodeVersion.Major != requestedMinor.Major || nodeVersion.Minor != requestedMinor.Minor {
+			continue
+		}
+		if latestVersionID == "" || nodeVersion.GT(latestVersion) {
+			latestVersion = nodeVersion
+			latestVersionID = node.Version
+		}
+	}
+
+	if latestVersionID == "" {
+		return "", fmt.Errorf("no %s versions found in %s for requested minor %s", channelGroup, channel, version)
+	}
+
+	return latestVersionID, nil
 }
 
 // GetLatestInstallVersionForNightlyChannel returns the latest accepted nightly tag for the given minor version

@@ -121,7 +121,7 @@ func TestCheckForProvisioningStateConflict(t *testing.T) {
 				// Pre-populate the parent cluster in the database for nested resources (node pool, external auth)
 				if tt.parentConflict != nil {
 					parentResourceID := resourceID.Parent
-					clusterInternalID := api.Must(api.NewInternalID(ocm.GenerateClusterHREF("testCluster")))
+					clusterInternalID := api.Must(api.NewInternalID(ocm.GenerateOCMCommercialClusterHREF("testCluster")))
 					parentCluster := &api.HCPOpenShiftCluster{
 						TrackedResource: arm.TrackedResource{
 							Resource: arm.Resource{
@@ -168,7 +168,7 @@ func TestCheckForProvisioningStateConflict(t *testing.T) {
 					parentResourceID := resourceID.Parent
 					if parentResourceID.ResourceType.Namespace == resourceID.ResourceType.Namespace {
 						// Pre-populate the parent cluster with the test provisioning state
-						clusterInternalID := api.Must(api.NewInternalID(ocm.GenerateClusterHREF("testCluster")))
+						clusterInternalID := api.Must(api.NewInternalID(ocm.GenerateOCMCommercialClusterHREF("testCluster")))
 						parentCluster := &api.HCPOpenShiftCluster{
 							TrackedResource: arm.TrackedResource{
 								Resource: arm.Resource{

@@ -309,6 +309,6 @@ func createManagementClusterContentWithKubeContentItems(t *testing.T, ctx contex
 			},
 		},
 	}
-	_, err := mockDB.ManagementClusterContents(testSubscriptionID, testResourceGroupName, testClusterName).Create(ctx, managementClusterContent, nil)
+	_, err := mockDB.HCPClusters(testSubscriptionID, testResourceGroupName).ManagementClusterContents(testClusterName).Create(ctx, managementClusterContent, nil)
 	require.NoError(t, err)
 }

@@ -42,20 +42,36 @@ var (
 	aroHcpV1Alpha1ProvisionShardPattern = path.Join(aroHcpV1Alpha1ClusterPattern, provisionShardKey, "*")
 )
 
-func GenerateClusterHREF(clusterName string) string {
+func GenerateOCMCommercialClusterHREF(clusterName string) string {
 	return path.Join(v1Pattern, clusterKey, clusterName)
 }
 
-func GenerateNodePoolHREF(clusterPath string, nodePoolName string) string {
+func GenerateAROHCPClusterHREF(clusterName string) string {
+	return path.Join(aroHcpV1Alpha1Pattern, clusterKey, clusterName)
+}
+
+func GenerateOCMCommercialNodePoolHREF(clusterPath string, nodePoolName string) string {
 	return path.Join(clusterPath, nodePoolKey, nodePoolName)
 }
 
-func GenerateExternalAuthHREF(clusterPath string, externalAuthName string) string {
+func GenerateAROHCPNodePoolHREF(clusterPath string, nodePoolName string) string {
+	return path.Join(aroHcpV1Alpha1Pattern, clusterKey, clusterPath, nodePoolKey, nodePoolName)
+}
+
+func GenerateOCMCommercialExternalAuthHREF(clusterPath string, externalAuthName string) string {
 	return path.Join(clusterPath, externalAuthKey, externalAuthName)
 }
 
-func GenerateBreakGlassCredentialHREF(clusterPath string, credentialName string) string {
+func GenerateAROHCPExternalAuthHREF(clusterPath string, externalAuthName string) string {
+	return path.Join(aroHcpV1Alpha1Pattern, clusterKey, clusterPath, externalAuthKey, externalAuthName)
+}
+
+func GenerateOCMCommercialBreakGlassCredentialHREF(clusterPath string, credentialName string) string {
 	return path.Join(clusterPath, "break_glass_credentials", credentialName)
+}
+
+func GenerateAROHCPBreakGlassCredentialHREF(clusterPath string, credentialName string) string {
+	return path.Join(aroHcpV1Alpha1Pattern, clusterKey, clusterPath, "break_glass_credentials", credentialName)
 }
 
 type InternalID = api.InternalID

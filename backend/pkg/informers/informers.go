@@ -32,7 +32,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/utils"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 const (
@@ -340,13 +340,13 @@ func NewServiceProviderClusterInformerWithRelistDuration(lister database.GlobalL
 }
 
 // NewManagementClusterContentInformer creates an unstarted SharedIndexInformer for management cluster contents
-// with a cluster index using the default relist duration.
+// with cluster and node pool indexes using the default relist duration.
 func NewManagementClusterContentInformer(lister database.GlobalLister[api.ManagementClusterContent]) cache.SharedIndexInformer {
 	return NewManagementClusterContentInformerWithRelistDuration(lister, ManagementClusterContentRelistDuration)
 }
 
 // NewManagementClusterContentInformerWithRelistDuration creates an unstarted SharedIndexInformer for management cluster contents
-// with a cluster index and a configurable relist duration.
+// with cluster and node pool indexes and a configurable relist duration.
 func NewManagementClusterContentInformerWithRelistDuration(lister database.GlobalLister[api.ManagementClusterContent], relistDuration time.Duration) cache.SharedIndexInformer {
 	lw := &cache.ListWatch{
 		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
@@ -381,7 +381,8 @@ func NewManagementClusterContentInformerWithRelistDuration(lister database.Globa
 		cache.SharedIndexInformerOptions{
 			ResyncPeriod: 1 * time.Hour, // this is only a default.  Shorter resyncs can be added when registering handlers.
 			Indexers: cache.Indexers{
-				listers.ByCluster: clusterResourceIDIndexFunc,
+				listers.ByCluster:  clusterResourceIDIndexFunc,
+				listers.ByNodePool: nodePoolResourceIDIndexFunc,
 			},
 		},
 	)
@@ -602,7 +603,7 @@ func findAncestorResourceID(resourceType azcorearm.ResourceType, resourceID *azc
 	if resourceID == nil {
 		return nil, nil
 	}
-	if apihelpers.ResourceTypeEqual(resourceID.ResourceType, resourceType) {
+	if armhelpers.ResourceTypeEqual(resourceID.ResourceType, resourceType) {
 		return []string{strings.ToLower(resourceID.String())}, nil
 	}
 	if resourceID.Parent == nil {
@@ -668,8 +669,8 @@ func activeOperationClusterIndexFunc(obj interface{}) ([]string, error) {
 	return clusterResourceIDFromResourceID(op.ExternalID)
 }
 
-// nodePoolResourceIDIndexFunc indexes service provider node pools by their parent node pool
-// resource ID, derived from the embedded CosmosMetadata.
+// nodePoolResourceIDIndexFunc indexes objects by the node pool resource ID of their nearest
+// nodePool ancestor in the ARM path (Cosmos metadata resource ID).
 func nodePoolResourceIDIndexFunc(obj interface{}) ([]string, error) {
 	switch castObj := obj.(type) {
 	case arm.CosmosMetadataAccessor:

@@ -200,6 +200,7 @@ func (tc *perBinaryInvocationTestContext) getHCPClientFactoryOptions() *azcorear
 				PerCallPolicies: []policy.Policy{
 					&correlationRequestIDPolicy{},
 					&armSystemDataPolicy{},
+					&armResourceGroupValidationPolicy{cred: tc.azureCredentials},
 					&sanitizeAuthHeaderPolicy{},
 				},
 			},

@@ -38,6 +38,26 @@ const (
 	OpenShiftVersionPrefix = "openshift-v"
 )
 
+// AllowedMajorUpgrades is for OpenShift cross-major upgrades (one major at a time, e.g. 4 to 5). Keys and values
+// are major.minor lines ("x.y"): the key is the current version's line, the value is the only allowed line for
+// the desired version. Used when validating version on clusters and node pools.
+// Add entries when new cross-major paths are supported.
+var AllowMajorUpgradePaths = map[string]string{
+	"4.22": "5.0",
+	"4.23": "5.1",
+}
+
+// AllowControlPlaneNodePoolMajorVersionSkew maps node pool OpenShift minor release lines (x.y) to allowed
+// control-plane minor release lines when the node pool major differs from the cluster major. Values are
+// sorted from strictest to most permissive allowed skew. See the HyperShift control plane version status
+// enhancement for node pool skews against cluster version:
+// https://github.com/openshift/enhancements/blob/master/enhancements/hypershift/hypershift-control-plane-version-status.md
+var AllowControlPlaneNodePoolMajorVersionSkew = map[string][]string{
+	"4.21": {"5.0"},
+	"4.22": {"5.0", "5.1"},
+	"4.23": {"5.1", "5.2"},
+}
+
 // Ptr returns a pointer to p.
 func Ptr[T any](p T) *T {
 	return &p

@@ -1,0 +1,9 @@
+{
+	"name": "np421",
+	"properties": {
+		"version": {
+			"id": "5.0.0"
+		}
+	},
+	"type": "Microsoft.RedHatOpenShift/hcpOpenShiftClusters/nodePools"
+}

@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/blang/semver/v4"
@@ -31,8 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+
+	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
 
 func NoExtraWhitespace(_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *string) field.ErrorList {
@@ -99,6 +104,58 @@ func VersionMayNotDecrease(_ context.Context, op operation.Operation, fldPath *f
 		return field.ErrorList{field.Invalid(fldPath, value, fmt.Sprintf("may not decrease from %s", *oldValue))}
 	}
 
+	return nil
+}
+
+// OpenshiftVersionAtMostOneMinorSkew returns nil if newVersionID is an allowed skew from previousVersionID
+// (same rules as ARM validation: at most one minor within a major; cross-major only 4→5 via the supported pairings).
+// Empty previous or new id is a no-op (nil). Parse failures return an error from semver.
+func OpenshiftVersionAtMostOneMinorSkew(previousVersionID, newVersionID string) error {
+	if len(previousVersionID) == 0 || len(newVersionID) == 0 {
+		return nil
+	}
+
+	parsedDesiredVersion, err := semver.ParseTolerant(newVersionID)
+	if err != nil {
+		return err
+	}
+	parsedPreviousVersion, err := semver.ParseTolerant(previousVersionID)
+	if err != nil {
+		return err
+	}
+
+	if parsedDesiredVersion.Major != parsedPreviousVersion.Major {
+		// Only a single major bump is considered; +2 or more (e.g. 4→6) is not supported.
+		if parsedDesiredVersion.Major != parsedPreviousVersion.Major+1 {
+			return fmt.Errorf("invalid upgrade path from %s to %s: skipping major versions is not allowed", previousVersionID, newVersionID)
+		}
+		previousVersionReleaseLine := fmt.Sprintf("%d.%d", parsedPreviousVersion.Major, parsedPreviousVersion.Minor)
+		desiredVersionReleaseLine := fmt.Sprintf("%d.%d", parsedDesiredVersion.Major, parsedDesiredVersion.Minor)
+		allowedTargetReleaseLine := api.AllowMajorUpgradePaths[previousVersionReleaseLine]
+		if desiredVersionReleaseLine != allowedTargetReleaseLine {
+			return fmt.Errorf("invalid upgrade path from %s to %s: cross-major upgrade from %s is only allowed to %s", previousVersionID, newVersionID, previousVersionReleaseLine, allowedTargetReleaseLine)
+		}
+		return nil
+	}
+
+	if parsedDesiredVersion.Minor > parsedPreviousVersion.Minor+1 {
+		return fmt.Errorf("only upgrade to the next minor is allowed: expected %d.%d after %d.%d", parsedPreviousVersion.Major, parsedPreviousVersion.Minor+1, parsedPreviousVersion.Major, parsedPreviousVersion.Minor)
+	}
+
+	return nil
+}
+
+// OpenshiftVersionAtMostOneMinorSkewWithField reports OpenshiftVersionAtMostOneMinorSkew failures as field errors on newVersionID.
+func OpenshiftVersionAtMostOneMinorSkewWithField(_ context.Context, _ operation.Operation, fldPath *field.Path, newVersionID, previousVersionID *string) field.ErrorList {
+	newVersionIDString := ptr.Deref(newVersionID, "")
+	previousVersionIDString := ptr.Deref(previousVersionID, "")
+	if len(newVersionIDString) == 0 || len(previousVersionIDString) == 0 {
+		return nil
+	}
+
+	if err := OpenshiftVersionAtMostOneMinorSkew(previousVersionIDString, newVersionIDString); err != nil {
+		return field.ErrorList{field.Invalid(fldPath, newVersionID, err.Error())}
+	}
 	return nil
 }
 
@@ -232,7 +289,7 @@ var (
 	clusterResourceNameRegex       = regexp.MustCompile(clusterResourceName)
 	clusterResourceNameErrorString = `(must be a valid DNS RFC 1035 label)`
 
-	nodePoolResourceName            = `^[a-zA-Z][-a-zA-Z0-9]{1,13}[a-z-A-Z0-9]$`
+	nodePoolResourceName            = `^[a-zA-Z][-a-zA-Z0-9]{1,13}[a-zA-Z0-9]$`
 	nodePoolResourceNameRegex       = regexp.MustCompile(nodePoolResourceName)
 	nodePoolResourceNameErrorString = `(must be a valid DNS RFC 1035 label)`
 
@@ -748,4 +805,76 @@ func MaximumIfNoAZ[T constraints.Integer](ctx context.Context, op operation.Oper
 
 	// If availability zone is NOT set, enforce the max limit using the existing Maximum validator
 	return Maximum(ctx, op, fldPath, value, oldValue, max)
+}
+
+// ValidateMajorUpgrade validates that a cross-major version upgrade follows the allowed upgrade paths.
+// Returns an error if the upgrade path is not allowed, nil otherwise.
+// Use the n-1 skew
+func ValidateMajorUpgrade(fromVersion, toVersion semver.Version) error {
+	sourceKey := fmt.Sprintf("%d.%d", fromVersion.Major, fromVersion.Minor)
+	targetKey := fmt.Sprintf("%d.%d", toVersion.Major, toVersion.Minor)
+
+	allowedTargets, exists := api.AllowMajorUpgradePaths[sourceKey]
+	if !exists {
+		return fmt.Errorf("invalid upgrade path from %s to %s: major version upgrades are not supported",
+			fromVersion.String(), toVersion.String())
+	}
+
+	if allowedTargets != targetKey {
+		return fmt.Errorf("invalid upgrade path from %s to %s: %s can only upgrade to %s",
+			fromVersion.String(), toVersion.String(), sourceKey, allowedTargets)
+	}
+
+	return nil
+}
+
+// ValidateNodePoolUpgrade performs common node pool version upgrade validation:
+// - No downgrades from highest active version
+// - Cannot exceed lowest control plane version
+// - No major version changes without AFEC (uses existing ValidateMajorUpgrade)
+// - No minor version skipping
+func ValidateNodePoolUpgrade(desiredVersion semver.Version, activeVersions []api.HCPNodePoolActiveVersion, lowestCPVersion *semver.Version, allowMajorUpgrade bool) error {
+	// Skip if already in active versions
+	if slices.ContainsFunc(activeVersions, func(av api.HCPNodePoolActiveVersion) bool {
+		return av.Version != nil && av.Version.EQ(desiredVersion)
+	}) {
+		return nil
+	}
+
+	lowest, highest := apihelpers.FindLowestAndHighestNodePoolVersion(activeVersions)
+
+	// No partial downgrades: desiredVersion >= highest active version
+	if highest != nil && desiredVersion.LT(*highest) {
+		return fmt.Errorf(
+			"invalid node pool version %s: cannot downgrade from current version %s",
+			desiredVersion.String(), highest.String(),
+		)
+	}
+
+	// Check if the desiredVersion <= control plane versions
+	// TODO: We may relax this constraint in the future
+	if lowestCPVersion != nil && desiredVersion.GT(*lowestCPVersion) {
+		return fmt.Errorf(
+			"invalid node pool version %s: cannot exceed control plane version %s",
+			desiredVersion.String(), lowestCPVersion.String(),
+		)
+	}
+
+	// No major version change unless FeatureExperimentalReleaseFeatures is registered
+	if lowest != nil && desiredVersion.Major > lowest.Major {
+		if !allowMajorUpgrade {
+			return fmt.Errorf("major version changes are not supported")
+		}
+		return ValidateMajorUpgrade(*lowest, desiredVersion)
+	}
+
+	// Minor skip validation
+	if lowest != nil && desiredVersion.Minor > lowest.Minor+1 {
+		return fmt.Errorf(
+			"invalid upgrade path from %s to %s: skipping minor versions is not allowed",
+			lowest.String(), desiredVersion.String(),
+		)
+	}
+
+	return nil
 }

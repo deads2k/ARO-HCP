@@ -1,0 +1,1 @@
+major version upgrades are not supported

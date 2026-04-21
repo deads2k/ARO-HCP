@@ -20,15 +20,20 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"k8s.io/utils/ptr"
+
+	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/cluster-version-operator/pkg/cincinnati"
 
 	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/api/arm"
 	cincinatti "github.com/Azure/ARO-HCP/internal/cincinatti"
+	"github.com/Azure/ARO-HCP/internal/databasetesting"
 )
 
 func TestDesiredControlPlaneZVersion_ZStreamManagedUpgrade(t *testing.T) {
@@ -271,10 +276,10 @@ func TestDesiredControlPlaneZVersion_ZStreamManagedUpgrade(t *testing.T) {
 			mockCincinnatiClient := cincinatti.NewMockClient(ctrl)
 			tt.mockSetup(mockCincinnatiClient)
 
-			syncer := &controlPlaneDesiredVersionSyncer{}
+			syncer := &controlPlaneDesiredVersionSyncer{cosmosClient: databasetesting.NewMockDBClient()}
 
 			ctx := context.Background()
-			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions)
+			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster")), tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions, false)
 
 			assertVersionResult(t, result, err, tt.expectedVersion, tt.expectedError, tt.expectedErrorContains)
 		})
@@ -288,6 +293,7 @@ func TestDesiredControlPlaneZVersion_NextYStreamUpgrade(t *testing.T) {
 		customerDesiredMinor  string
 		channelGroup          string
 		mockSetup             func(*cincinatti.MockClient)
+		cosmosResources       []any
 		expectedVersion       *semver.Version
 		expectedError         bool
 		expectedErrorContains string
@@ -324,6 +330,42 @@ func TestDesiredControlPlaneZVersion_NextYStreamUpgrade(t *testing.T) {
 					nil,
 				)
 			},
+			expectedVersion: ptr.To(semver.MustParse("4.20.10")),
+			expectedError:   false,
+		},
+		{
+			name:                 "Y-stream upgrade - succeeds with node pool within skew versus desired minor",
+			activeVersions:       []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.19.22")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor: "4.20",
+			channelGroup:         "stable",
+			mockSetup: func(mc *cincinatti.MockClient) {
+				// Query for 4.20 versions from 4.19.22
+				// Cincinnati may return versions from other minors which should be filtered out
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), api.Must(cincinatti.GetCincinnatiURI("stable")), "multi", "multi", "stable-4.20", semver.MustParse("4.19.22")).Return(
+					configv1.Release{Version: "4.19.22"},
+					[]configv1.Release{{Version: "4.20.15"}, {Version: "4.20.10"}, {Version: "4.19.25"}}, // 4.19.25 should be filtered out
+					[]configv1.ConditionalUpdate{},
+					nil,
+				)
+
+				// Check if 4.20.15 (latest candidate) has gateway to 4.21
+				// This is called twice: once to check if next minor exists, once to check gateway
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), api.Must(cincinatti.GetCincinnatiURI("stable")), "multi", "multi", "stable-4.21", semver.MustParse("4.20.15")).Return(
+					configv1.Release{Version: "4.20.15"},
+					[]configv1.Release{}, // No path to 4.21
+					[]configv1.ConditionalUpdate{},
+					nil,
+				).Times(2)
+
+				// Check if 4.20.10 has gateway to 4.21 - it does
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), api.Must(cincinatti.GetCincinnatiURI("stable")), "multi", "multi", "stable-4.21", semver.MustParse("4.20.10")).Return(
+					configv1.Release{Version: "4.20.10"},
+					[]configv1.Release{{Version: "4.21.0"}},
+					[]configv1.ConditionalUpdate{},
+					nil,
+				)
+			},
+			cosmosResources: testCosmosClusterWithWorkersNodePoolAtVersion("4.18.0"),
 			expectedVersion: ptr.To(semver.MustParse("4.20.10")),
 			expectedError:   false,
 		},
@@ -450,26 +492,61 @@ func TestDesiredControlPlaneZVersion_NextYStreamUpgrade(t *testing.T) {
 			mockCincinnatiClient := cincinatti.NewMockClient(ctrl)
 			tt.mockSetup(mockCincinnatiClient)
 
-			syncer := &controlPlaneDesiredVersionSyncer{}
-
 			ctx := context.Background()
-			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions)
+			mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, tt.cosmosResources)
+			require.NoError(t, err)
+			syncer := &controlPlaneDesiredVersionSyncer{cosmosClient: mockDB}
+
+			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster")), tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions, false)
 
 			assertVersionResult(t, result, err, tt.expectedVersion, tt.expectedError, tt.expectedErrorContains)
 		})
 	}
 }
 
+// testCosmosClusterWithWorkersNodePoolAtVersion returns a cluster and workers node pool for the subscription, resource group,
+// and cluster name shared by desiredControlPlaneZVersion tests. nodePoolVersionId is properties.version.id on the pool.
+func testCosmosClusterWithWorkersNodePoolAtVersion(nodePoolVersionId string) []any {
+	clusterResourceId := api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster"))
+	cluster := &api.HCPOpenShiftCluster{
+		TrackedResource: arm.TrackedResource{
+			Resource: arm.Resource{
+				ID:   clusterResourceId,
+				Name: clusterResourceId.Name,
+				Type: clusterResourceId.ResourceType.String(),
+			},
+		},
+		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
+			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster")),
+		},
+	}
+	nodePoolResourceId := api.Must(azcorearm.ParseResourceID(clusterResourceId.String() + "/nodePools/workers"))
+	return []any{
+		cluster,
+		&api.HCPOpenShiftClusterNodePool{
+			TrackedResource: arm.NewTrackedResource(nodePoolResourceId, "eastus"),
+			Properties: api.HCPOpenShiftClusterNodePoolProperties{
+				Version: api.NodePoolVersionProfile{ID: nodePoolVersionId},
+			},
+			ServiceProviderProperties: api.HCPOpenShiftClusterNodePoolServiceProviderProperties{
+				ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster/node_pools/workers")),
+			},
+		},
+	}
+}
+
 func TestDesiredControlPlaneZVersion_Validations(t *testing.T) {
 	tests := []struct {
-		name                  string
-		activeVersions        []api.HCPClusterActiveVersion
-		customerDesiredMinor  string
-		channelGroup          string
-		mockSetup             func(*cincinatti.MockClient)
-		expectedVersion       *semver.Version
-		expectedError         bool
-		expectedErrorContains string
+		name                        string
+		activeVersions              []api.HCPClusterActiveVersion
+		customerDesiredMinor        string
+		channelGroup                string
+		mockSetup                   func(*cincinatti.MockClient)
+		cosmosResources             []any
+		experimentalReleaseFeatures bool
+		expectedVersion             *semver.Version
+		expectedError               bool
+		expectedErrorContains       string
 	}{
 		{
 			name:                  "Validation - downgrade not allowed (4.20 -> 4.19)",
@@ -482,14 +559,25 @@ func TestDesiredControlPlaneZVersion_Validations(t *testing.T) {
 			expectedErrorContains: "only upgrades to the next minor version are allowed, no downgrades",
 		},
 		{
-			name:                  "Validation - major version change not supported (4.20 -> 5.0)",
+			name:                  "Validation - OpenShift 5.x requires AFEC (4.20 -> 5.0)",
 			activeVersions:        []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.20.15")), State: configv1.CompletedUpdate}},
 			customerDesiredMinor:  "5.0",
 			channelGroup:          "stable",
 			mockSetup:             func(mc *cincinatti.MockClient) {},
 			expectedVersion:       nil,
 			expectedError:         true,
-			expectedErrorContains: "major version changes are not supported",
+			expectedErrorContains: "OpenShift v5 and above is not supported",
+		},
+		{
+			name:                        "Validation - unsupported cross-major (4.20 -> 5.0, not a supported 4→5 landing) when AFEC registered",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.20.15")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.0",
+			channelGroup:                "stable",
+			mockSetup:                   func(mc *cincinatti.MockClient) {},
+			experimentalReleaseFeatures: true,
+			expectedVersion:             nil,
+			expectedError:               true,
+			expectedErrorContains:       "cross-major upgrade from 4.20 is only allowed to",
 		},
 		{
 			name:                  "Validation - skip minor version not allowed (4.19 -> 4.21)",
@@ -499,7 +587,7 @@ func TestDesiredControlPlaneZVersion_Validations(t *testing.T) {
 			mockSetup:             func(mc *cincinatti.MockClient) {},
 			expectedVersion:       nil,
 			expectedError:         true,
-			expectedErrorContains: "only upgrades to the next minor version are allowed, no skipping minor versions",
+			expectedErrorContains: "only upgrade to the next minor is allowed",
 		},
 		{
 			name:                  "Validation - major version downgrade not allowed (5.1 -> 4.20)",
@@ -511,6 +599,18 @@ func TestDesiredControlPlaneZVersion_Validations(t *testing.T) {
 			expectedError:         true,
 			expectedErrorContains: "only upgrades to the next minor version are allowed, no downgrades",
 		},
+		{
+			name:                        "Validation - node pool minor skew blocks supported cross-major desired minor",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.22.0")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.0",
+			channelGroup:                "stable",
+			mockSetup:                   func(mc *cincinatti.MockClient) {},
+			cosmosResources:             testCosmosClusterWithWorkersNodePoolAtVersion("4.20.0"),
+			experimentalReleaseFeatures: true,
+			expectedVersion:             nil,
+			expectedError:               true,
+			expectedErrorContains:       "incompatible with node pool",
+		},
 	}
 
 	for _, tt := range tests {
@@ -520,10 +620,112 @@ func TestDesiredControlPlaneZVersion_Validations(t *testing.T) {
 			mockCincinnatiClient := cincinatti.NewMockClient(ctrl)
 			tt.mockSetup(mockCincinnatiClient)
 
-			syncer := &controlPlaneDesiredVersionSyncer{}
+			ctx := context.Background()
+			mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, tt.cosmosResources)
+			require.NoError(t, err)
+			syncer := &controlPlaneDesiredVersionSyncer{cosmosClient: mockDB}
+
+			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster")), tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions, tt.experimentalReleaseFeatures)
+
+			assertVersionResult(t, result, err, tt.expectedVersion, tt.expectedError, tt.expectedErrorContains)
+		})
+	}
+}
+
+func TestDesiredControlPlaneZVersion_CrossMajorUpgrade(t *testing.T) {
+	tests := []struct {
+		name                        string
+		activeVersions              []api.HCPClusterActiveVersion
+		customerDesiredMinor        string
+		channelGroup                string
+		mockSetup                   func(*cincinatti.MockClient)
+		cosmosResources             []any
+		experimentalReleaseFeatures bool
+		expectedVersion             *semver.Version
+		expectedError               bool
+		expectedErrorContains       string
+	}{
+		{
+			name:                        "Cross-major allowed — 4.22 to 5.0 with experimental release features and compatible node pools",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.22.0")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.0",
+			channelGroup:                "stable",
+			cosmosResources:             testCosmosClusterWithWorkersNodePoolAtVersion("4.22.0"),
+			experimentalReleaseFeatures: true,
+			mockSetup: func(mc *cincinatti.MockClient) {
+				stableURI := api.Must(cincinatti.GetCincinnatiURI("stable"))
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), stableURI, "multi", "multi", "stable-5.0", semver.MustParse("4.22.0")).Return(
+					configv1.Release{Version: "4.22.0"},
+					[]configv1.Release{{Version: "5.0.15"}, {Version: "5.0.10"}, {Version: "4.22.5"}},
+					[]configv1.ConditionalUpdate{},
+					nil,
+				)
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), stableURI, "multi", "multi", "stable-5.1", semver.MustParse("5.0.15")).Times(2).Return(
+					configv1.Release{Version: "5.0.15"},
+					[]configv1.Release{},
+					[]configv1.ConditionalUpdate{},
+					nil,
+				)
+				mc.EXPECT().GetUpdates(gomock.AssignableToTypeOf(context.Background()), stableURI, "multi", "multi", "stable-5.1", semver.MustParse("5.0.10")).Return(
+					configv1.Release{Version: "5.0.10"},
+					[]configv1.Release{{Version: "5.1.0"}},
+					[]configv1.ConditionalUpdate{},
+					nil,
+				)
+			},
+			expectedVersion: ptr.To(semver.MustParse("5.0.10")),
+			expectedError:   false,
+		},
+		{
+			name:                        "Cross-major not allowed — 4.22 to 5.0 without experimental release features",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.22.0")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.0",
+			channelGroup:                "stable",
+			mockSetup:                   func(mc *cincinatti.MockClient) {},
+			experimentalReleaseFeatures: false,
+			expectedVersion:             nil,
+			expectedError:               true,
+			expectedErrorContains:       "OpenShift v5 and above is not supported",
+		},
+		{
+			name:                        "Cross-major not allowed — 4.21 to 5.0 is not a supported landing even with experimental release features",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.21.10")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.0",
+			channelGroup:                "stable",
+			cosmosResources:             testCosmosClusterWithWorkersNodePoolAtVersion("4.21.0"),
+			mockSetup:                   func(mc *cincinatti.MockClient) {},
+			experimentalReleaseFeatures: true,
+			expectedVersion:             nil,
+			expectedError:               true,
+			expectedErrorContains:       "cross-major upgrade from 4.21 is only allowed to",
+		},
+		{
+			name:                        "Cross-major not allowed — 4.22 to 5.1 skips the supported 4.22 to 5.0 path",
+			activeVersions:              []api.HCPClusterActiveVersion{{Version: ptr.To(semver.MustParse("4.22.0")), State: configv1.CompletedUpdate}},
+			customerDesiredMinor:        "5.1",
+			channelGroup:                "stable",
+			cosmosResources:             testCosmosClusterWithWorkersNodePoolAtVersion("4.22.0"),
+			mockSetup:                   func(mc *cincinatti.MockClient) {},
+			experimentalReleaseFeatures: true,
+			expectedVersion:             nil,
+			expectedError:               true,
+			expectedErrorContains:       "cross-major upgrade from 4.22 is only allowed to",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+
+			mockCincinnatiClient := cincinatti.NewMockClient(ctrl)
+			tt.mockSetup(mockCincinnatiClient)
 
 			ctx := context.Background()
-			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions)
+			mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, tt.cosmosResources)
+			require.NoError(t, err)
+			syncer := &controlPlaneDesiredVersionSyncer{cosmosClient: mockDB}
+
+			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster")), tt.customerDesiredMinor, tt.channelGroup, tt.activeVersions, tt.experimentalReleaseFeatures)
 
 			assertVersionResult(t, result, err, tt.expectedVersion, tt.expectedError, tt.expectedErrorContains)
 		})
@@ -661,13 +863,13 @@ func TestDesiredControlPlaneZVersion_InitialVersionSelection(t *testing.T) {
 			mockCincinnatiClient := cincinatti.NewMockClient(ctrl)
 			tt.mockSetup(mockCincinnatiClient)
 
-			syncer := &controlPlaneDesiredVersionSyncer{}
+			syncer := &controlPlaneDesiredVersionSyncer{cosmosClient: databasetesting.NewMockDBClient()}
 
 			// Empty active versions - simulating a new cluster
 			activeVersions := []api.HCPClusterActiveVersion{}
 
 			ctx := context.Background()
-			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, tt.customerDesiredMinor, tt.channelGroup, activeVersions)
+			result, err := syncer.desiredControlPlaneZVersion(ctx, mockCincinnatiClient, api.Must(api.ToClusterResourceID("6b690bec-0c16-4ecb-8f67-781caf40bba7", "test-rg", "test-cluster")), tt.customerDesiredMinor, tt.channelGroup, activeVersions, false)
 
 			assertVersionResult(t, result, err, tt.expectedVersion, tt.expectedError, tt.expectedErrorContains)
 		})

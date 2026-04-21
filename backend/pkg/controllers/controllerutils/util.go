@@ -60,18 +60,18 @@ type OperationKey struct {
 	ParentResourceID string `json:"parentResourceID"`
 }
 
-func (k *OperationKey) GetParentResourceID() *azcorearm.ResourceID {
+func (k OperationKey) GetParentResourceID() *azcorearm.ResourceID {
 	return api.Must(azcorearm.ParseResourceID(k.ParentResourceID))
 }
 
-func (k *OperationKey) AddLoggerValues(logger logr.Logger) logr.Logger {
+func (k OperationKey) AddLoggerValues(logger logr.Logger) logr.Logger {
 	return logger.WithValues(
 		utils.LogValues{}.
 			AddLogValuesForResourceID(k.GetParentResourceID()).
 			AddOperationID(k.OperationName)...)
 }
 
-func (k *OperationKey) InitialController(controllerName string) *api.Controller {
+func (k OperationKey) InitialController(controllerName string) *api.Controller {
 	// TODO, this structure only allows one status per operation controller even if there are multiple instances of the operation
 	// TODO, this may or may not age well. Nesting is possible or we could actually separate controllers that way (probably useful).
 	// TODO, leaving this as a thing open to change in the future.
@@ -94,17 +94,17 @@ type HCPClusterKey struct {
 	HCPClusterName    string `json:"hcpClusterName"`
 }
 
-func (k *HCPClusterKey) GetResourceID() *azcorearm.ResourceID {
+func (k HCPClusterKey) GetResourceID() *azcorearm.ResourceID {
 	return api.Must(api.ToClusterResourceID(k.SubscriptionID, k.ResourceGroupName, k.HCPClusterName))
 }
 
-func (k *HCPClusterKey) AddLoggerValues(logger logr.Logger) logr.Logger {
+func (k HCPClusterKey) AddLoggerValues(logger logr.Logger) logr.Logger {
 	return logger.WithValues(
 		utils.LogValues{}.
 			AddLogValuesForResourceID(k.GetResourceID())...)
 }
 
-func (k *HCPClusterKey) InitialController(controllerName string) *api.Controller {
+func (k HCPClusterKey) InitialController(controllerName string) *api.Controller {
 	resourceID := api.Must(azcorearm.ParseResourceID(k.GetResourceID().String() + "/" + api.ControllerResourceTypeName + "/" + controllerName))
 	return &api.Controller{
 		CosmosMetadata: api.CosmosMetadata{
@@ -126,16 +126,16 @@ type HCPNodePoolKey struct {
 	HCPNodePoolName   string `json:"hcpNodePoolName"`
 }
 
-func (k *HCPNodePoolKey) GetResourceID() *azcorearm.ResourceID {
+func (k HCPNodePoolKey) GetResourceID() *azcorearm.ResourceID {
 	return api.Must(api.ToNodePoolResourceID(k.SubscriptionID, k.ResourceGroupName, k.HCPClusterName, k.HCPNodePoolName))
 }
 
-func (k *HCPNodePoolKey) AddLoggerValues(logger logr.Logger) logr.Logger {
+func (k HCPNodePoolKey) AddLoggerValues(logger logr.Logger) logr.Logger {
 	return logger.WithValues(
 		utils.LogValues{}.AddLogValuesForResourceID(k.GetResourceID())...)
 }
 
-func (k *HCPNodePoolKey) InitialController(controllerName string) *api.Controller {
+func (k HCPNodePoolKey) InitialController(controllerName string) *api.Controller {
 	resourceID := api.Must(azcorearm.ParseResourceID(k.GetResourceID().String() + "/" + api.ControllerResourceTypeName + "/" + controllerName))
 	return &api.Controller{
 		CosmosMetadata: api.CosmosMetadata{
@@ -154,11 +154,11 @@ type SubscriptionKey struct {
 	SubscriptionID string `json:"subscriptionID"`
 }
 
-func (k *SubscriptionKey) GetResourceID() *azcorearm.ResourceID {
+func (k SubscriptionKey) GetResourceID() *azcorearm.ResourceID {
 	return api.Must(arm.ToSubscriptionResourceID(k.SubscriptionID))
 }
 
-func (k *SubscriptionKey) AddLoggerValues(logger logr.Logger) logr.Logger {
+func (k SubscriptionKey) AddLoggerValues(logger logr.Logger) logr.Logger {
 	return logger.WithValues(
 		utils.LogValues{}.
 			AddLogValuesForResourceID(k.GetResourceID())...)

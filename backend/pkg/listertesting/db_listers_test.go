@@ -355,6 +355,61 @@ func TestDBControllerLister(t *testing.T) {
 	})
 }
 
+func TestDBManagementClusterContentLister(t *testing.T) {
+	ctx := context.Background()
+
+	cluster1 := newTestCluster(testSubscriptionID, testResourceGroupName, testClusterName)
+	cluster2 := newTestCluster(testSubscriptionID, testResourceGroupName, testClusterName2)
+	np := newTestNodePool(testSubscriptionID, testResourceGroupName, testClusterName, testNodePoolName)
+
+	mccCluster1 := newTestClusterScopedManagementClusterContent(testSubscriptionID, testResourceGroupName, testClusterName, "mcc-under-cluster")
+	mccCluster2 := newTestClusterScopedManagementClusterContent(testSubscriptionID, testResourceGroupName, testClusterName2, "mcc-under-cluster2")
+	mccNP := newTestNodePoolScopedManagementClusterContent(testSubscriptionID, testResourceGroupName, testClusterName, testNodePoolName, "mcc-under-np")
+
+	mockDB, err := databasetesting.NewMockDBClientWithResources(ctx, []any{
+		cluster1, cluster2, np,
+		mccCluster1, mccCluster2, mccNP,
+	})
+	require.NoError(t, err)
+
+	lister := &DBManagementClusterContentLister{DBClient: mockDB}
+
+	t.Run("List returns all management cluster contents", func(t *testing.T) {
+		result, err := lister.List(ctx)
+		require.NoError(t, err)
+		assert.Len(t, result, 3)
+	})
+
+	t.Run("ListForCluster returns cluster-scoped and node-pool-scoped MCC for that cluster", func(t *testing.T) {
+		result, err := lister.ListForCluster(ctx, testSubscriptionID, testResourceGroupName, testClusterName)
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		names := []string{result[0].GetResourceID().Name, result[1].GetResourceID().Name}
+		assert.Contains(t, names, "mcc-under-cluster")
+		assert.Contains(t, names, "mcc-under-np")
+	})
+
+	t.Run("ListForCluster returns only MCC for other cluster", func(t *testing.T) {
+		result, err := lister.ListForCluster(ctx, testSubscriptionID, testResourceGroupName, testClusterName2)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "mcc-under-cluster2", result[0].GetResourceID().Name)
+	})
+
+	t.Run("ListForNodePool returns only node-pool-scoped MCC", func(t *testing.T) {
+		result, err := lister.ListForNodePool(ctx, testSubscriptionID, testResourceGroupName, testClusterName, testNodePoolName)
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, "mcc-under-np", result[0].GetResourceID().Name)
+	})
+
+	t.Run("ListForNodePool returns empty for non-existent node pool", func(t *testing.T) {
+		result, err := lister.ListForNodePool(ctx, testSubscriptionID, testResourceGroupName, testClusterName, "non-existent")
+		require.NoError(t, err)
+		assert.Empty(t, result)
+	})
+}
+
 func TestDBClusterListerWithEmptyDB(t *testing.T) {
 	ctx := context.Background()
 	mockDB := databasetesting.NewMockDBClient()

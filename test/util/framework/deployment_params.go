@@ -40,10 +40,9 @@ const (
 	RBACScopeResourceGroup RBACScope = "resourceGroup"
 	RBACScopeResource      RBACScope = "resource"
 
-	// Default OpenShift channel group, version, and node pool version for the E2E test
+	// Default OpenShift channel group and version for the E2E tests
 	DefaultOCPChannelGroup         = "candidate"
 	DefaultOCPVersionId            = "4.20"
-	DefaultOCPNodePoolVersionId    = "4.20.15"
 	DefaultOCPNodePoolChannelGroup = "candidate"
 
 	DefaultPodCIDR      = "10.128.0.0/14"
@@ -90,15 +89,15 @@ func DefaultOpenshiftControlPlaneVersionId() string {
 	version := os.Getenv("ARO_HCP_OPENSHIFT_CONTROLPLANE_VERSION")
 	if len(version) == 0 {
 		version = DefaultOCPVersionId
-		// For nightly channel, calculate the latest version for the default Y stream
-		if DefaultOpenshiftChannelGroup() == "nightly" {
+		channelGroup := DefaultOpenshiftChannelGroup()
+		if channelGroup != "stable" {
 			var err error
-			version, err = GetLatestInstallVersionForNightlyChannel(version)
+			version, err = GetLatestInstallVersion(context.Background(), channelGroup, version)
 			if err != nil {
-				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) {
-					Skip(fmt.Sprintf("No install version found for %s in nightly channel (%s)", version, err.Error()))
+				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) || errors.Is(err, ErrVersionNotFound) {
+					Skip(fmt.Sprintf("No install version found for %s in %s channel (%s)", version, channelGroup, err.Error()))
 				} else {
-					Fail(fmt.Sprintf("failed to get latest install version for nightly channel: %s", err.Error()))
+					Fail(fmt.Sprintf("failed to get latest install version for %s channel: %s", channelGroup, err.Error()))
 				}
 			}
 		}
@@ -117,16 +116,15 @@ func DefaultOpenshiftChannelGroup() string {
 func DefaultOpenshiftNodePoolVersionId() string {
 	version := os.Getenv("ARO_HCP_OPENSHIFT_NODEPOOL_VERSION")
 	if len(version) == 0 {
-		version = DefaultOCPNodePoolVersionId
-		// For nightly channel, calculate the latest version for the default Y stream (it's the same as the control plane version)
-		if DefaultOpenshiftNodePoolChannelGroup() == "nightly" {
+		channelGroup := DefaultOpenshiftNodePoolChannelGroup()
+		if channelGroup != "stable" {
 			var err error
-			version, err = GetLatestInstallVersionForNightlyChannel(DefaultOCPVersionId)
+			version, err = GetLatestInstallVersion(context.Background(), channelGroup, DefaultOCPVersionId)
 			if err != nil {
-				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) {
-					Skip(fmt.Sprintf("No node pool install version found for %s in nightly channel (%s)", version, err.Error()))
+				if errors.Is(err, ErrNightlyReleaseStreamNotFound) || errors.Is(err, ErrNoAcceptedNightlyTags) || errors.Is(err, ErrVersionNotFound) {
+					Skip(fmt.Sprintf("No install version found for %s in %s channel (%s)", version, channelGroup, err.Error()))
 				} else {
-					Fail(fmt.Sprintf("failed to get latest node pool install version for nightly channel: %s", err.Error()))
+					Fail(fmt.Sprintf("failed to get latest install version for %s channel: %s", channelGroup, err.Error()))
 				}
 			}
 		}

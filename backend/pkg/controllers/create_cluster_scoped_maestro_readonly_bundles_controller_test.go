@@ -76,8 +76,8 @@ var _ database.ServiceProviderClusterCRUD = &errorInjectingSPCCRUDForCreate{}
 
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildClusterEmptyHostedCluster(t *testing.T) {
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		maestroSourceEnvironmentIdentifier: "testenv",
-		uuidV4Generator:                    uuid.NewRandom,
+		maestroSourceEnvironmentIdentifier:   "testenv",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	csClusterID := "11111111111111111111111111111111"
@@ -97,8 +97,8 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_getHostedClusterNamespa
 	expected := fmt.Sprintf("ocm-%s-%s", envName, csClusterID)
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		maestroSourceEnvironmentIdentifier: envName,
-		uuidV4Generator:                    uuid.NewRandom,
+		maestroSourceEnvironmentIdentifier:   envName,
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	result := syncer.getHostedClusterNamespace(envName, csClusterID)
@@ -106,11 +106,9 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_getHostedClusterNamespa
 }
 
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialMaestroBundleReference(t *testing.T) {
-	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		uuidV4Generator: uuid.NewRandom,
-	}
+	generator := maestro.NewMaestroAPIMaestroBundleNameGenerator()
 
-	ref, err := syncer.buildInitialMaestroBundleReference(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster)
+	ref, err := buildInitialMaestroBundleReference(api.MaestroBundleInternalNameReadonlyHypershiftHostedCluster, generator)
 	require.NoError(t, err)
 
 	assert.NotNil(t, ref)
@@ -125,8 +123,8 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialMaestroBund
 
 func TestBuildInitialReadonlyMaestroBundleForHostedCluster(t *testing.T) {
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		maestroSourceEnvironmentIdentifier: "testenv",
-		uuidV4Generator:                    uuid.NewRandom,
+		maestroSourceEnvironmentIdentifier:   "testenv",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/test-cluster"))
@@ -166,108 +164,6 @@ func TestBuildInitialReadonlyMaestroBundleForHostedCluster(t *testing.T) {
 	assert.Equal(t, expectedHostedCluster, bundle.Spec.Workload.Manifests[0].Object)
 }
 
-func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_getOrCreateMaestroBundle(t *testing.T) {
-	desiredBundle := &workv1.ManifestWork{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-maestro-api-maestro-bundle-name",
-			Namespace: "test-maestro-consumer",
-		},
-		Spec: workv1.ManifestWorkSpec{
-			ManifestConfigs: []workv1.ManifestConfigOption{
-				{
-					ResourceIdentifier: workv1.ResourceIdentifier{
-						Name:      "hostedcluster-name",
-						Namespace: "ocm-testenv-11111111111111111111111111111111",
-					},
-				},
-			},
-		},
-	}
-
-	tests := []struct {
-		name       string
-		setupMock  func(*maestro.MockClient, *workv1.ManifestWork)
-		wantBundle *workv1.ManifestWork
-		wantErr    bool
-		errSubstr  string
-	}{
-		{
-			name: "returns existing bundle if it already exists",
-			setupMock: func(m *maestro.MockClient, want *workv1.ManifestWork) {
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(want, nil)
-			},
-			wantBundle: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-maestro-api-maestro-bundle-name", Namespace: "test-maestro-consumer", UID: "existing-uid",
-				},
-			},
-		},
-		{
-			name: "creates new bundle if it does not exist",
-			setupMock: func(m *maestro.MockClient, want *workv1.ManifestWork) {
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(nil, k8serrors.NewNotFound(schema.GroupResource{}, "not-found"))
-				m.EXPECT().Create(gomock.Any(), desiredBundle, gomock.Any()).Return(want, nil)
-			},
-			wantBundle: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-maestro-api-maestro-bundle-name", Namespace: "test-maestro-consumer", UID: "new-uid",
-				},
-			},
-		},
-		{
-			name: "returns existing bundle when internal call to create returns AlreadyExists and then the following get succeeds",
-			setupMock: func(m *maestro.MockClient, want *workv1.ManifestWork) {
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(nil, k8serrors.NewNotFound(schema.GroupResource{}, "not-found"))
-				m.EXPECT().Create(gomock.Any(), desiredBundle, gomock.Any()).Return(nil, k8serrors.NewAlreadyExists(schema.GroupResource{}, "test-maestro-api-maestro-bundle-name"))
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(want, nil)
-			},
-			wantBundle: &workv1.ManifestWork{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-maestro-api-maestro-bundle-name", Namespace: "test-maestro-consumer", UID: "existing-uid",
-				},
-			},
-		},
-		{
-			name: "returns error if it fails to get the bundle",
-			setupMock: func(m *maestro.MockClient, _ *workv1.ManifestWork) {
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(nil, fmt.Errorf("connection error"))
-			},
-			wantErr:   true,
-			errSubstr: "failed to get Maestro Bundle",
-		},
-		{
-			name: "returns error if it fails to create the bundle",
-			setupMock: func(m *maestro.MockClient, _ *workv1.ManifestWork) {
-				m.EXPECT().Get(gomock.Any(), "test-maestro-api-maestro-bundle-name", gomock.Any()).Return(nil, k8serrors.NewNotFound(schema.GroupResource{}, "test-maestro-api-maestro-bundle-name"))
-				m.EXPECT().Create(gomock.Any(), desiredBundle, gomock.Any()).Return(nil, fmt.Errorf("maestro API error"))
-			},
-			wantErr:   true,
-			errSubstr: "failed to create Maestro Bundle: maestro API error",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			mockMaestro := maestro.NewMockClient(ctrl)
-			tt.setupMock(mockMaestro, tt.wantBundle)
-			syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-				uuidV4Generator: uuid.NewRandom,
-			}
-
-			result, err := syncer.getOrCreateMaestroBundle(context.Background(), mockMaestro, desiredBundle)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				assert.Nil(t, result)
-				assert.Contains(t, err.Error(), tt.errSubstr)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.wantBundle, result)
-			}
-		})
-	}
-}
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *testing.T) {
 	// syncMaestroBundleTestDeterministicUUID is the fixed UUID used when testing "no bundle reference initially" so returned values are deterministic.
 	syncMaestroBundleTestDeterministicUUID := uuid.MustParse("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
@@ -503,10 +399,9 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *te
 			mockMaestro := maestro.NewMockClient(ctrl)
 			tt.maestroClientSetupMock(mockMaestro)
 
-			deterministicUUIDGenerator := func() (uuid.UUID, error) { return syncMaestroBundleTestDeterministicUUID, nil }
 			syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-				maestroSourceEnvironmentIdentifier: "test-env",
-				uuidV4Generator:                    deterministicUUIDGenerator,
+				maestroSourceEnvironmentIdentifier:   "test-env",
+				maestroAPIMaestroBundleNameGenerator: maestro.NewAlwaysSameNameMaestroAPIMaestroBundleNameGenerator(syncMaestroBundleTestDeterministicUUID.String()),
 			}
 			ctx := context.Background()
 			cluster := &api.HCPOpenShiftCluster{
@@ -552,35 +447,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *te
 	}
 }
 
-func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_generateNewMaestroAPIMaestroBundleName(t *testing.T) {
-	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		uuidV4Generator: uuid.NewRandom,
-	}
-
-	// Test successful generation
-	name1, err := syncer.generateNewMaestroAPIMaestroBundleName()
-	require.NoError(t, err)
-	assert.NotEmpty(t, name1)
-
-	// Verify it's a valid UUID
-	_, err = uuid.Parse(name1)
-	assert.NoError(t, err, "Generated name should be a valid UUID")
-
-	// Test that multiple calls generate different UUIDs
-	name2, err := syncer.generateNewMaestroAPIMaestroBundleName()
-	require.NoError(t, err)
-	assert.NotEqual(t, name1, name2, "Multiple calls should generate different UUIDs")
-
-	// Verify second name is also a valid UUID
-	_, err = uuid.Parse(name2)
-	assert.NoError(t, err, "Second generated name should also be a valid UUID")
-}
-
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialReadonlyMaestroBundle(t *testing.T) {
-	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		uuidV4Generator: uuid.NewRandom,
-	}
-
 	maestroBundleNamespacedName := types.NamespacedName{
 		Name:      "custom-bundle",
 		Namespace: "custom-namespace",
@@ -605,7 +472,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialReadonlyMae
 		Namespace: configMap.Namespace,
 	}
 
-	bundle := syncer.buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, resourceIdentifier, configMap)
+	bundle := buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, resourceIdentifier, configMap, readonlyBundleManagedByK8sLabelValueClusterScoped)
 
 	// Verify bundle metadata
 	assert.NotNil(t, bundle)
@@ -644,10 +511,10 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_buildInitialReadonlyMae
 func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_ClusterNotFound(t *testing.T) {
 	mockDBClient := databasetesting.NewMockDBClient()
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    &alwaysSyncCooldownChecker{},
-		cosmosClient:                       mockDBClient,
-		maestroSourceEnvironmentIdentifier: "test-env",
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      &alwaysSyncCooldownChecker{},
+		cosmosClient:                         mockDBClient,
+		maestroSourceEnvironmentIdentifier:   "test-env",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	key := controllerutils.HCPClusterKey{
@@ -697,10 +564,10 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_GetServiceProv
 	}
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    &alwaysSyncCooldownChecker{},
-		cosmosClient:                       mockDBClient,
-		maestroSourceEnvironmentIdentifier: "test-env",
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      &alwaysSyncCooldownChecker{},
+		cosmosClient:                         mockDBClient,
+		maestroSourceEnvironmentIdentifier:   "test-env",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	err = syncer.SyncOnce(ctx, key)
@@ -712,10 +579,10 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_AllBundlesAlre
 	ctx := context.Background()
 	mockDBClient := databasetesting.NewMockDBClient()
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    &alwaysSyncCooldownChecker{},
-		cosmosClient:                       mockDBClient,
-		maestroSourceEnvironmentIdentifier: "test-env",
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      &alwaysSyncCooldownChecker{},
+		cosmosClient:                         mockDBClient,
+		maestroSourceEnvironmentIdentifier:   "test-env",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	key := controllerutils.HCPClusterKey{
@@ -779,12 +646,12 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_SyncLoopExecut
 	mockMaestroClient := maestro.NewMockClient(ctrl)
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    &alwaysSyncCooldownChecker{},
-		cosmosClient:                       mockDBClient,
-		clusterServiceClient:               mockClusterService,
-		maestroClientBuilder:               mockMaestroBuilder,
-		maestroSourceEnvironmentIdentifier: "test-env",
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      &alwaysSyncCooldownChecker{},
+		cosmosClient:                         mockDBClient,
+		clusterServiceClient:                 mockClusterService,
+		maestroClientBuilder:                 mockMaestroBuilder,
+		maestroSourceEnvironmentIdentifier:   "test-env",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	key := controllerutils.HCPClusterKey{
@@ -894,12 +761,12 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_ProcessesParti
 	mockMaestroClient := maestro.NewMockClient(ctrl)
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    &alwaysSyncCooldownChecker{},
-		cosmosClient:                       mockDBClient,
-		clusterServiceClient:               mockClusterService,
-		maestroClientBuilder:               mockMaestroBuilder,
-		maestroSourceEnvironmentIdentifier: "test-env",
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      &alwaysSyncCooldownChecker{},
+		cosmosClient:                         mockDBClient,
+		clusterServiceClient:                 mockClusterService,
+		maestroClientBuilder:                 mockMaestroBuilder,
+		maestroSourceEnvironmentIdentifier:   "test-env",
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	key := controllerutils.HCPClusterKey{

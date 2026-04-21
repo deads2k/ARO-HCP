@@ -32,7 +32,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/internal/api/arm"
 	"github.com/Azure/ARO-HCP/internal/utils"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 type GenericSyncer[T comparable] interface {
@@ -143,13 +143,25 @@ func (c *genericWatchingController[T]) processNextWorkItem(ctx context.Context) 
 	return true
 }
 
+// QueueForInformers is equivalent to calling QueueForInformersWithMaxDepth with maxDepth of -1.
+// See QueueForInformersWithMaxDepth for more details.
 func (c *genericWatchingController[T]) QueueForInformers(resyncDuration time.Duration, notifiers ...Notifier) error {
+	return c.QueueForInformersWithMaxDepth(resyncDuration, -1, notifiers...)
+}
+
+// QueueForInformersWithMaxDepth adds event handlers to the notifiers for the controller with a given max depth.
+// maxDepth is the maximum number of parent hops to traverse when searching for a resourceID whose type is c.resourceType. Each
+// walk to Parent consumes one level.
+// maxDepth 0 means only the resourceID itself is considered.
+// maxDepth -1 (or any negative value) means no limit. The parent walk continues until a match or nil parent is reached.
+// It is exposed so that individual controllers can add other items to requeue based on easily.
+func (c *genericWatchingController[T]) QueueForInformersWithMaxDepth(resyncDuration time.Duration, maxDepth int, notifiers ...Notifier) error {
 	errs := []error{}
 	for _, notifier := range notifiers {
 		_, err := notifier.AddEventHandlerWithOptions(
 			cache.ResourceEventHandlerFuncs{
-				AddFunc:    c.EnqueueCosmosAdd,
-				UpdateFunc: c.EnqueueCosmosUpdate,
+				AddFunc:    c.enqueueCosmosAddFunc(maxDepth),
+				UpdateFunc: c.enqueueCosmosUpdateFunc(maxDepth),
 			},
 			cache.HandlerOptions{
 				ResyncPeriod: ptr.To(resyncDuration),
@@ -159,14 +171,34 @@ func (c *genericWatchingController[T]) QueueForInformers(resyncDuration time.Dur
 	return errors.Join(errs...)
 }
 
-// EnqueueResourceIDAdd traverses to find a resourceID that is an hcpcluster and adds it if found.
+// enqueueResourceIDAdd is equivalent to calling EnqueueResourceIDAddWithMaxDepth with a maxDepth of -1.
+// See EnqueueResourceIDAddWithMaxDepth for more details.
 // It is exposed so that individual controllers can add other items to requeue based on easily.
 func (c *genericWatchingController[T]) EnqueueResourceIDAdd(resourceID *azcorearm.ResourceID, changed bool) {
+	c.EnqueueResourceIDAddWithMaxDepth(resourceID, changed, -1)
+}
+
+// enqueueResourceIDAddWithMaxDepth traverses resourceID and its parents according to maxDepth until it
+// finds a resourceID that is of the resource type of c.resourceType and adds it if found. Each walk to Parent consumes one level.
+// maxDepth is the maximum number of parent hops to traverse when searching for a resourceID of type c.resourceType.
+// maxDepth 0 means only the resourceID itself is considered.
+// maxDepth -1 (or any negative value) means no limit. The parent walk continues until a match or nil parent is reached.
+// It is exposed so that individual controllers can add other items to requeue based on easily.
+// When there's a match of resourceType: when changed is true, the resourceID is added to the queue immediately. Otherwise, the resourceID is
+// added to the queue only if the cooldown checker allows it.
+func (c *genericWatchingController[T]) EnqueueResourceIDAddWithMaxDepth(resourceID *azcorearm.ResourceID, changed bool, maxDepth int) {
 	if resourceID == nil {
 		return
 	}
-	if !apihelpers.ResourceTypeEqual(resourceID.ResourceType, c.resourceType) {
-		c.EnqueueResourceIDAdd(resourceID.Parent, changed)
+	if !armhelpers.ResourceTypeEqual(resourceID.ResourceType, c.resourceType) {
+		if maxDepth == 0 {
+			return
+		}
+		nextDepth := maxDepth
+		if maxDepth > 0 {
+			nextDepth = maxDepth - 1
+		}
+		c.EnqueueResourceIDAddWithMaxDepth(resourceID.Parent, changed, nextDepth)
 		return
 	}
 
@@ -191,11 +223,23 @@ func (c *genericWatchingController[T]) EnqueueResourceIDAdd(resourceID *azcorear
 	c.queue.Add(key)
 }
 
-func (c *genericWatchingController[T]) EnqueueCosmosAdd(newObj any) {
-	c.EnqueueResourceIDAdd(newObj.(arm.CosmosPersistable).GetCosmosData().GetResourceID(), true)
+func (c *genericWatchingController[T]) enqueueCosmosAddFunc(maxDepth int) func(any) {
+	return func(newObj any) {
+		c.enqueueCosmosAddWithMaxDepth(newObj, maxDepth)
+	}
 }
 
-func (c *genericWatchingController[T]) EnqueueCosmosUpdate(oldObj, newObj any) {
+func (c *genericWatchingController[T]) enqueueCosmosAddWithMaxDepth(newObj any, maxDepth int) {
+	c.EnqueueResourceIDAddWithMaxDepth(newObj.(arm.CosmosPersistable).GetCosmosData().GetResourceID(), true, maxDepth)
+}
+
+func (c *genericWatchingController[T]) enqueueCosmosUpdateFunc(maxDepth int) func(any, any) {
+	return func(oldObj, newObj any) {
+		c.enqueueCosmosUpdateWithMaxDepth(oldObj, newObj, maxDepth)
+	}
+}
+
+func (c *genericWatchingController[T]) enqueueCosmosUpdateWithMaxDepth(oldObj, newObj any, maxDepth int) {
 	changed := oldObj.(arm.CosmosPersistable).GetCosmosData().GetEtag() != newObj.(arm.CosmosPersistable).GetCosmosData().GetEtag()
-	c.EnqueueResourceIDAdd(newObj.(arm.CosmosPersistable).GetCosmosData().GetResourceID(), changed)
+	c.EnqueueResourceIDAddWithMaxDepth(newObj.(arm.CosmosPersistable).GetCosmosData().GetResourceID(), changed, maxDepth)
 }

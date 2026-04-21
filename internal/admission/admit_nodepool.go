@@ -16,14 +16,16 @@ package admission
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/blang/semver/v4"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/Azure/ARO-HCP/internal/api"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
 // AdmitNodePool performs non-static checks of nodepool.  Checks that require more information than is contained inside of
@@ -62,14 +64,14 @@ func AdmitNodePool(newNodePool, oldNodePool *api.HCPOpenShiftClusterNodePool, cl
 // It includes all validations from AdmitNodePool plus version upgrade constraints.
 // The spNodePool and spCluster parameters provide the service provider state for version validation.
 func AdmitNodePoolUpdate(newNodePool, oldNodePool *api.HCPOpenShiftClusterNodePool, cluster *api.HCPOpenShiftCluster,
-	spNodePool *api.ServiceProviderNodePool, spCluster *api.ServiceProviderCluster) field.ErrorList {
+	spNodePool *api.ServiceProviderNodePool, spCluster *api.ServiceProviderCluster, op operation.Operation) field.ErrorList {
 	errs := field.ErrorList{}
 
 	// Include all standard node pool admission checks
 	errs = append(errs, AdmitNodePool(newNodePool, oldNodePool, cluster)...)
 
 	// Add update-specific version upgrade validation
-	errs = append(errs, validateNodePoolVersionUpgrade(newNodePool, oldNodePool, spNodePool, spCluster)...)
+	errs = append(errs, validateNodePoolVersionUpgrade(newNodePool, oldNodePool, spNodePool, spCluster, op)...)
 
 	return errs
 }
@@ -77,10 +79,10 @@ func AdmitNodePoolUpdate(newNodePool, oldNodePool *api.HCPOpenShiftClusterNodePo
 // validateNodePoolVersionUpgrade validates that a node pool version change is a valid upgrade.
 // It checks:
 //   - No downgrade: new version >= old version
-//   - No major version change: new major == old major
+//   - No major version change: new major == old major (unless FeatureExperimentalReleaseFeatures is registered)
 //   - No skipping minor versions: new minor <= old minor + 1
 //   - Cannot exceed cluster version: new version <= cluster version
-func validateNodePoolVersionUpgrade(newNodePool, oldNodePool *api.HCPOpenShiftClusterNodePool, spNodePool *api.ServiceProviderNodePool, spCluster *api.ServiceProviderCluster) field.ErrorList {
+func validateNodePoolVersionUpgrade(newNodePool, oldNodePool *api.HCPOpenShiftClusterNodePool, spNodePool *api.ServiceProviderNodePool, spCluster *api.ServiceProviderCluster, op operation.Operation) field.ErrorList {
 
 	// Skip validation if no version is specified or version didn't change
 	if len(newNodePool.Properties.Version.ID) == 0 || newNodePool.Properties.Version.ID == oldNodePool.Properties.Version.ID {
@@ -92,11 +94,9 @@ func validateNodePoolVersionUpgrade(newNodePool, oldNodePool *api.HCPOpenShiftCl
 
 	newVersion, err := semver.Parse(newNodePool.Properties.Version.ID)
 	if err != nil {
-		errs = append(errs, field.Invalid(
-			fldPath,
-			newNodePool.Properties.Version.ID,
-			fmt.Sprintf("invalid node pool version format: %s", err.Error()),
-		))
+		errs = append(errs, field.Invalid(fldPath, newNodePool.Properties.Version.ID, fmt.Sprintf("invalid node pool version format: %s", err.Error())))
+		// Return early, it cannot validate an unparseable version
+		return errs
 	}
 	// Skip validation if the newVersion hasn't changed from the desired Version
 	if spNodePool.Spec.NodePoolVersion.DesiredVersion != nil &&
@@ -104,75 +104,13 @@ func validateNodePoolVersionUpgrade(newNodePool, oldNodePool *api.HCPOpenShiftCl
 		return nil
 	}
 
-	nodePoolActiveVersions := spNodePool.Status.NodePoolVersion.ActiveVersions
-
-	// Check if the newVersion is already in the activeVersions
-	if isVersionInActiveVersions(newVersion, nodePoolActiveVersions) {
-		return nil
+	lowestCPVersion, _ := apihelpers.FindLowestAndHighestClusterVersion(spCluster.Status.ControlPlaneVersion.ActiveVersions)
+	if err := validation.ValidateNodePoolUpgrade(newVersion, spNodePool.Status.NodePoolVersion.ActiveVersions, lowestCPVersion, op.HasOption(api.FeatureExperimentalReleaseFeatures)); err != nil {
+		errs = append(errs, field.Invalid(fldPath, newNodePool.Properties.Version.ID, err.Error()))
 	}
 
-	// Check if the newVersion <= control plane versions
-	// TODO: We may relax this constraint in the future
-	clusterActiveVersions := spCluster.Status.ControlPlaneVersion.ActiveVersions
-	if len(clusterActiveVersions) > 0 {
-		lowestControlPlane := api.FindLowestClusterVersion(clusterActiveVersions)
-		if lowestControlPlane != nil && newVersion.GT(*lowestControlPlane) {
-			errs = append(errs, field.Invalid(
-				fldPath,
-				newNodePool.Properties.Version.ID,
-				fmt.Sprintf("invalid node pool version %s: cannot exceed control plane version %s",
-					newVersion.String(), lowestControlPlane.String()),
-			))
-		}
+	if spNodePool.Spec.NodePoolVersion.DesiredVersion != nil && newVersion.LE(*spNodePool.Spec.NodePoolVersion.DesiredVersion) {
+		errs = append(errs, field.Invalid(fldPath, newNodePool.Properties.Version.ID, fmt.Sprintf("cannot downgrade from version %s to %s", spNodePool.Spec.NodePoolVersion.DesiredVersion.String(), newVersion.String())))
 	}
-
-	if len(nodePoolActiveVersions) > 0 {
-		lowestActive, highestActive := api.FindNodePoolVersionBounds(nodePoolActiveVersions)
-		// No partial downgrades: Node pool version >= highest active version
-		if highestActive != nil && newVersion.LT(*highestActive) {
-			errs = append(errs, field.Invalid(
-				fldPath,
-				newNodePool.Properties.Version.ID,
-				fmt.Sprintf("cannot downgrade from version %s to %s", highestActive.String(), newVersion.String()),
-			))
-		}
-
-		if newVersion.LE(*spNodePool.Spec.NodePoolVersion.DesiredVersion) {
-			errs = append(errs, field.Invalid(
-				fldPath,
-				newNodePool.Properties.Version.ID,
-				fmt.Sprintf("cannot downgrade from version %s to %s", spNodePool.Spec.NodePoolVersion.DesiredVersion.String(), newVersion.String()),
-			))
-		}
-		// No major version change
-		// TODO: Add support for major version upgrades (e.g., 4.20 → 5.0) when needed
-		if newVersion.Major != lowestActive.Major {
-			errs = append(errs, field.Invalid(
-				fldPath,
-				newNodePool.Properties.Version.ID,
-				fmt.Sprintf("invalid upgrade path from %s to %s: major version changes are not supported",
-					lowestActive.String(), newVersion.String()),
-			))
-		}
-		//Don't skip minor
-		// TODO: We will relax this constraint in the future to allow skipping minor versions
-		if newVersion.Minor > lowestActive.Minor+1 {
-			errs = append(errs, field.Invalid(
-				fldPath,
-				newNodePool.Properties.Version.ID,
-				fmt.Sprintf("invalid upgrade path from %s to %s: skipping minor versions is not allowed",
-					lowestActive.String(), newVersion.String()),
-			))
-		}
-
-	}
-
 	return errs
-}
-
-// isVersionInActiveVersions checks if the given version is already in the list of active versions.
-func isVersionInActiveVersions(version semver.Version, activeVersions []api.HCPNodePoolActiveVersion) bool {
-	return slices.ContainsFunc(activeVersions, func(av api.HCPNodePoolActiveVersion) bool {
-		return av.Version != nil && av.Version.EQ(version)
-	})
 }

@@ -1,0 +1,23 @@
+{
+	"id": "|subscriptions|6b690bec-0c16-4ecb-8f67-781caf40bba7|resourcegroups|resourcegroupname|providers|microsoft.redhatopenshift|hcpopenshiftclusters|major-upgrade|nodepools|np421|serviceprovidernodepools|default",
+	"partitionKey": "6b690bec-0c16-4ecb-8f67-781caf40bba7",
+	"properties": {
+		"resourceId": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/major-upgrade/nodePools/np421/serviceProviderNodePools/default",
+		"spec": {
+			"nodePoolVersion": {
+				"desiredVersion": "4.21.0"
+			}
+		},
+		"status": {
+			"nodePoolVersion": {
+				"activeVersions": [
+					{
+						"version": "4.21.0"
+					}
+				]
+			}
+		}
+	},
+	"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/major-upgrade/nodePools/np421/serviceProviderNodePools/default",
+	"resourceType": "microsoft.redhatopenshift/hcpopenshiftclusters/nodepools/serviceprovidernodepools"
+}

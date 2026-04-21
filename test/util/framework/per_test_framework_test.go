@@ -29,85 +29,67 @@ func TestIsResourceGroupNotFoundError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		err      error
-		expected bool
+		name string
+		err  error
+		want bool
 	}{
 		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
+			name: "nil error",
+			err:  nil,
+			want: false,
 		},
 		{
-			name:     "non-ResponseError",
-			err:      fmt.Errorf("something went wrong"),
-			expected: false,
+			name: "non-ResponseError",
+			err:  fmt.Errorf("something went wrong"),
+			want: false,
 		},
 		{
 			name: "HTTP 404 status",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusNotFound,
-			},
-			expected: true,
+			err:  &azcore.ResponseError{StatusCode: http.StatusNotFound},
+			want: true,
 		},
 		{
-			name: "ResourceGroupNotFound error code with non-404 status",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusConflict,
-				ErrorCode:  "ResourceGroupNotFound",
-			},
-			expected: true,
+			name: "ResourceGroupNotFound error code",
+			err:  &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"},
+			want: true,
 		},
 		{
-			name: "ResourceNotFound error code with non-404 status",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusConflict,
-				ErrorCode:  "ResourceNotFound",
-			},
-			expected: true,
+			name: "ResourceNotFound error code",
+			err:  &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceNotFound"},
+			want: true,
 		},
 		{
-			name: "HTTP 409 Conflict with unrelated error code",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusConflict,
-				ErrorCode:  "SomeOtherError",
-			},
-			expected: false,
+			name: "HTTP 409 Conflict without matching error code",
+			err:  &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ConflictError"},
+			want: false,
 		},
 		{
 			name: "HTTP 403 Forbidden",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusForbidden,
-			},
-			expected: false,
+			err:  &azcore.ResponseError{StatusCode: http.StatusForbidden},
+			want: false,
 		},
 		{
 			name: "wrapped ResponseError with 404",
-			err: fmt.Errorf("wrapper: %w", &azcore.ResponseError{
-				StatusCode: http.StatusNotFound,
-			}),
-			expected: true,
+			err:  fmt.Errorf("outer: %w", &azcore.ResponseError{StatusCode: http.StatusNotFound}),
+			want: true,
 		},
 		{
 			name: "wrapped ResponseError with ResourceGroupNotFound",
-			err: fmt.Errorf("wrapper: %w", &azcore.ResponseError{
-				StatusCode: http.StatusConflict,
-				ErrorCode:  "ResourceGroupNotFound",
-			}),
-			expected: true,
+			err:  fmt.Errorf("outer: %w", &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"}),
+			want: true,
 		},
 		{
-			name:     "wrapped non-ResponseError",
-			err:      fmt.Errorf("wrapper: %w", fmt.Errorf("inner error")),
-			expected: false,
+			name: "wrapped non-ResponseError",
+			err:  fmt.Errorf("outer: %w", fmt.Errorf("inner")),
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := isResourceGroupNotFoundError(tt.err)
-			assert.Equal(t, tt.expected, result)
+			got := isResourceGroupNotFoundError(tt.err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -116,34 +98,29 @@ func TestIsIgnorableResourceGroupCleanupError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		err      error
-		expected bool
+		name string
+		err  error
+		want bool
 	}{
 		{
-			name:     "nil error",
-			err:      nil,
-			expected: false,
+			name: "nil error returns false",
+			err:  nil,
+			want: false,
 		},
 		{
-			name:     "non-ResponseError",
-			err:      fmt.Errorf("something went wrong"),
-			expected: false,
+			name: "non-ResponseError returns false",
+			err:  fmt.Errorf("some error"),
+			want: false,
 		},
 		{
-			name: "404 ResponseError",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusNotFound,
-			},
-			expected: true,
+			name: "404 ResponseError returns true",
+			err:  &azcore.ResponseError{StatusCode: http.StatusNotFound},
+			want: true,
 		},
 		{
-			name: "ResourceGroupNotFound",
-			err: &azcore.ResponseError{
-				StatusCode: http.StatusConflict,
-				ErrorCode:  "ResourceGroupNotFound",
-			},
-			expected: true,
+			name: "ResourceGroupNotFound returns true",
+			err:  &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"},
+			want: true,
 		},
 		{
 			name: "joined error with all not-found errors",
@@ -151,7 +128,7 @@ func TestIsIgnorableResourceGroupCleanupError(t *testing.T) {
 				&azcore.ResponseError{StatusCode: http.StatusNotFound},
 				&azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"},
 			),
-			expected: true,
+			want: true,
 		},
 		{
 			name: "joined error with one real failure and one not-found",
@@ -159,7 +136,7 @@ func TestIsIgnorableResourceGroupCleanupError(t *testing.T) {
 				&azcore.ResponseError{StatusCode: http.StatusNotFound},
 				&azcore.ResponseError{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"},
 			),
-			expected: false,
+			want: false,
 		},
 		{
 			name: "joined error with all real failures",
@@ -167,15 +144,15 @@ func TestIsIgnorableResourceGroupCleanupError(t *testing.T) {
 				&azcore.ResponseError{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"},
 				&azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "SomeOtherError"},
 			),
-			expected: false,
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := isIgnorableResourceGroupCleanupError(tt.err)
-			assert.Equal(t, tt.expected, result)
+			got := isIgnorableResourceGroupCleanupError(tt.err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

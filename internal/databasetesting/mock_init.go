@@ -20,7 +20,7 @@ import (
 
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/api/arm"
-	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 )
 
 // NewMockDBClientWithResources creates a new MockDBClient and populates it with the given resources.
@@ -30,8 +30,10 @@ import (
 //   - *api.Operation
 //   - *api.HCPOpenShiftClusterExternalAuth
 //   - *api.ServiceProviderCluster
+//   - *api.ServiceProviderNodePool
 //   - *arm.Subscription
 //   - *api.Controller
+//   - *api.ManagementClusterContent
 //
 // Returns an error if any resource cannot be created or if an unsupported type is encountered.
 func NewMockDBClientWithResources(ctx context.Context, resources []any) (*MockDBClient, error) {
@@ -59,10 +61,14 @@ func (m *MockDBClient) addResource(ctx context.Context, resource any) error {
 		return m.addExternalAuth(ctx, r)
 	case *api.ServiceProviderCluster:
 		return m.addServiceProviderCluster(ctx, r)
+	case *api.ServiceProviderNodePool:
+		return m.addServiceProviderNodePool(ctx, r)
 	case *arm.Subscription:
 		return m.addSubscription(ctx, r)
 	case *api.Controller:
 		return m.addController(ctx, r)
+	case *api.ManagementClusterContent:
+		return m.addManagementClusterContent(ctx, r)
 	default:
 		return fmt.Errorf("unsupported resource type: %T", resource)
 	}
@@ -126,6 +132,24 @@ func (m *MockDBClient) addServiceProviderCluster(ctx context.Context, spc *api.S
 	return err
 }
 
+func (m *MockDBClient) addServiceProviderNodePool(ctx context.Context, spnp *api.ServiceProviderNodePool) error {
+	resourceID := spnp.GetResourceID()
+	if resourceID == nil {
+		return fmt.Errorf("service provider node pool is missing resource ID")
+	}
+	if resourceID.Parent == nil {
+		return fmt.Errorf("service provider node pool is missing parent node pool ID")
+	}
+	if resourceID.Parent.Parent == nil {
+		return fmt.Errorf("service provider node pool is missing grandparent cluster ID")
+	}
+	clusterName := resourceID.Parent.Parent.Name
+	nodePoolName := resourceID.Parent.Name
+	serviceProviderNodePoolCRUD := m.ServiceProviderNodePools(resourceID.SubscriptionID, resourceID.ResourceGroupName, clusterName, nodePoolName)
+	_, err := serviceProviderNodePoolCRUD.Create(ctx, spnp, nil)
+	return err
+}
+
 func (m *MockDBClient) addSubscription(ctx context.Context, subscription *arm.Subscription) error {
 	resourceID := subscription.GetResourceID()
 	if resourceID == nil {
@@ -146,12 +170,12 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 	}
 	parentType := resourceID.Parent.ResourceType
 	switch {
-	case apihelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
 		clusterName := resourceID.Parent.Name
 		controllerCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).Controllers(clusterName)
 		_, err := controllerCRUD.Create(ctx, controller, nil)
 		return err
-	case apihelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
 		if resourceID.Parent.Parent == nil {
 			return fmt.Errorf("nodepool controller is missing grandparent cluster ID")
 		}
@@ -160,7 +184,7 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 		controllerCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(clusterName).Controllers(nodePoolName)
 		_, err := controllerCRUD.Create(ctx, controller, nil)
 		return err
-	case apihelpers.ResourceTypeEqual(parentType, api.ExternalAuthResourceType):
+	case armhelpers.ResourceTypeEqual(parentType, api.ExternalAuthResourceType):
 		if resourceID.Parent.Parent == nil {
 			return fmt.Errorf("externalauth controller is missing grandparent cluster ID")
 		}
@@ -171,4 +195,33 @@ func (m *MockDBClient) addController(ctx context.Context, controller *api.Contro
 		return err
 	}
 	return fmt.Errorf("unsupported parent resource type: %s", parentType)
+}
+
+func (m *MockDBClient) addManagementClusterContent(ctx context.Context, mcc *api.ManagementClusterContent) error {
+	resourceID := mcc.GetResourceID()
+	if resourceID == nil {
+		return fmt.Errorf("management cluster content is missing resource ID")
+	}
+	if resourceID.Parent == nil {
+		return fmt.Errorf("management cluster content is missing parent ID")
+	}
+	parentType := resourceID.Parent.ResourceType
+	switch {
+	case armhelpers.ResourceTypeEqual(parentType, api.ClusterResourceType):
+		clusterName := resourceID.Parent.Name
+		mccCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).ManagementClusterContents(clusterName)
+		_, err := mccCRUD.Create(ctx, mcc, nil)
+		return err
+	case armhelpers.ResourceTypeEqual(parentType, api.NodePoolResourceType):
+		if resourceID.Parent.Parent == nil {
+			return fmt.Errorf("node pool management cluster content is missing grandparent cluster ID")
+		}
+		clusterName := resourceID.Parent.Parent.Name
+		nodePoolName := resourceID.Parent.Name
+		mccCRUD := m.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).NodePools(clusterName).ManagementClusterContents(nodePoolName)
+		_, err := mccCRUD.Create(ctx, mcc, nil)
+		return err
+	default:
+		return fmt.Errorf("unsupported parent resource type for management cluster content: %s", parentType)
+	}
 }

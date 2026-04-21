@@ -20,12 +20,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	workv1 "open-cluster-management.io/api/work/v1"
 
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -42,8 +39,6 @@ import (
 )
 
 const (
-	// readonlyBundleManagedByK8sLabelKey is the key of the K8s label that is used to identify the controller that manages the readonly Maestro bundle.
-	readonlyBundleManagedByK8sLabelKey = "aro-hcp.azure.com/readonly-bundle-managed-by"
 	// readonlyBundleManagedByK8sLabelValueClusterScoped is the K8s label associated to the readonlyBundleManagedByK8sLabelKey
 	// key that indicates that the readonly Maestro bundle is managed by the create
 	// cluster scoped maestro readonly bundles controller.
@@ -69,10 +64,7 @@ type createClusterScopedMaestroReadonlyBundlesSyncer struct {
 
 	maestroClientBuilder maestro.MaestroClientBuilder
 
-	// uuidV4Generator is used to generate a new UUIDv4. It must be provided.
-	// We define it as a dependency to enable deterministic testing in some
-	// scenarios.
-	uuidV4Generator func() (uuid.UUID, error)
+	maestroAPIMaestroBundleNameGenerator maestro.MaestroAPIMaestroBundleNameGenerator
 }
 
 var _ controllerutils.ClusterSyncer = (*createClusterScopedMaestroReadonlyBundlesSyncer)(nil)
@@ -87,13 +79,13 @@ func NewCreateClusterScopedMaestroReadonlyBundlesController(
 ) controllerutils.Controller {
 
 	syncer := &createClusterScopedMaestroReadonlyBundlesSyncer{
-		cooldownChecker:                    controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
-		cosmosClient:                       cosmosClient,
-		clusterServiceClient:               clusterServiceClient,
-		activeOperationLister:              activeOperationLister,
-		maestroSourceEnvironmentIdentifier: maestroSourceEnvironmentIdentifier,
-		maestroClientBuilder:               maestroClientBuilder,
-		uuidV4Generator:                    uuid.NewRandom,
+		cooldownChecker:                      controllerutils.DefaultActiveOperationPrioritizingCooldown(activeOperationLister),
+		cosmosClient:                         cosmosClient,
+		clusterServiceClient:                 clusterServiceClient,
+		activeOperationLister:                activeOperationLister,
+		maestroSourceEnvironmentIdentifier:   maestroSourceEnvironmentIdentifier,
+		maestroClientBuilder:                 maestroClientBuilder,
+		maestroAPIMaestroBundleNameGenerator: maestro.NewMaestroAPIMaestroBundleNameGenerator(),
 	}
 
 	controller := controllerutils.NewClusterWatchingController(
@@ -173,7 +165,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) SyncOnce(ctx context.C
 	// This is important to avoid leaking resources when the sync is done.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	maestroClient, err := c.createMaestroClientFromProvisionShard(ctx, clusterProvisionShard)
+	maestroClient, err := createMaestroClientFromCSProvisionShard(ctx, c.maestroSourceEnvironmentIdentifier, c.maestroClientBuilder, clusterProvisionShard)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to create Maestro client: %w", err))
 	}
@@ -230,7 +222,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 	// and it makes it resistant to crashes/reboots.
 	if existingMaestroBundleRef == nil {
 		var err error
-		existingMaestroBundleRef, err = c.buildInitialMaestroBundleReference(maestroBundleInternalName)
+		existingMaestroBundleRef, err = buildInitialMaestroBundleReference(maestroBundleInternalName, c.maestroAPIMaestroBundleNameGenerator)
 		if err != nil {
 			return lastPersistedSPC, utils.TrackError(fmt.Errorf("failed to build initial Maestro Bundle reference: %w", err))
 		}
@@ -266,7 +258,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) syncMaestroBundle(
 		return lastPersistedSPC, utils.TrackError(fmt.Errorf("unrecognized Maestro Bundle internal name: %s", maestroBundleInternalName))
 	}
 
-	resultMaestroBundle, err := c.getOrCreateMaestroBundle(ctx, maestroClient, desiredMaestroBundle)
+	resultMaestroBundle, err := maestro.GetOrCreateMaestroBundle(ctx, maestroClient, desiredMaestroBundle)
 	if err != nil {
 		return lastPersistedSPC, utils.TrackError(fmt.Errorf("failed to get or create Maestro Bundle: %w", err))
 	}
@@ -336,111 +328,7 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMa
 		Namespace: hostedCluster.Namespace,
 	}
 
-	return c.buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hostedCluster)
-}
-
-// buildInitialReadonlyMaestroBundle builds an initial readonly Maestro Bundle for a given resource specified in obj.
-// objResourceIdentifier is the resource identifier of the resource specified in obj.
-// maestroBundleNamespacedName is the namespaced name of the Maestro Bundle.
-// Used to create the readonly Maestro bundle associated to the resource specified in obj.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName types.NamespacedName, objResourceIdentifier workv1.ResourceIdentifier, obj runtime.Object) *workv1.ManifestWork {
-	maestroBundleObjMeta := metav1.ObjectMeta{
-		Name:            maestroBundleNamespacedName.Name,
-		Namespace:       maestroBundleNamespacedName.Namespace,
-		ResourceVersion: "0", // TODO is this needed when creating a maestro bundle?
-		Labels: map[string]string{
-			// We define it as a K8s label because Maestro supports server-side filtering based on K8s labels.
-			// We can define it as a K8s label because for this specific use case we can comply with
-			// K8s labels length and charset restrictions https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set.
-			readonlyBundleManagedByK8sLabelKey: readonlyBundleManagedByK8sLabelValueClusterScoped,
-		},
-	}
-
-	// We build the Maestro Bundle that will contain the resource specified in obj.
-	// Aside from putting the resource (manifest) previously built above, we
-	// also define a FeedbackRule that will allow us to retrieve the whole content
-	// from the management cluster
-	maestroBundle := &workv1.ManifestWork{
-		ObjectMeta: maestroBundleObjMeta,
-		Spec: workv1.ManifestWorkSpec{
-			Workload: workv1.ManifestsTemplate{
-				Manifests: []workv1.Manifest{
-					{
-						RawExtension: runtime.RawExtension{
-							// We put the resource (manifest) specified in obj.
-							// In Maestro only the desired `spec` as defined in the bundle can be retrieved
-							// from here when querying the Maestro Bundle.
-							// To retrieve another section other than the desired spec Maestro
-							// requires defining FeedbackRule(s) in the Maestro bundle.
-							// For maestro readonly resources, not even the desired spec can be retrieved from here. For
-							// those type of resources it needs to be retrieved via status feedback rule(s) too.
-							// For owned resources, here the desired spec can be retrieved but that
-							// is not necessarily the actual spec in the management cluster side. If that is
-							// desired it is again necessary to get the spec via FeedbackRule(s).
-							Object: obj,
-						},
-					},
-				},
-			},
-			ManifestConfigs: []workv1.ManifestConfigOption{
-				// We also need to define the ManifestConfig associated to the resource(manifest)
-				// that is being put within the Maestro Bundle.
-				{
-					// ResourceIdentifier needs to be specified and it is the information
-					// associated to the manifest that is being put within the Maestro Bundle.
-					ResourceIdentifier: objResourceIdentifier,
-					// We need to set the UpdateStrategy to read only. This
-					// creates a "readonly maestro bundle".
-					UpdateStrategy: &workv1.UpdateStrategy{
-						Type: workv1.UpdateStrategyTypeReadOnly,
-					},
-					// We define a feedbackrule based on JSONPath. We alias the name
-					// of this JSONPath as "resource" and its real JSONPath is "@" which
-					// signals the whole object is retrieved. This includes both spec
-					// and status.
-					FeedbackRules: []workv1.FeedbackRule{
-						{
-							Type: workv1.JSONPathsType,
-							JsonPaths: []workv1.JsonPath{
-								{
-									Name: "resource",
-									Path: "@",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return maestroBundle
-}
-
-// buildInitialMaestroBundleReference builds an initial Maestro Bundle reference for a given maestro bundle internal name.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) buildInitialMaestroBundleReference(internalName api.MaestroBundleInternalName) (*api.MaestroBundleReference, error) {
-	maestroAPIMaestroBundleName, err := c.generateNewMaestroAPIMaestroBundleName()
-	if err != nil {
-		return nil, utils.TrackError(fmt.Errorf("failed to generate Maestro API Maestro Bundle name: %w", err))
-	}
-	hostedClusterMWMaestroBundleReference := &api.MaestroBundleReference{
-		Name:                        internalName,
-		MaestroAPIMaestroBundleName: maestroAPIMaestroBundleName,
-		MaestroAPIMaestroBundleID:   "",
-	}
-
-	return hostedClusterMWMaestroBundleReference, nil
-}
-
-// generateNewMaestroAPIMaestroBundleName generates a new Maestro API Maestro Bundle name.
-// Used to generate a new Maestro API Maestro Bundle name for a new Maestro Bundle reference.
-// The generated name is a UUIDv4.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) generateNewMaestroAPIMaestroBundleName() (string, error) {
-	newUUIDForMaestroAPIMaestroBundleName, err := c.uuidV4Generator()
-	if err != nil {
-		return "", utils.TrackError(fmt.Errorf("failed to generate UUIDv4 for Maestro API Maestro Bundle name: %w", err))
-	}
-	return newUUIDForMaestroAPIMaestroBundleName.String(), nil
+	return buildInitialReadonlyMaestroBundle(maestroBundleNamespacedName, maestroBundleResourceIdentifier, hostedCluster, readonlyBundleManagedByK8sLabelValueClusterScoped)
 }
 
 // getHostedClusterNamespace gets the namespace for the hosted cluster based on the environment name and the cluster service OCM Cluster ID.
@@ -452,56 +340,6 @@ func (c *createClusterScopedMaestroReadonlyBundlesSyncer) getHostedClusterNamesp
 	return fmt.Sprintf("ocm-%s-%s", envName, csClusterID)
 }
 
-// getOrCreateMaestroBundle gets (or creates if it does not exist) a Maestro Bundle for a given Maestro Bundle namespaced name.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) getOrCreateMaestroBundle(ctx context.Context, maestroClient maestro.Client, maestroBundle *workv1.ManifestWork) (*workv1.ManifestWork, error) {
-	logger := utils.LoggerFromContext(ctx)
-	existingMaestroBundle, err := maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})
-	if err == nil {
-		logger.Info(fmt.Sprintf("retrieved maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-		return existingMaestroBundle, nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		logger.Error(err, "failed to get Maestro Bundle and it is not already exists error")
-		return nil, utils.TrackError(fmt.Errorf("failed to get Maestro Bundle: %w", err))
-	}
-
-	logger.Info(fmt.Sprintf("attempting to create maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-	existingMaestroBundle, err = maestroClient.Create(ctx, maestroBundle, metav1.CreateOptions{})
-	if err == nil {
-		logger.Info(fmt.Sprintf("created maestro bundle name %s with resource name %s", maestroBundle.Name, maestroBundle.Spec.ManifestConfigs[0].ResourceIdentifier.Name))
-		return existingMaestroBundle, nil
-	}
-	if !k8serrors.IsAlreadyExists(err) {
-		logger.Error(err, "failed to create Maestro Bundle and it is not already exists error")
-		return nil, utils.TrackError(fmt.Errorf("failed to create Maestro Bundle: %w", err))
-	}
-	logger.Error(err, "failed to create Maestro Bundle because it returned already exists error. Attempting to get it again")
-	existingMaestroBundle, err = maestroClient.Get(ctx, maestroBundle.Name, metav1.GetOptions{})
-	return existingMaestroBundle, err
-}
-
 func (c *createClusterScopedMaestroReadonlyBundlesSyncer) CooldownChecker() controllerutils.CooldownChecker {
 	return c.cooldownChecker
-}
-
-// createMaestroClientFromProvisionShard creates a Maestro client for the given provision shard.
-// The client is scoped to the Maestro Consumer associated to the provision shard, as well
-// as to the the Maestro Source ID associated to the provision shard which is calculated from the provision shard ID and the
-// environment specified in c.maestroSourceEnvironmentIdentifier.
-func (c *createClusterScopedMaestroReadonlyBundlesSyncer) createMaestroClientFromProvisionShard(
-	ctx context.Context, provisionShard *arohcpv1alpha1.ProvisionShard,
-) (maestro.Client, error) {
-	provisionShardMaestroConsumerName := provisionShard.MaestroConfig().ConsumerName()
-	provisionShardMaestroRESTAPIEndpoint := provisionShard.MaestroConfig().RestApiConfig().Url()
-	provisionShardMaestroGRPCAPIEndpoint := provisionShard.MaestroConfig().GrpcApiConfig().Url()
-	// This allows us to be able to have visibility on the Maestro Bundles owned by the same source ID for a given
-	// provision shard and environment. This should have the same source ID as what CS has in each corresponding environment
-	// because otherwise we would not have visibility on the Maestro Bundles owned
-	// TODO do we want to use the same source ID that CS uses or do we want intentionally a different one? This has consequences
-	// on the visibility of the Maestro Bundles, including processing of events sent by Maestro.
-	maestroSourceID := maestro.GenerateMaestroSourceID(c.maestroSourceEnvironmentIdentifier, provisionShard.ID())
-
-	maestroClient, err := c.maestroClientBuilder.NewClient(ctx, provisionShardMaestroRESTAPIEndpoint, provisionShardMaestroGRPCAPIEndpoint, provisionShardMaestroConsumerName, maestroSourceID)
-
-	return maestroClient, err
 }

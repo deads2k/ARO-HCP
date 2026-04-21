@@ -470,6 +470,7 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		b.options.ClustersServiceClient,
 		activeOperationLister,
 		backendInformers,
+		subscriptionLister,
 	)
 	triggerControlPlaneUpgradeController := upgradecontrollers.NewTriggerControlPlaneUpgradeController(
 		b.options.CosmosDBClient,
@@ -495,14 +496,25 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 		activeOperationLister,
 		backendInformers,
 	)
-	maestroCreateReadonlyBundlesController := controllers.NewCreateClusterScopedMaestroReadonlyBundlesController(
+
+	maestroCreateClusterScopedReadonlyBundlesController := controllers.NewCreateClusterScopedMaestroReadonlyBundlesController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
 		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
 	)
-	maestroReadAndPersistReadonlyBundlesContentController := controllers.NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
+	maestroReadAndPersistClusterScopedReadonlyBundlesContentController := controllers.NewReadAndPersistClusterScopedMaestroReadonlyBundlesContentController(
 		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
 		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
 	)
+
+	maestroCreateNodePoolScopedReadonlyBundlesController := controllers.NewCreateNodePoolScopedMaestroReadonlyBundlesController(
+		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
+		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
+	)
+	maestroReadAndPersistNodePoolScopedReadonlyBundlesContentController := controllers.NewReadAndPersistNodePoolScopedMaestroReadonlyBundlesContentController(
+		activeOperationLister, b.options.CosmosDBClient, b.options.ClustersServiceClient,
+		backendInformers, b.options.MaestroSourceEnvironmentIdentifier, maestroClientBuilder,
+	)
+
 	maestroDeleteOrphanedReadonlyBundlesController := controllers.NewDeleteOrphanedMaestroReadonlyBundlesController(
 		b.options.CosmosDBClient,
 		b.options.ClustersServiceClient,
@@ -609,8 +621,10 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 				go azureClusterResourceGroupExistenceValidationController.Run(ctx, 20)
 				go azureClusterManagedIdentitiesExistenceValidationController.Run(ctx, 20)
 				go nodePoolVersionController.Run(ctx, 20)
-				go maestroCreateReadonlyBundlesController.Run(ctx, 20)
-				go maestroReadAndPersistReadonlyBundlesContentController.Run(ctx, 20)
+				go maestroCreateClusterScopedReadonlyBundlesController.Run(ctx, 20)
+				go maestroReadAndPersistClusterScopedReadonlyBundlesContentController.Run(ctx, 20)
+				go maestroCreateNodePoolScopedReadonlyBundlesController.Run(ctx, 20)
+				go maestroReadAndPersistNodePoolScopedReadonlyBundlesContentController.Run(ctx, 20)
 				go maestroDeleteOrphanedReadonlyBundlesController.Run(ctx, 20)
 				go triggerNodePoolUpgradeController.Run(ctx, 20)
 				go nodePoolPropertiesSyncController.Run(ctx, 20)

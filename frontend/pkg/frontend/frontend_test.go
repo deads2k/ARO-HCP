@@ -54,7 +54,7 @@ func newClusterResourceID(t *testing.T) *azcorearm.ResourceID {
 }
 
 func newClusterInternalID(t *testing.T) ocm.InternalID {
-	internalID, err := api.NewInternalID(ocm.GenerateClusterHREF("myCluster"))
+	internalID, err := api.NewInternalID(ocm.GenerateOCMCommercialClusterHREF("myCluster"))
 	require.NoError(t, err)
 	return internalID
 }
@@ -377,7 +377,7 @@ func TestDeploymentPreflight(t *testing.T) {
 			expectErrors: []expectedPreflightError{
 				{message: "Required value", target: "properties.version.id"},
 				{message: "Invalid value: \"invalidCidr\": invalid CIDR address: invalidCidr", target: "properties.network.podCidr"},
-				{message: "Unsupported value: \"invisible\": supported values: \"Private\", \"Public\"", target: "properties.api.visiblity"},
+				{message: "Unsupported value: \"invisible\": supported values: \"Private\", \"Public\"", target: "properties.api.visibility"},
 				{message: "Required value", target: "properties.platform.subnetId"},
 				{message: "Required value", target: "properties.platform.networkSecurityGroupId"},
 			},
@@ -636,7 +636,7 @@ func TestRequestAdminCredential(t *testing.T) {
 				mockCSClient.EXPECT().
 					PostBreakGlassCredential(gomock.Any(), clusterInternalID).
 					Return(cmv1.NewBreakGlassCredential().
-						HREF(ocm.GenerateBreakGlassCredentialHREF(clusterInternalID.String(), "0")).Build())
+						HREF(ocm.GenerateOCMCommercialBreakGlassCredentialHREF(clusterInternalID.String(), "0")).Build())
 			}
 
 			subs := map[string]*arm.Subscription{

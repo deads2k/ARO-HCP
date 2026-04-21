@@ -23,7 +23,7 @@ import (
 // ManagementClusterContent represents K8s resources in the Management Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ManagementClusterContent struct {
-	// CosmosMetadata ResourceID is nested under the cluster so that association and cleanup work as expected
+	// CosmosMetadata is nested under the corresponding resource type so that association and cleanup work as expected
 	CosmosMetadata `json:"cosmosMetadata"`
 
 	// resourceID exists to match cosmosMetadata.resourceID until we're able to transition all types to use cosmosMetadata,

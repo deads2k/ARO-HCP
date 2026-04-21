@@ -119,8 +119,6 @@ type DBClient interface {
 	GlobalListers() GlobalListers
 
 	ServiceProviderNodePools(subscriptionID, resourceGroupName, clusterName, nodePoolName string) ServiceProviderNodePoolCRUD
-
-	ManagementClusterContents(subscriptionID, resourceGroupName, clusterName string) ManagementClusterContentCRUD
 }
 
 var _ DBClient = &cosmosDBClient{}
@@ -201,12 +199,6 @@ func (d *cosmosDBClient) ServiceProviderNodePools(subscriptionID, resourceGroupN
 		d.resources, nodePoolResourceID, api.ServiceProviderNodePoolResourceType)
 }
 
-func (d *cosmosDBClient) ManagementClusterContents(subscriptionID, resourceGroupName, clusterName string) ManagementClusterContentCRUD {
-	clusterResourceID := NewClusterResourceID(subscriptionID, resourceGroupName, clusterName)
-	return NewCosmosResourceCRUD[api.ManagementClusterContent, GenericDocument[api.ManagementClusterContent]](
-		d.resources, clusterResourceID, api.ManagementClusterContentResourceType)
-}
-
 func (d *cosmosDBClient) UntypedCRUD(parentResourceID azcorearm.ResourceID) (UntypedResourceCRUD, error) {
 	return NewUntypedCRUD(d.resources, parentResourceID), nil
 }
@@ -219,7 +211,8 @@ func (d *cosmosDBClient) GlobalListers() GlobalListers {
 func NewCosmosDatabaseClient(url string, dbName string, clientOptions azcore.ClientOptions) (*azcosmos.DatabaseClient, error) {
 	credential, err := azidentity.NewDefaultAzureCredential(
 		&azidentity.DefaultAzureCredentialOptions{
-			ClientOptions: clientOptions,
+			ClientOptions:                clientOptions,
+			RequireAzureTokenCredentials: true,
 		})
 	if err != nil {
 		return nil, utils.TrackError(err)

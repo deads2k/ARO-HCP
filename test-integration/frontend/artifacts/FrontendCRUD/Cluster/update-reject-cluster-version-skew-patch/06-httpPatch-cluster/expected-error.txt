@@ -1,0 +1,23 @@
+{
+  "error": {
+    "code": "MultipleErrorsOccurred",
+    "message": "3 errors occurred",
+    "details": [
+      {
+        "code": "InvalidRequestContent",
+        "message": "Invalid value: \"4.23\": only upgrade to the next minor is allowed: expected 4.22 after 4.21",
+        "target": "properties.version.id"
+      },
+      {
+        "code": "InvalidRequestContent",
+        "message": "Invalid value: \"4.23\": only upgrade to the next minor is allowed: expected 4.21 after 4.20",
+        "target": "properties.version.id"
+      },
+      {
+        "code": "InvalidRequestContent",
+        "message": "Invalid value: \"4.23\": cluster minor 4.23 must not be more than two minor versions ahead of node pool \"workers\" (minor 4.20)",
+        "target": "properties.version.id"
+      }
+    ]
+  }
+}

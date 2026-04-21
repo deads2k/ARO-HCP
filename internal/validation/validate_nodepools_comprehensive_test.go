@@ -692,6 +692,17 @@ func TestValidateNodePoolCreate(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid nodepool resource name - ends with hyphen",
+			nodePool: func() *api.HCPOpenShiftClusterNodePool {
+				np := createValidNodePool()
+				np.ID.Name = "my-pool-"
+				return np
+			}(),
+			expectErrors: []expectedError{
+				{message: "must be a valid DNS RFC 1035 label", fieldPath: "id"},
+			},
+		},
+		{
 			name: "invalid nodepool resource name - too long",
 			nodePool: func() *api.HCPOpenShiftClusterNodePool {
 				np := createValidNodePool()

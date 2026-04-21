@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"k8s.io/utils/ptr"
+
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
@@ -59,9 +61,31 @@ func (a *alwaysSyncCooldownChecker) CanSync(ctx context.Context, key any) bool {
 
 var _ controllerutils.CooldownChecker = &alwaysSyncCooldownChecker{}
 
+// createTestSubscription creates a subscription in the mock database.
+func createTestSubscription(t *testing.T, ctx context.Context, mockDB *databasetesting.MockDBClient) {
+	t.Helper()
+
+	subResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/" + testSubscriptionID))
+	subscription := &arm.Subscription{
+		CosmosMetadata: arm.CosmosMetadata{
+			ResourceID: subResourceID,
+		},
+		ResourceID: subResourceID,
+		State:      arm.SubscriptionStateRegistered,
+		Properties: &arm.SubscriptionProperties{
+			TenantId: ptr.To("test-tenant-id"),
+		},
+	}
+	_, err := mockDB.Subscriptions().Create(ctx, subscription, nil)
+	require.NoError(t, err)
+}
+
 // createTestNodePoolWithVersion creates a parent cluster and a node pool in the mock database.
 func createTestNodePoolWithVersion(t *testing.T, ctx context.Context, mockDB *databasetesting.MockDBClient, desiredVersion string) {
 	t.Helper()
+
+	// Create subscription first
+	createTestSubscription(t, ctx, mockDB)
 
 	// Create parent cluster first (required by mock DB structure).
 	clusterResourceID := api.Must(azcorearm.ParseResourceID("/subscriptions/" + testSubscriptionID +
@@ -278,6 +302,7 @@ func TestNodePoolVersionSyncer_ValidateDesiredNodePoolVersion(t *testing.T) {
 		desiredVersion       string
 		activeVersions       []string
 		controlPlaneVersions []string
+		allowMajorUpgrades   bool
 		expectError          bool
 		errorContains        string
 	}{
@@ -336,12 +361,55 @@ func TestNodePoolVersionSyncer_ValidateDesiredNodePoolVersion(t *testing.T) {
 			errorContains:        "skipping minor versions is not allowed",
 		},
 		{
-			name:                 "major version change - fail",
-			desiredVersion:       "5.19.10",
-			activeVersions:       []string{"4.19.10"},
-			controlPlaneVersions: []string{"5.19.10"},
+			name:                 "major version change - fail by default",
+			desiredVersion:       "5.0.0",
+			activeVersions:       []string{"4.22.0"},
+			controlPlaneVersions: []string{"5.0.0"},
 			expectError:          true,
 			errorContains:        "major version changes are not supported",
+		},
+		{
+			name:                 "valid major upgrade 4.22 to 5.0",
+			desiredVersion:       "5.0.0",
+			activeVersions:       []string{"4.22.0"},
+			controlPlaneVersions: []string{"5.0.0"},
+			allowMajorUpgrades:   true,
+			expectError:          false,
+		},
+		{
+			name:                 "valid major upgrade 4.23 to 5.1",
+			desiredVersion:       "5.1.0",
+			activeVersions:       []string{"4.23.0"},
+			controlPlaneVersions: []string{"5.1.0"},
+			allowMajorUpgrades:   true,
+			expectError:          false,
+		},
+		{
+			name:                 "invalid major upgrade 4.22 to 5.1",
+			desiredVersion:       "5.1.0",
+			activeVersions:       []string{"4.22.0"},
+			controlPlaneVersions: []string{"5.1.0"},
+			allowMajorUpgrades:   true,
+			expectError:          true,
+			errorContains:        "4.22 can only upgrade to 5.0",
+		},
+		{
+			name:                 "invalid major upgrade 4.23 to 5.0",
+			desiredVersion:       "5.0.0",
+			activeVersions:       []string{"4.23.0"},
+			controlPlaneVersions: []string{"5.0.0"},
+			allowMajorUpgrades:   true,
+			expectError:          true,
+			errorContains:        "4.23 can only upgrade to 5.1",
+		},
+		{
+			name:                 "invalid major upgrade 4.20 not supported",
+			desiredVersion:       "5.0.0",
+			activeVersions:       []string{"4.20.0"},
+			controlPlaneVersions: []string{"5.0.0"},
+			allowMajorUpgrades:   true,
+			expectError:          true,
+			errorContains:        "major version upgrades are not supported",
 		},
 		// Downgrade tests
 		{
@@ -432,11 +500,24 @@ func TestNodePoolVersionSyncer_ValidateDesiredNodePoolVersion(t *testing.T) {
 			}
 			syncer.clusterToCincinnatiClient.Add(clusterKey, mockCincinnatiClient)
 
+			// Create subscription based on allowMajorUpgrades flag
+			subscription := &arm.Subscription{
+				Properties: &arm.SubscriptionProperties{},
+			}
+
+			if tt.allowMajorUpgrades {
+				subscription.Properties.RegisteredFeatures = &[]arm.Feature{{
+					Name:  ptr.To(api.FeatureExperimentalReleaseFeatures),
+					State: ptr.To("Registered"),
+				}}
+			}
+
 			err := syncer.validateDesiredNodePoolVersion(
 				ctx,
 				&desiredVersion,
 				spNodePool,
 				spCluster,
+				subscription,
 				"stable",
 				clusterKey,
 				[16]byte{}, // dummy UUID
@@ -448,59 +529,6 @@ func TestNodePoolVersionSyncer_ValidateDesiredNodePoolVersion(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestNodePoolVersionSyncer_IsVersionInActiveVersions(t *testing.T) {
-	tests := []struct {
-		name           string
-		version        string
-		activeVersions []string
-		expected       bool
-	}{
-		{
-			name:           "empty active versions",
-			version:        "4.19.10",
-			activeVersions: []string{},
-			expected:       false,
-		},
-		{
-			name:           "version found in single active version",
-			version:        "4.19.10",
-			activeVersions: []string{"4.19.10"},
-			expected:       true,
-		},
-		{
-			name:           "version not found in single active version",
-			version:        "4.20.5",
-			activeVersions: []string{"4.19.10"},
-			expected:       false,
-		},
-		{
-			name:           "version found in multiple active versions",
-			version:        "4.19.5",
-			activeVersions: []string{"4.19.10", "4.19.5"},
-			expected:       true,
-		},
-		{
-			name:           "version not found in multiple active versions",
-			version:        "4.20.5",
-			activeVersions: []string{"4.19.10", "4.19.5"},
-			expected:       false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			version := semver.MustParse(tt.version)
-			var activeVersions []api.HCPNodePoolActiveVersion
-			for _, v := range tt.activeVersions {
-				version := semver.MustParse(v)
-				activeVersions = append(activeVersions, api.HCPNodePoolActiveVersion{Version: &version})
-			}
-			result := isVersionInActiveVersions(&version, activeVersions)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
