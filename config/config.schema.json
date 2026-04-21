@@ -2695,6 +2695,9 @@
             "sl": {
               "$ref": "#/definitions/icmConnection"
             },
+            "rp": {
+              "$ref": "#/definitions/icmConnection"
+            },
             "msft": {
               "$ref": "#/definitions/icmConnection"
             }
