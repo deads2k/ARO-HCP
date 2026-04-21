@@ -30,6 +30,7 @@ import (
 //   - *api.Operation
 //   - *api.HCPOpenShiftClusterExternalAuth
 //   - *api.ServiceProviderCluster
+//   - *api.ServiceProviderNodePool
 //   - *arm.Subscription
 //   - *api.Controller
 //   - *api.ManagementClusterContent
@@ -60,6 +61,8 @@ func (m *MockDBClient) addResource(ctx context.Context, resource any) error {
 		return m.addExternalAuth(ctx, r)
 	case *api.ServiceProviderCluster:
 		return m.addServiceProviderCluster(ctx, r)
+	case *api.ServiceProviderNodePool:
+		return m.addServiceProviderNodePool(ctx, r)
 	case *arm.Subscription:
 		return m.addSubscription(ctx, r)
 	case *api.Controller:
@@ -126,6 +129,24 @@ func (m *MockDBClient) addServiceProviderCluster(ctx context.Context, spc *api.S
 	clusterName := resourceID.Parent.Name
 	spcCRUD := m.ServiceProviderClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName, clusterName)
 	_, err := spcCRUD.Create(ctx, spc, nil)
+	return err
+}
+
+func (m *MockDBClient) addServiceProviderNodePool(ctx context.Context, spnp *api.ServiceProviderNodePool) error {
+	resourceID := spnp.GetResourceID()
+	if resourceID == nil {
+		return fmt.Errorf("service provider node pool is missing resource ID")
+	}
+	if resourceID.Parent == nil {
+		return fmt.Errorf("service provider node pool is missing parent node pool ID")
+	}
+	if resourceID.Parent.Parent == nil {
+		return fmt.Errorf("service provider node pool is missing grandparent cluster ID")
+	}
+	clusterName := resourceID.Parent.Parent.Name
+	nodePoolName := resourceID.Parent.Name
+	serviceProviderNodePoolCRUD := m.ServiceProviderNodePools(resourceID.SubscriptionID, resourceID.ResourceGroupName, clusterName, nodePoolName)
+	_, err := serviceProviderNodePoolCRUD.Create(ctx, spnp, nil)
 	return err
 }
 

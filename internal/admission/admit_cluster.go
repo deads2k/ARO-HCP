@@ -16,16 +16,23 @@ package admission
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/api/arm"
+	"github.com/Azure/ARO-HCP/internal/database"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
+	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
 // MutateCluster sets internal cluster state derived from subscription features
@@ -111,6 +118,59 @@ func MutateClusterCreate(cluster *api.HCPOpenShiftCluster) {
 func AdmitClusterOnCreate(ctx context.Context, newVersion *api.HCPOpenShiftCluster, subscription *arm.Subscription) field.ErrorList {
 	// to be filled in
 	errs := field.ErrorList{}
+
+	return errs
+}
+
+// AdmitClusterOnUpdate performs non-static checks of cluster. Checks that
+// require more information than is contained inside of the cluster instance itself.
+func AdmitClusterOnUpdate(ctx context.Context, op operation.Operation, dbClient database.DBClient, oldCluster, newCluster *api.HCPOpenShiftCluster) field.ErrorList {
+	var errs field.ErrorList
+
+	// Version                 VersionProfile              `json:"version,omitempty"`
+	errs = append(errs, admitVersionProfileOnClusterUpdate(ctx, op, dbClient, oldCluster, newCluster)...)
+
+	return errs
+}
+
+// admitVersionProfileOnClusterUpdate runs admission checks when properties.version changes
+// (skew against active control-plane versions and existing node pool minor skew).
+func admitVersionProfileOnClusterUpdate(ctx context.Context, op operation.Operation, dbClient database.DBClient, oldCluster, newCluster *api.HCPOpenShiftCluster) field.ErrorList {
+	if len(newCluster.CustomerProperties.Version.ID) == 0 ||
+		oldCluster.CustomerProperties.Version.ID == newCluster.CustomerProperties.Version.ID {
+		return nil
+	}
+	versionPath := field.NewPath("properties", "version", "id")
+	var errs field.ErrorList
+
+	oldVersion, oldParseErr := semver.ParseTolerant(oldCluster.CustomerProperties.Version.ID)
+	if oldParseErr != nil {
+		return field.ErrorList{field.Invalid(versionPath, oldCluster.CustomerProperties.Version.ID, oldParseErr.Error())}
+	}
+
+	serviceProviderCluster, err := database.GetOrCreateServiceProviderCluster(ctx, dbClient, oldCluster.ID)
+	if err != nil {
+		errs = append(errs, field.InternalError(versionPath, errors.New("cannot validate cluster version skew")))
+	} else {
+		lowest, highest := apihelpers.FindLowestAndHighestClusterVersion(serviceProviderCluster.Status.ControlPlaneVersion.ActiveVersions)
+		if lowest != nil && highest != nil {
+			// When the customer's current release line matches the lowest active CP, static validation
+			// already enforced skew from the old cluster version; do not duplicate against lowest.
+			if oldVersion.Major != lowest.Major || oldVersion.Minor != lowest.Minor {
+				if skewErr := validation.OpenshiftVersionAtMostOneMinorSkew(lowest.String(), newCluster.CustomerProperties.Version.ID); skewErr != nil {
+					errs = append(errs, field.Invalid(versionPath, newCluster.CustomerProperties.Version.ID, skewErr.Error()))
+				}
+			}
+			errs = append(errs, validation.VersionMustBeAtLeast(ctx, op, versionPath, ptr.To(newCluster.CustomerProperties.Version.ID), nil, highest.String())...)
+		}
+	}
+
+	clusterVersion, parseErr := semver.ParseTolerant(newCluster.CustomerProperties.Version.ID)
+	if parseErr != nil {
+		errs = append(errs, field.Invalid(versionPath, newCluster.CustomerProperties.Version.ID, parseErr.Error()))
+	} else if npErr := ValidateClusterNodePoolsMinorVersionSkew(ctx, dbClient, oldCluster.ID, clusterVersion); npErr != nil {
+		errs = append(errs, field.Invalid(versionPath, newCluster.CustomerProperties.Version.ID, npErr.Error()))
+	}
 
 	return errs
 }

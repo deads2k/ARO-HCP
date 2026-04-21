@@ -20,6 +20,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/blang/semver/v4"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/safe"
 	"k8s.io/apimachinery/pkg/api/validate"
@@ -330,8 +332,7 @@ var (
 func validateVersionProfile(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *api.VersionProfile) field.ErrorList {
 	errs := field.ErrorList{}
 
-	// Version should be immutable once is created
-	// additional validations may depend on the subscription, hence they will be done in the admission package
+	// Version should be immutable once is created.
 	// ID           string `json:"id,omitempty"
 	// Version ID is required, but some records may not have had it originally, so don't fail them yet.
 	if oldObj == nil || len(oldObj.ID) > 0 {
@@ -346,12 +347,16 @@ func validateVersionProfile(ctx context.Context, op operation.Operation, fldPath
 		}
 
 		errs = append(errs, VersionMayNotDecrease(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
+		errs = append(errs, OpenshiftVersionAtMostOneMinorSkewWithField(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
 	}
 	if !op.HasOption(api.FeatureExperimentalReleaseFeatures) {
-		// only allow our subscription to change versions for now until we add validation protecting the change
-		errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("id"), &newObj.ID, safe.Field(oldObj, toVersionID))...)
 		// we never allow micro to any cluster that might live longer than a couple days.  We cannot allow it because it might install naughty things
 		errs = append(errs, OpenshiftVersionWithoutMicro(ctx, op, fldPath.Child("id"), &newObj.ID, nil)...)
+		// only allow OpenShift v5 and above for subscriptions that have the experimental feature registered for now
+		// remove this together with the matching check in the control plane desired version controller when we are ready
+		if v, err := semver.ParseTolerant(newObj.ID); err == nil && v.Major >= 5 {
+			errs = append(errs, field.Invalid(fldPath.Child("id"), newObj.ID, "OpenShift v5 and above is not supported"))
+		}
 	} else {
 		// For our CI clusters, let us install anything: allow full semver format (X.Y.Z-prerelease)
 		errs = append(errs, OpenshiftVersionWithOptionalMicro(ctx, op, fldPath.Child("id"), &newObj.ID, nil)...)

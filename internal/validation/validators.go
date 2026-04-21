@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
@@ -103,6 +104,58 @@ func VersionMayNotDecrease(_ context.Context, op operation.Operation, fldPath *f
 		return field.ErrorList{field.Invalid(fldPath, value, fmt.Sprintf("may not decrease from %s", *oldValue))}
 	}
 
+	return nil
+}
+
+// OpenshiftVersionAtMostOneMinorSkew returns nil if newVersionID is an allowed skew from previousVersionID
+// (same rules as ARM validation: at most one minor within a major; cross-major only 4→5 via the supported pairings).
+// Empty previous or new id is a no-op (nil). Parse failures return an error from semver.
+func OpenshiftVersionAtMostOneMinorSkew(previousVersionID, newVersionID string) error {
+	if len(previousVersionID) == 0 || len(newVersionID) == 0 {
+		return nil
+	}
+
+	parsedDesiredVersion, err := semver.ParseTolerant(newVersionID)
+	if err != nil {
+		return err
+	}
+	parsedPreviousVersion, err := semver.ParseTolerant(previousVersionID)
+	if err != nil {
+		return err
+	}
+
+	if parsedDesiredVersion.Major != parsedPreviousVersion.Major {
+		// Only a single major bump is considered; +2 or more (e.g. 4→6) is not supported.
+		if parsedDesiredVersion.Major != parsedPreviousVersion.Major+1 {
+			return fmt.Errorf("invalid upgrade path from %s to %s: skipping major versions is not allowed", previousVersionID, newVersionID)
+		}
+		previousVersionReleaseLine := fmt.Sprintf("%d.%d", parsedPreviousVersion.Major, parsedPreviousVersion.Minor)
+		desiredVersionReleaseLine := fmt.Sprintf("%d.%d", parsedDesiredVersion.Major, parsedDesiredVersion.Minor)
+		allowedTargetReleaseLine := api.AllowMajorUpgradePaths[previousVersionReleaseLine]
+		if desiredVersionReleaseLine != allowedTargetReleaseLine {
+			return fmt.Errorf("invalid upgrade path from %s to %s: cross-major upgrade from %s is only allowed to %s", previousVersionID, newVersionID, previousVersionReleaseLine, allowedTargetReleaseLine)
+		}
+		return nil
+	}
+
+	if parsedDesiredVersion.Minor > parsedPreviousVersion.Minor+1 {
+		return fmt.Errorf("only upgrade to the next minor is allowed: expected %d.%d after %d.%d", parsedPreviousVersion.Major, parsedPreviousVersion.Minor+1, parsedPreviousVersion.Major, parsedPreviousVersion.Minor)
+	}
+
+	return nil
+}
+
+// OpenshiftVersionAtMostOneMinorSkewWithField reports OpenshiftVersionAtMostOneMinorSkew failures as field errors on newVersionID.
+func OpenshiftVersionAtMostOneMinorSkewWithField(_ context.Context, _ operation.Operation, fldPath *field.Path, newVersionID, previousVersionID *string) field.ErrorList {
+	newVersionIDString := ptr.Deref(newVersionID, "")
+	previousVersionIDString := ptr.Deref(previousVersionID, "")
+	if len(newVersionIDString) == 0 || len(previousVersionIDString) == 0 {
+		return nil
+	}
+
+	if err := OpenshiftVersionAtMostOneMinorSkew(previousVersionIDString, newVersionIDString); err != nil {
+		return field.ErrorList{field.Invalid(fldPath, newVersionID, err.Error())}
+	}
 	return nil
 }
 

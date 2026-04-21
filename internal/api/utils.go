@@ -47,6 +47,17 @@ var AllowMajorUpgradePaths = map[string]string{
 	"4.23": "5.1",
 }
 
+// AllowControlPlaneNodePoolMajorVersionSkew maps node pool OpenShift minor release lines (x.y) to allowed
+// control-plane minor release lines when the node pool major differs from the cluster major. Values are
+// sorted from strictest to most permissive allowed skew. See the HyperShift control plane version status
+// enhancement for node pool skews against cluster version:
+// https://github.com/openshift/enhancements/blob/master/enhancements/hypershift/hypershift-control-plane-version-status.md
+var AllowControlPlaneNodePoolMajorVersionSkew = map[string][]string{
+	"4.21": {"5.0"},
+	"4.22": {"5.0", "5.1"},
+	"4.23": {"5.1", "5.2"},
+}
+
 // Ptr returns a pointer to p.
 func Ptr[T any](p T) *T {
 	return &p

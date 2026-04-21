@@ -616,15 +616,16 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 	if mutationErrs := admission.MutateCluster(newInternalCluster, subscription); len(mutationErrs) > 0 {
 		return utils.TrackError(arm.CloudErrorFromFieldErrors(mutationErrs))
 	}
+
 	validationOp := operation.Operation{
 		Type:    operation.Update,
 		Options: validation.AFECsToValidationOptions(subscription.GetRegisteredFeatures()),
 	}
 	validationErrs := validation.ValidateCluster(ctx, validationOp, newInternalCluster, oldInternalCluster, api.Must(versionedInterface.ValidationPathRewriter(&api.HCPOpenShiftCluster{})))
+	validationErrs = append(validationErrs, admission.AdmitClusterOnUpdate(ctx, validationOp, f.dbClient, oldInternalCluster, newInternalCluster)...)
 	if err := arm.CloudErrorFromFieldErrors(validationErrs); err != nil {
 		return utils.TrackError(err)
 	}
-
 	// Now that validation is done we clear the user-assigned identities map since that is reconstructed from Cluster Service data
 	// TODO this is bad, see above TODOs. We want to validate what we store.
 	newInternalCluster.Identity.UserAssignedIdentities = nil
