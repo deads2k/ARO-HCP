@@ -76,11 +76,22 @@ const (
 )
 
 // azureRetryOptions configures the Azure SDK retry policy for e2e tests.
-// The defaults (3 retries, 800ms delay) are insufficient when Azure throttles
-// requests with Retry-After values of 60+ seconds.
+// 429 (Too Many Requests) is deliberately excluded from StatusCodes so that
+// throttle responses bypass the SDK's fast inner retry loop and bubble up to
+// the outer throttleRetryPolicy, which applies conservative backoff based on
+// the Retry-After header. This avoids bursts of rapid retries that worsen
+// subscription-level throttling.
 var azureRetryOptions = policy.RetryOptions{
 	MaxRetries:    6,
 	MaxRetryDelay: 5 * time.Minute,
+	StatusCodes: []int{
+		http.StatusRequestTimeout,      // 408
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+		// 429 errors have their own custom retry policy in the throttleRetryPolicy
+	},
 }
 
 // InvocationContext requires the following env vars
@@ -158,6 +169,7 @@ func (tc *perBinaryInvocationTestContext) getClientFactoryOptions() *azcorearm.C
 				},
 				PerCallPolicies: []policy.Policy{
 					&correlationRequestIDPolicy{},
+					NewThrottleRetryPolicy(),
 					NewLROPollerRetryDeploymentNotFoundPolicy(),
 					&sanitizeAuthHeaderPolicy{},
 				},
@@ -168,6 +180,7 @@ func (tc *perBinaryInvocationTestContext) getClientFactoryOptions() *azcorearm.C
 		ClientOptions: azcore.ClientOptions{
 			Retry: azureRetryOptions,
 			PerCallPolicies: []policy.Policy{
+				NewThrottleRetryPolicy(),
 				NewLROPollerRetryDeploymentNotFoundPolicy(),
 				&sanitizeAuthHeaderPolicy{},
 			},
@@ -201,6 +214,7 @@ func (tc *perBinaryInvocationTestContext) getHCPClientFactoryOptions() *azcorear
 					&correlationRequestIDPolicy{},
 					&armSystemDataPolicy{},
 					&armResourceGroupValidationPolicy{cred: tc.azureCredentials},
+					NewThrottleRetryPolicy(),
 					&sanitizeAuthHeaderPolicy{},
 				},
 			},
@@ -210,6 +224,7 @@ func (tc *perBinaryInvocationTestContext) getHCPClientFactoryOptions() *azcorear
 		ClientOptions: azcore.ClientOptions{
 			Retry: azureRetryOptions,
 			PerCallPolicies: []policy.Policy{
+				NewThrottleRetryPolicy(),
 				&sanitizeAuthHeaderPolicy{},
 			},
 		},
