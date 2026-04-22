@@ -64,6 +64,7 @@ func setupCli() *cobra.Command {
 	// The tests that a suite is composed of can be filtered by CEL expressions. By
 	// default, the qualifiers only apply to tests from this extension.
 	integrationQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.DevelopmentOnly[0], labels.StageAndProdOnly[0])
+	integrationTestTimeout := 150 * time.Minute
 	ext.AddSuite(e.Suite{
 		Name: "integration/parallel",
 		Qualifiers: []string{
@@ -73,6 +74,7 @@ func setupCli() *cobra.Command {
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
+		TestTimeout: &integrationTestTimeout,
 	})
 
 	ext.AddSuite(e.Suite{
@@ -84,6 +86,7 @@ func setupCli() *cobra.Command {
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
+		TestTimeout: &integrationTestTimeout,
 	})
 
 	stageQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.IntegrationOnly[0], labels.DevelopmentOnly[0])
