@@ -2226,6 +2226,9 @@
         },
         "limitClusterSizes": {
           "type": "boolean"
+        },
+        "sharedIngressImage": {
+          "$ref": "#/definitions/containerImage"
         }
       },
       "additionalProperties": false,

@@ -160,3 +160,16 @@ module globalMSISvcAcrAccess '../modules/acr/acr-permissions.bicep' = {
     svcAcr
   ]
 }
+
+module globalMSIOcpAcrAccess '../modules/acr/acr-permissions.bicep' = {
+  name: '${globalMSIName}-ocp-acr-access'
+  params: {
+    principalIds: [globalMSI.properties.principalId]
+    grantPushAccess: true
+    grantPullAccess: true
+    acrName: ocpAcrName
+  }
+  dependsOn: [
+    ocpAcr
+  ]
+}

@@ -32,6 +32,9 @@ spec:
             {{- if .Values.operatorEnvVars.sharedIngressIPTag }}
             --additional-operator-env-vars SHARED_INGRESS_AZURE_PIP_IP_TAGS={{ .Values.operatorEnvVars.sharedIngressIPTag }} \
             {{- end }}
+            {{- if .Values.operatorEnvVars.sharedIngressImage }}
+            --additional-operator-env-vars IMAGE_SHARED_INGRESS_HAPROXY={{ .Values.operatorEnvVars.sharedIngressImage }} \
+            {{- end }}
             {{ .Values.additionalArgs }}
       restartPolicy: Never
       serviceAccountName: hypershift-installer
