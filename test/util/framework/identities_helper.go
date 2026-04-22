@@ -685,24 +685,33 @@ func (tc *perItOrDescribeTestContext) cleanupLeasedIdentityContainerRoleAssignme
 		return nil
 	}
 
-	wg := sync.WaitGroup{}
+	const raDeleteParallelism = 4
+
+	jobs := make(chan *armauthorization.RoleAssignment)
 	errCh := make(chan error, len(toDelete))
 
-	for _, ra := range toDelete {
-		wg.Add(1)
-		go func(ctx context.Context, ra *armauthorization.RoleAssignment) {
+	var wg sync.WaitGroup
+	wg.Add(raDeleteParallelism)
+	for range raDeleteParallelism {
+		go func() {
 			defer wg.Done()
-
-			_, err := client.Delete(ctx, *ra.Properties.Scope, *ra.Name, nil)
-			if err != nil {
-				var respErr *azcore.ResponseError
-				if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
-					return
+			for ra := range jobs {
+				_, err := client.Delete(ctx, *ra.Properties.Scope, *ra.Name, nil)
+				if err != nil {
+					var respErr *azcore.ResponseError
+					if errors.As(err, &respErr) && respErr.StatusCode == http.StatusNotFound {
+						continue
+					}
+					errCh <- fmt.Errorf("failed to delete role assignment %s: %w", *ra.ID, err)
 				}
-				errCh <- fmt.Errorf("failed to delete role assignment %s: %w", *ra.ID, err)
 			}
-		}(ctx, ra)
+		}()
 	}
+
+	for _, ra := range toDelete {
+		jobs <- ra
+	}
+	close(jobs)
 
 	wg.Wait()
 	close(errCh)
