@@ -254,6 +254,7 @@ defaults:
           keyVault: "empty-sentinel"
           name: "empty-sentinel"
   kusto:
+    location: "{{ .ctx.region }}"
     enableAutoScale: false
     manageInstance: false
     autoScaleMin: 2

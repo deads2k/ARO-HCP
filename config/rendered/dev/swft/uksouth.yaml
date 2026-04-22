@@ -448,6 +448,7 @@ kusto:
   enableAutoScale: true
   hostedControlPlaneLogsDatabase: HostedControlPlaneLogs
   kustoName: hcp-dev-us-2
+  location: uksouth
   manageInstance: false
   rg: hcp-kusto-us
   serviceLogsDatabase: ServiceLogs

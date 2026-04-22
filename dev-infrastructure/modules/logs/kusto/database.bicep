@@ -1,3 +1,6 @@
+@description('Azure Region Location')
+param location string = resourceGroup().location
+
 @description('Name of the Kusto cluster owning this database')
 param kustoName string
 
@@ -25,7 +28,7 @@ param icmViewerTenantId string?
 // Create the database as a resource whose name includes the cluster (parent)
 resource database 'Microsoft.Kusto/clusters/databases@2024-04-13' = {
   name: '${kustoName}/${databaseName}'
-  location: resourceGroup().location
+  location: location
   kind: 'ReadWrite'
   properties: {
     softDeletePeriod: softDeletePeriod

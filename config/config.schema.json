@@ -1823,6 +1823,10 @@
     "kusto": {
       "type": "object",
       "properties": {
+        "location": {
+          "type": "string",
+          "description": "Override the Azure region where the Kusto cluster is deployed. Defaults to the region being deployed."
+        },
         "rg": {
           "type": "string"
         },
