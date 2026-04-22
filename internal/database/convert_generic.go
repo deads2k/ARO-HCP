@@ -71,9 +71,23 @@ func CosmosGenericToInternal[InternalAPIType any](cosmosObj *GenericDocument[Int
 	// this isn't pretty, but on balance it's a better choice so that we can share all the rest.
 	switch castObj := any(ret).(type) {
 	case *arm.Subscription:
+		if castObj.CosmosMetadata.ResourceID == nil && castObj.ResourceID != nil {
+			castObj.CosmosMetadata.ResourceID = castObj.ResourceID
+		}
+		if castObj.CosmosMetadata.ResourceID == nil && cosmosObj.ResourceID != nil {
+			castObj.CosmosMetadata.ResourceID = cosmosObj.ResourceID
+		}
 		castObj.LastUpdated = cosmosObj.CosmosTimestamp
 	case arm.Subscription:
 		castObj.LastUpdated = cosmosObj.CosmosTimestamp
+	}
+
+	if ret.GetResourceID() == nil {
+		if cosmosObj.ResourceID != nil {
+			ret.SetResourceID(cosmosObj.ResourceID)
+		} else {
+			return nil, fmt.Errorf("internalObj is missing a resourceID: %T: %q", cosmosObj, cosmosObj.ID)
+		}
 	}
 
 	return &cosmosObj.Content, nil
