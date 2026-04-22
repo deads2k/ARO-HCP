@@ -37,9 +37,15 @@ kube::codegen::gen_openapi \
     --boilerplate "${SESSIONGATE_ROOT}/hack/boilerplate.go.txt" \
     "${SESSIONGATE_ROOT}/pkg/apis"
 
+OPENAPI_SCHEMA_JSON=$(mktemp)
+trap "rm -f ${OPENAPI_SCHEMA_JSON}" EXIT
+echo "Generating OpenAPI Swagger JSON for applyconfiguration-gen"
+(cd "${SESSIONGATE_ROOT}" && go run ./hack/gen-openapi-schema "${OPENAPI_SCHEMA_JSON}")
+
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
+    --applyconfig-openapi-schema "${OPENAPI_SCHEMA_JSON}" \
     --output-dir "${SESSIONGATE_ROOT}/pkg/generated" \
     --output-pkg "${THIS_PKG}/pkg/generated" \
     --boilerplate "${SESSIONGATE_ROOT}/hack/boilerplate.go.txt" \

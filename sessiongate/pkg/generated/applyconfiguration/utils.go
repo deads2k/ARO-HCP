@@ -16,12 +16,13 @@
 package applyconfiguration
 
 import (
-	v1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
-	internal "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/internal"
-	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/sessiongate/v1alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+
+	v1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
+	internal "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/internal"
+	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/sessiongate/v1alpha1"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no

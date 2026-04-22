@@ -18,13 +18,14 @@ package v1alpha1
 import (
 	context "context"
 
-	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
-	applyconfigurationsessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/sessiongate/v1alpha1"
-	scheme "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
+
+	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
+	applyconfigurationsessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/sessiongate/v1alpha1"
+	scheme "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/clientset/versioned/scheme"
 )
 
 // SessionsGetter has a method to return a SessionInterface.
