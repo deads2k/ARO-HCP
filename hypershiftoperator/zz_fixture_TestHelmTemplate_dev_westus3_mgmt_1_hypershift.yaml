@@ -644,6 +644,39 @@ metadata:
   namespace: 'hypershift'
 type: kubernetes.io/dockerconfigjson
 ---
+# Source: aro-hcp-hypershift-operator/templates/sre-metrics-set.configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-metric-set
+  namespace: 'hypershift'
+data:
+  config: |
+    etcd:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    kubeAPIServer:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    kubeControllerManager:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    openshiftAPIServer:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    openshiftControllerManager:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    cvo:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+---
 # Source: aro-hcp-hypershift-operator/templates/installer.clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -690,6 +723,7 @@ spec:
             --registry-overrides "quay.io/openshift-release-dev/ocp-v4.0-art-dev=arohcpocpdev.azurecr.io/openshift-release-dev/ocp-v4.0-art-dev,quay.io/openshift-release-dev/ocp-release=arohcpocpdev.azurecr.io/openshift-release-dev/ocp-release,quay.io/openshift-release-dev/ocp-release-nightly=arohcpocpdev.azurecr.io/openshift-release-dev/ocp-release-nightly,registry.redhat.io/redhat=arohcpocpdev.azurecr.io/redhat" \
             --hypershift-image arohcpsvcdev.azurecr.io/redhat-services-prod/crt-redhat-acm-tenant/hypershift/hypershift-operator@sha256:1234567890 \
             --platform-monitoring=None \
+            --metrics-set=SRE \
             --enable-size-tagging=true \
             --limit-crd-install=Azure \
             --additional-operator-env-vars IMAGE_SHARED_INGRESS_HAPROXY=arohcpocpdev.azurecr.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-shared-ingress-main@sha256:1234567890 \
