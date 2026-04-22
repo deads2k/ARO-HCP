@@ -66,7 +66,7 @@ type HCPOpenShiftClusterCustomerProperties struct {
 type HCPOpenShiftClusterServiceProviderProperties struct {
 	ExistingCosmosUID            string                         `json:"-"`
 	ProvisioningState            arm.ProvisioningState          `json:"provisioningState,omitempty"`
-	ClusterServiceID             InternalID                     `json:"clusterServiceID,omitempty"`
+	ClusterServiceID             *InternalID                    `json:"clusterServiceID,omitempty"`
 	ActiveOperationID            string                         `json:"activeOperationId,omitempty"`
 	RevokeCredentialsOperationID string                         `json:"revokeCredentialsOperationId,omitempty"`
 	DNS                          ServiceProviderDNSProfile      `json:"dns,omitempty"`

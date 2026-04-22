@@ -64,7 +64,7 @@ func deepCopyFuzzerFor(src rand.Source) *randfill.Filler {
 				return
 			}
 			foo := Must(NewInternalID("/api/clusters_mgmt/v1/clusters/r" + strings.ReplaceAll(c.String(10), "/", "-")))
-			j.ClusterServiceID = foo
+			j.ClusterServiceID = &foo
 		},
 		func(j *HCPOpenShiftClusterNodePoolServiceProviderProperties, c randfill.Continue) {
 			c.FillNoCustom(j)

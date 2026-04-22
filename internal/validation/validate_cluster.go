@@ -258,7 +258,7 @@ var (
 		return &oldObj.DNS
 	}
 	toServiceProviderClusterServiceID = func(oldObj *api.HCPOpenShiftClusterServiceProviderProperties) *api.InternalID {
-		return &oldObj.ClusterServiceID
+		return oldObj.ClusterServiceID
 	}
 	toServiceProviderConsole = func(oldObj *api.HCPOpenShiftClusterServiceProviderProperties) *api.ServiceProviderConsoleProfile {
 		return &oldObj.Console
@@ -283,8 +283,8 @@ func validateClusterServiceProviderProperties(ctx context.Context, op operation.
 	// ProvisioningState       arm.ProvisioningState       `json:"provisioningState,omitempty"`
 	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath.Child("provisioningState"), &newObj.ProvisioningState, safe.Field(oldObj, toHCPOpenShiftClusterServiceProviderPropertiesProvisioningState))...)
 
-	//ClusterServiceID  InternalID                     `json:"clusterServiceID,omitempty"`
-	errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath.Child("clusterServiceID"), &newObj.ClusterServiceID, safe.Field(oldObj, toServiceProviderClusterServiceID))...)
+	//ClusterServiceID  *InternalID                    `json:"clusterServiceID,omitempty"`
+	errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath.Child("clusterServiceID"), newObj.ClusterServiceID, safe.Field(oldObj, toServiceProviderClusterServiceID))...)
 
 	// DNS                     CustomerDNSProfile                  `json:"dns,omitempty"`
 	errs = append(errs, validateServiceProviderDNSProfile(ctx, op, fldPath.Child("dns"), &newObj.DNS, safe.Field(oldObj, toServiceProviderDNS))...)

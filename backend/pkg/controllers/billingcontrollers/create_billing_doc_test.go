@@ -96,7 +96,7 @@ func newTestCluster(t *testing.T, clusterUID string, provisioningState arm.Provi
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: provisioningState,
 			ClusterUID:        clusterUID,
-			ClusterServiceID:  api.Must(api.NewInternalID(testClusterServiceIDStr)),
+			ClusterServiceID:  api.Ptr(api.Must(api.NewInternalID(testClusterServiceIDStr))),
 		},
 	}
 }

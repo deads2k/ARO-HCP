@@ -353,7 +353,7 @@ func clusterInformerTestCase() informerTestCase {
 			},
 			ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 				ProvisioningState: state,
-				ClusterServiceID:  internalID,
+				ClusterServiceID:  &internalID,
 			},
 		}
 	}
@@ -488,7 +488,7 @@ func nodePoolInformerTestCase() informerTestCase {
 				},
 				ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 					ProvisioningState: arm.ProvisioningStateSucceeded,
-					ClusterServiceID:  internalID,
+					ClusterServiceID:  &internalID,
 				},
 			}
 			_, err = mockDB.HCPClusters(subscriptionID, resourceGroupName).Create(ctx, cluster, nil)
@@ -723,7 +723,7 @@ func controllerInformerTestCase() informerTestCase {
 				},
 				ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 					ProvisioningState: arm.ProvisioningStateSucceeded,
-					ClusterServiceID:  internalID,
+					ClusterServiceID:  &internalID,
 				},
 			}
 			_, err = mockDB.HCPClusters(subscriptionID, resourceGroupName).Create(ctx, cluster, nil)

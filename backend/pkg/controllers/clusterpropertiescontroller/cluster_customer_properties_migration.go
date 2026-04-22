@@ -75,7 +75,7 @@ func (c *clusterCustomerPropertiesMigrationController) CooldownChecker() control
 func (c *clusterCustomerPropertiesMigrationController) NeedsWork(ctx context.Context, existingCluster *api.HCPOpenShiftCluster) bool {
 	// Check if we have a cluster service ID to query. We will lack this information for newly created records when we
 	// transition to async cluster-service creation.
-	if len(existingCluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+	if existingCluster.ServiceProviderProperties.ClusterServiceID == nil || len(existingCluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
 		return false
 	}
 
@@ -124,7 +124,7 @@ func (c *clusterCustomerPropertiesMigrationController) SyncOnce(ctx context.Cont
 	}
 
 	// Fetch the cluster from Cluster Service
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

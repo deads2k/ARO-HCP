@@ -155,7 +155,7 @@ func newMetricsTestCluster(resourceID *azcorearm.ResourceID, provisioningState a
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: provisioningState,
-			ClusterServiceID:  api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster")),
+			ClusterServiceID:  api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster"))),
 		},
 	}
 }

@@ -135,7 +135,7 @@ func TestBuildInitialReadonlyMaestroBundleForHostedCluster(t *testing.T) {
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 
@@ -409,7 +409,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_syncMaestroBundle(t *te
 					Resource: arm.Resource{ID: clusterResourceID},
 				},
 				ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-					ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+					ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 				},
 			}
 
@@ -545,7 +545,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_GetServiceProv
 	cluster := &api.HCPOpenShiftCluster{
 		TrackedResource: arm.TrackedResource{Resource: arm.Resource{ID: clusterResourceID}},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 
@@ -597,7 +597,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_AllBundlesAlre
 			Resource: arm.Resource{ID: clusterResourceID},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 	clustersCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
@@ -669,7 +669,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_SyncLoopExecut
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 
@@ -698,7 +698,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_SyncLoopExecut
 	// Setup cluster service mocks
 	provisionShard := buildTestProvisionShard("test-consumer")
 	mockClusterService.EXPECT().
-		GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetClusterProvisionShard(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(provisionShard, nil)
 
 	csCluster, err := arohcpv1alpha1.NewCluster().
@@ -706,7 +706,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_SyncLoopExecut
 		Build()
 	require.NoError(t, err)
 	mockClusterService.EXPECT().
-		GetCluster(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetCluster(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(csCluster, nil)
 
 	// Setup maestro builder mock
@@ -781,7 +781,7 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_ProcessesParti
 			Resource: arm.Resource{ID: clusterResourceID},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/aro_hcp/v1alpha1/clusters/11111111111111111111111111111111"))),
 		},
 	}
 	clustersCRUD := mockDBClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
@@ -815,12 +815,12 @@ func TestCreateClusterScopedMaestroReadonlyBundlesSyncer_SyncOnce_ProcessesParti
 
 	provisionShard := buildTestProvisionShard("test-consumer")
 	mockClusterService.EXPECT().
-		GetClusterProvisionShard(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetClusterProvisionShard(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(provisionShard, nil)
 	csCluster, err := arohcpv1alpha1.NewCluster().DomainPrefix("test-domain").Build()
 	require.NoError(t, err)
 	mockClusterService.EXPECT().
-		GetCluster(gomock.Any(), cluster.ServiceProviderProperties.ClusterServiceID).
+		GetCluster(gomock.Any(), *cluster.ServiceProviderProperties.ClusterServiceID).
 		Return(csCluster, nil)
 
 	restEndpoint := provisionShard.MaestroConfig().RestApiConfig().Url()

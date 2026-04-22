@@ -517,7 +517,7 @@ func testCosmosClusterWithWorkersNodePoolAtVersion(nodePoolVersionId string) []a
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster")),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/test-cluster"))),
 		},
 	}
 	nodePoolResourceId := api.Must(azcorearm.ParseResourceID(clusterResourceId.String() + "/nodePools/workers"))

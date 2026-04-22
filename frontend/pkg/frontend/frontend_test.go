@@ -605,7 +605,7 @@ func TestRequestAdminCredential(t *testing.T) {
 				},
 				ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 					ProvisioningState:            test.clusterProvisioningState,
-					ClusterServiceID:             clusterInternalID,
+					ClusterServiceID:             &clusterInternalID,
 					RevokeCredentialsOperationID: test.revokeCredentialsOperationID,
 				},
 			}
@@ -724,7 +724,7 @@ func TestRevokeCredentials(t *testing.T) {
 				},
 				ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 					ProvisioningState:            test.clusterProvisioningState,
-					ClusterServiceID:             clusterInternalID,
+					ClusterServiceID:             &clusterInternalID,
 					RevokeCredentialsOperationID: test.revokeCredentialsOperationID,
 				},
 			}

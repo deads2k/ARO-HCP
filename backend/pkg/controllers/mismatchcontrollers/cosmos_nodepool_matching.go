@@ -100,13 +100,17 @@ func (c *cosmosNodePoolMatching) synchronizeAllNodes(ctx context.Context, keyObj
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// no work to do because clusters start without clusterServiceIDs and that means we haven't got any child resources, so they haven't got an orphan.
+		return nil
+	}
 
 	clusterServiceIDToCosmosNodePools, allCosmosNodePools, err := c.getAllCosmosObjs(ctx, keyObj)
 	if err != nil {
 		return utils.TrackError(err)
 	}
 
-	clusterServiceIDToClusterServiceNodePools, allClusterServiceNodePools, err := c.getAllClusterServiceObjs(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	clusterServiceIDToClusterServiceNodePools, allClusterServiceNodePools, err := c.getAllClusterServiceObjs(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}

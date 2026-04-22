@@ -77,12 +77,15 @@ func (h *HCPBreakglassSessionCreationHandler) ServeHTTP(writer http.ResponseWrit
 		return fmt.Errorf("failed to get HCP from database: %w", err)
 	}
 
-	clusterHypershiftDetails, err := h.csClient.GetClusterHypershiftDetails(request.Context(), hcp.ServiceProviderProperties.ClusterServiceID)
+	if hcp.ServiceProviderProperties.ClusterServiceID == nil {
+		return fmt.Errorf("cluster has no ClusterServiceID")
+	}
+	clusterHypershiftDetails, err := h.csClient.GetClusterHypershiftDetails(request.Context(), *hcp.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return hcphelpers.ClusterServiceError(err, "hypershift details")
 	}
 
-	provisionShard, err := h.csClient.GetClusterProvisionShard(request.Context(), hcp.ServiceProviderProperties.ClusterServiceID)
+	provisionShard, err := h.csClient.GetClusterProvisionShard(request.Context(), *hcp.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return hcphelpers.ClusterServiceError(err, "provision shard")
 	}

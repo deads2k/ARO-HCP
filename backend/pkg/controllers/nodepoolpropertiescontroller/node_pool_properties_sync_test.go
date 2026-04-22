@@ -278,7 +278,7 @@ func newTestCluster(t *testing.T) *api.HCPOpenShiftCluster {
 			Location: "eastus",
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: clusterInternalID,
+			ClusterServiceID: &clusterInternalID,
 		},
 	}
 }

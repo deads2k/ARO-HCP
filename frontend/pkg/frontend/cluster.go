@@ -101,6 +101,11 @@ func (f *Frontend) ArmResourceListClusters(writer http.ResponseWriter, request *
 	}
 	clustersByClusterServiceID := make(map[string]*api.HCPOpenShiftCluster)
 	for _, internalCluster := range internalClusterIterator.Items(ctx) {
+		if internalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+			// TODO this will be removed during our switch to read only from cosmos.
+			// we can still merge now since the value will never be nil until both the read path is fixed and this PR makes it to prod.
+			continue
+		}
 		clustersByClusterServiceID[internalCluster.ServiceProviderProperties.ClusterServiceID.ID()] = internalCluster
 	}
 	err = internalClusterIterator.GetError()
@@ -368,10 +373,11 @@ func (f *Frontend) createHCPCluster(writer http.ResponseWriter, request *http.Re
 		return utils.TrackError(err)
 	}
 
-	newInternalCluster.ServiceProviderProperties.ClusterServiceID, err = api.NewInternalID(resultingClusterServiceCluster.HREF())
+	csID, err := api.NewInternalID(resultingClusterServiceCluster.HREF())
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	newInternalCluster.ServiceProviderProperties.ClusterServiceID = &csID
 
 	transaction := f.dbClient.NewTransaction(newInternalCluster.ID.SubscriptionID)
 
@@ -379,7 +385,7 @@ func (f *Frontend) createHCPCluster(writer http.ResponseWriter, request *http.Re
 	clusterCreateOperation := database.NewOperation(
 		database.OperationRequestCreate,
 		newInternalCluster.ID,
-		newInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		ptr.Deref(newInternalCluster.ServiceProviderProperties.ClusterServiceID, api.InternalID{}),
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -635,39 +641,41 @@ func (f *Frontend) updateHCPClusterInCosmos(ctx context.Context, writer http.Res
 		tenantID = *subscription.Properties.TenantId
 	}
 
-	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
-	if err != nil {
-		return utils.TrackError(err)
-	}
-	newClusterServiceClusterBuilder, newClusterServiceAutoscalerBuilder, err := ocm.BuildCSCluster(oldInternalCluster.ID, tenantID, newInternalCluster, nil, oldClusterServiceCluster)
-	if err != nil {
-		return utils.TrackError(err)
-	}
+	var resultingClusterServiceCluster *arohcpv1alpha1.Cluster
+	if oldInternalCluster.ServiceProviderProperties.ClusterServiceID != nil {
+		oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
+		if err != nil {
+			return utils.TrackError(err)
+		}
+		newClusterServiceClusterBuilder, newClusterServiceAutoscalerBuilder, err := ocm.BuildCSCluster(oldInternalCluster.ID, tenantID, newInternalCluster, nil, oldClusterServiceCluster)
+		if err != nil {
+			return utils.TrackError(err)
+		}
 
-	logger.Info(fmt.Sprintf("updating resource %s", oldInternalCluster.ID))
-	resultingClusterServiceAutoscaler, err := f.clusterServiceClient.UpdateClusterAutoscaler(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceAutoscalerBuilder)
-	if err != nil {
-		return utils.TrackError(err)
-	}
-	resultingClusterServiceCluster, err := f.clusterServiceClient.UpdateCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceClusterBuilder)
-	if err != nil {
-		return utils.TrackError(err)
-	}
-
-	// Merge the autoscaler model into the cluster model.
-	resultingClusterServiceCluster, err = arohcpv1alpha1.NewCluster().
-		Copy(resultingClusterServiceCluster).
-		Autoscaler(arohcpv1alpha1.NewClusterAutoscaler().Copy(resultingClusterServiceAutoscaler)).
-		Build()
-	if err != nil {
-		return utils.TrackError(err)
+		logger.Info(fmt.Sprintf("updating resource %s", oldInternalCluster.ID))
+		resultingClusterServiceAutoscaler, err := f.clusterServiceClient.UpdateClusterAutoscaler(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceAutoscalerBuilder)
+		if err != nil {
+			return utils.TrackError(err)
+		}
+		resultingClusterServiceCluster, err = f.clusterServiceClient.UpdateCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID, newClusterServiceClusterBuilder)
+		if err != nil {
+			return utils.TrackError(err)
+		}
+		// Merge the autoscaler model into the cluster model.
+		resultingClusterServiceCluster, err = arohcpv1alpha1.NewCluster().
+			Copy(resultingClusterServiceCluster).
+			Autoscaler(arohcpv1alpha1.NewClusterAutoscaler().Copy(resultingClusterServiceAutoscaler)).
+			Build()
+		if err != nil {
+			return utils.TrackError(err)
+		}
 	}
 
 	transaction := f.dbClient.NewTransaction(oldInternalCluster.ID.SubscriptionID)
 	clusterUpdateOperation := database.NewOperation(
 		database.OperationRequestUpdate,
 		oldInternalCluster.ID,
-		oldInternalCluster.ServiceProviderProperties.ClusterServiceID,
+		ptr.Deref(oldInternalCluster.ServiceProviderProperties.ClusterServiceID, api.InternalID{}),
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -775,18 +783,20 @@ func (f *Frontend) addDeleteClusterToTransaction(ctx context.Context, writer htt
 		return utils.TrackError(err)
 	}
 
-	err = f.clusterServiceClient.DeleteCluster(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
-	var ocmError *ocmerrors.Error
-	if errors.As(err, &ocmError) && ocmError.Status() == http.StatusNotFound {
-		// StatusNotFound means we have stale data in Cosmos DB.
-		// This can happen in test environments if a user bypasses
-		// the RP to delete a resource (e.g. "ocm delete"). It can
-		// also happen if an asynchronous deletion operation fails.
-		// we will fall through and cancel all operations and go through as normal a deletion flow as we can to avoid
-		// leaking data related to the resource, like controller status.
-		logger.Info("clusterService cluster missing, trying to clean up", "err", err)
-	} else if err != nil {
-		return utils.TrackError(err)
+	if cluster.ServiceProviderProperties.ClusterServiceID != nil {
+		err = f.clusterServiceClient.DeleteCluster(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
+		var ocmError *ocmerrors.Error
+		if errors.As(err, &ocmError) && ocmError.Status() == http.StatusNotFound {
+			// StatusNotFound means we have stale data in Cosmos DB.
+			// This can happen in test environments if a user bypasses
+			// the RP to delete a resource (e.g. "ocm delete"). It can
+			// also happen if an asynchronous deletion operation fails.
+			// we will fall through and cancel all operations and go through as normal a deletion flow as we can to avoid
+			// leaking data related to the resource, like controller status.
+			logger.Info("clusterService cluster missing, trying to clean up", "err", err)
+		} else if err != nil {
+			return utils.TrackError(err)
+		}
 	}
 
 	// Cluster Service will take care of canceling any ongoing operations
@@ -804,10 +814,14 @@ func (f *Frontend) addDeleteClusterToTransaction(ctx context.Context, writer htt
 		return utils.TrackError(err)
 	}
 
+	clusterServiceID := api.InternalID{}
+	if cluster.ServiceProviderProperties.ClusterServiceID != nil {
+		clusterServiceID = *cluster.ServiceProviderProperties.ClusterServiceID
+	}
 	operationDoc := database.NewOperation(
 		database.OperationRequestDelete,
 		cluster.ID,
-		cluster.ServiceProviderProperties.ClusterServiceID,
+		clusterServiceID,
 		f.azureLocation,
 		"",
 		"",
@@ -864,6 +878,9 @@ func (f *Frontend) addDeleteClusterToTransaction(ctx context.Context, writer htt
 // TODO this overwrite will transformed into a "set" function as we transition fields to ownership in cosmos
 // TODO remove the azure location once we have migrated every record to store the location
 func mergeToInternalCluster(csCluster *arohcpv1alpha1.Cluster, internalCluster *api.HCPOpenShiftCluster, azureLocation string) (*api.HCPOpenShiftCluster, error) {
+	if csCluster == nil {
+		return nil, utils.TrackError(fmt.Errorf("cannot merge nil cluster"))
+	}
 	if len(internalCluster.CustomerProperties.Version.ChannelGroup) == 0 {
 		// if we hit this branch, then we have old data that exists from before we stored all the content of the requested cluster
 		return legacyMergeToInternalCluster(csCluster, internalCluster, azureLocation)
@@ -905,7 +922,10 @@ func legacyMergeToInternalCluster(csCluster *arohcpv1alpha1.Cluster, internalClu
 // merges the states together, and returns the internal representation.
 // TODO remove the header it takes and collapse that to some general error handling.
 func (f *Frontend) readInternalClusterFromClusterService(ctx context.Context, oldInternalCluster *api.HCPOpenShiftCluster) (*api.HCPOpenShiftCluster, error) {
-	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
+	if oldInternalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return nil, utils.TrackError(errors.New("clusterServiceID is nil"))
+	}
+	oldClusterServiceCluster, err := f.clusterServiceClient.GetCluster(ctx, *oldInternalCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return nil, utils.TrackError(err)
 	}

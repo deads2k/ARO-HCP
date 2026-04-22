@@ -48,6 +48,7 @@ import (
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
 	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/armhelpers"
 	"github.com/Azure/ARO-HCP/internal/validation"
 )
 
@@ -349,11 +350,13 @@ func (f *Frontend) ArmResourceActionRequestAdminCredential(writer http.ResponseW
 	if err != nil {
 		return utils.TrackError(err)
 	}
-
 	// CheckForProvisioningStateConflict does not log conflict errors
 	// but does log unexpected errors like database failures.
 	if err := checkForProvisioningStateConflict(ctx, f.dbClient, operationRequest, cluster.ID, cluster.ServiceProviderProperties.ProvisioningState); err != nil {
 		return utils.TrackError(err)
+	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
 	}
 
 	// New credential cannot be requested while credentials are being revoked.
@@ -362,7 +365,7 @@ func (f *Frontend) ArmResourceActionRequestAdminCredential(writer http.ResponseW
 		return arm.NewConflictError(clusterResourceID, "Cannot request credential while credentials are being revoked")
 	}
 
-	csCredential, err := f.clusterServiceClient.PostBreakGlassCredential(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	csCredential, err := f.clusterServiceClient.PostBreakGlassCredential(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -420,11 +423,13 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	if err != nil {
 		return utils.TrackError(err)
 	}
-
 	// CheckForProvisioningStateConflict does not log conflict errors
 	// but does log unexpected errors like database failures.
 	if err := checkForProvisioningStateConflict(ctx, f.dbClient, operationRequest, cluster.ID, cluster.ServiceProviderProperties.ProvisioningState); err != nil {
 		return utils.TrackError(err)
+	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
 	}
 
 	subscription, err := f.dbClient.Subscriptions().Get(ctx, clusterResourceID.SubscriptionID)
@@ -453,7 +458,7 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 		return arm.NewConflictError(clusterResourceID, "Credentials are already being revoked")
 	}
 
-	err = f.clusterServiceClient.DeleteBreakGlassCredentials(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	err = f.clusterServiceClient.DeleteBreakGlassCredentials(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
 	}
@@ -473,7 +478,7 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	operationDoc := database.NewOperation(
 		operationRequest,
 		clusterResourceID,
-		cluster.ServiceProviderProperties.ClusterServiceID,
+		*cluster.ServiceProviderProperties.ClusterServiceID,
 		f.azureLocation,
 		request.Header.Get(arm.HeaderNameHomeTenantID),
 		request.Header.Get(arm.HeaderNameClientObjectID),
@@ -1024,7 +1029,7 @@ func (f *Frontend) OperationResult(writer http.ResponseWriter, request *http.Req
 			return utils.TrackError(err)
 		}
 
-	case operation.InternalID.Kind() == arohcpv1alpha1.ClusterKind:
+	case armhelpers.ResourceTypeEqual(operation.ExternalID.ResourceType, api.ClusterResourceType):
 		resultingInternalCluster, err := f.getInternalClusterFromStorage(ctx, operation.ExternalID)
 		if err != nil {
 			return utils.TrackError(err)

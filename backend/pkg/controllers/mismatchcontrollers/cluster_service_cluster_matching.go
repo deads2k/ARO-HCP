@@ -80,6 +80,10 @@ func (c *clusterServiceClusterMatching) getAllCosmosObjs(ctx context.Context) (m
 
 		for _, cluster := range allHCPClusters.Items(ctx) {
 			ret = append(ret, cluster)
+			// we skip items without a clusterServiceID because they make be about to get them and shouldn't be deleted.
+			if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+				continue
+			}
 			existingCluster, exists := clusterServiceIDToCluster[cluster.ServiceProviderProperties.ClusterServiceID.String()]
 			if exists {
 				return nil, nil, utils.TrackError(fmt.Errorf("duplicate obj found: %s, owned by %q and %q", cluster.ID.String(), existingCluster.ID.String(), cluster.ID.String()))

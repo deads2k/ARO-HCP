@@ -89,6 +89,9 @@ func (f *Frontend) ArmResourceListNodePools(writer http.ResponseWriter, request 
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if internalCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", internalCluster.ID))
+	}
 
 	pagedResponse := arm.NewPagedResponse()
 
@@ -120,7 +123,7 @@ func (f *Frontend) ArmResourceListNodePools(writer http.ResponseWriter, request 
 	query := fmt.Sprintf("id in (%s)", strings.Join(queryIDs, ", "))
 	logger.Info(fmt.Sprintf("Searching Cluster Service for %q", query))
 
-	csIterator := f.clusterServiceClient.ListNodePools(internalCluster.ServiceProviderProperties.ClusterServiceID, query)
+	csIterator := f.clusterServiceClient.ListNodePools(*internalCluster.ServiceProviderProperties.ClusterServiceID, query)
 	for csNodePool := range csIterator.Items(ctx) {
 		if internalNodePool, ok := nodePoolsByClusterServiceID[csNodePool.ID()]; ok {
 			internalNodePool, err = mergeToInternalNodePool(csNodePool, internalNodePool, f.azureLocation)
@@ -284,6 +287,9 @@ func (f *Frontend) createNodePool(writer http.ResponseWriter, request *http.Requ
 	if err != nil {
 		return utils.TrackError(err)
 	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		return utils.TrackError(fmt.Errorf("cluster %s has no ClusterServiceID", cluster.ID))
+	}
 
 	validationOp := operation.Operation{
 		Type:    operation.Create,
@@ -304,7 +310,7 @@ func (f *Frontend) createNodePool(writer http.ResponseWriter, request *http.Requ
 	if err != nil {
 		return utils.TrackError(err)
 	}
-	csNodePool, err := f.clusterServiceClient.PostNodePool(ctx, cluster.ServiceProviderProperties.ClusterServiceID, csNodePoolBuilder)
+	csNodePool, err := f.clusterServiceClient.PostNodePool(ctx, *cluster.ServiceProviderProperties.ClusterServiceID, csNodePoolBuilder)
 	if err != nil {
 		return utils.TrackError(err)
 	}

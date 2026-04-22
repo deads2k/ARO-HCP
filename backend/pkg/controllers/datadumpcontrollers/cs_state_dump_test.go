@@ -177,7 +177,7 @@ func TestCSStateDump_SyncOnce(t *testing.T) {
 						Resource: arm.Resource{ID: clusterResourceID},
 					},
 					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-						ClusterServiceID: csID,
+						ClusterServiceID: &csID,
 					},
 				}
 

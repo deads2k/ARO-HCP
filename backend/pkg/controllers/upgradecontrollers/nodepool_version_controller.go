@@ -138,9 +138,14 @@ func (c *nodePoolVersionSyncer) SyncOnce(ctx context.Context, key controllerutil
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from cosmos: %w", err))
 	}
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// TODO this appears to only be used to look up a clusterservice cluster to get a UUID.  Once the billing changes merge,
+		// we'll have UID to key by and won't need this.
+		return nil
+	}
 
 	// Get the cluster from Cluster Service to obtain the cluster UUID for Cincinnati
-	csCluster, err := c.clusterServiceClient.GetCluster(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	csCluster, err := c.clusterServiceClient.GetCluster(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

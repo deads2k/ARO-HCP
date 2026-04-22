@@ -478,7 +478,7 @@ func (c *deleteOrphanedMaestroReadonlyBundles) clusterProvisionShardIDForService
 // provisionShardIDFromCluster resolves the provision shard for a Cosmos cluster document. skip is true when ClusterServiceID
 // is unset so the cluster is not yet registered with Cluster Service (same gate as create-*-scoped Maestro bundle controllers).
 func (c *deleteOrphanedMaestroReadonlyBundles) provisionShardIDFromCluster(ctx context.Context, cluster *api.HCPOpenShiftCluster) (shardID string, skip bool, err error) {
-	if len(cluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
+	if cluster.ServiceProviderProperties.ClusterServiceID == nil || len(cluster.ServiceProviderProperties.ClusterServiceID.String()) == 0 {
 		return "", true, nil
 	}
 	// TODO We get the provision shard ID from CS but at some point we should have
@@ -486,7 +486,7 @@ func (c *deleteOrphanedMaestroReadonlyBundles) provisionShardIDFromCluster(ctx c
 	// TODO should we take into account that at some point in the future we will implement migration between management
 	// clusters, where a cluster could have bundles allocated to different provision shards at the same time? For now
 	// we assume that the cluster is associated to a single provision shard at a time.
-	clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, cluster.ServiceProviderProperties.ClusterServiceID)
+	clusterCSShard, err := c.clusterServiceClient.GetClusterProvisionShard(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return "", false, utils.TrackError(fmt.Errorf("failed to get Cluster Provision Shard: %w", err))
 	}

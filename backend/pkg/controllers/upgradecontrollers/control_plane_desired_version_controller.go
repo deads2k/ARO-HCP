@@ -112,6 +112,11 @@ func (c *controlPlaneDesiredVersionSyncer) SyncOnce(ctx context.Context, key con
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get Cluster: %w", err))
 	}
+	if existingCluster.ServiceProviderProperties.ClusterServiceID == nil {
+		// Currently, this is correct.  We will likely refactor and change this to separate the read of active versions from the determination
+		// of the next desired version: we'll need to choose a desired version even if there are no active versions.
+		return nil
+	}
 
 	existingServiceProviderCluster, err := database.GetOrCreateServiceProviderCluster(ctx, c.cosmosClient, key.GetResourceID())
 	if err != nil {
@@ -119,7 +124,7 @@ func (c *controlPlaneDesiredVersionSyncer) SyncOnce(ctx context.Context, key con
 	}
 
 	// TODO bring the cluster uuid into serviceprovidercluster
-	clusterServiceCluster, err := c.clusterServiceClient.GetCluster(ctx, existingCluster.ServiceProviderProperties.ClusterServiceID)
+	clusterServiceCluster, err := c.clusterServiceClient.GetCluster(ctx, *existingCluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get cluster from Cluster Service: %w", err))
 	}

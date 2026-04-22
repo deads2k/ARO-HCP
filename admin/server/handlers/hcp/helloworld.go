@@ -65,7 +65,10 @@ func (h *HCPHelloWorldHandler) ServeHTTP(writer http.ResponseWriter, request *ht
 	}
 
 	// get CS cluster data - once the sync from CS to cosmos is in place, we should not need this anymore
-	csCluster, err := h.csClient.GetCluster(request.Context(), hcp.ServiceProviderProperties.ClusterServiceID)
+	if hcp.ServiceProviderProperties.ClusterServiceID == nil {
+		return fmt.Errorf("cluster has no ClusterServiceID")
+	}
+	csCluster, err := h.csClient.GetCluster(request.Context(), *hcp.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return fmt.Errorf("failed to get CS cluster data: %w", err)
 	}

@@ -98,7 +98,7 @@ func TestSerialConsoleHandler(t *testing.T) {
 						Resource: arm.Resource{ID: resourceID},
 					},
 					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-						ClusterServiceID: internalID,
+						ClusterServiceID: &internalID,
 					},
 				}
 				_, err = mockDB.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).Create(ctx, hcp, nil)
@@ -121,7 +121,7 @@ func TestSerialConsoleHandler(t *testing.T) {
 						Resource: arm.Resource{ID: resourceID},
 					},
 					ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-						ClusterServiceID: internalID,
+						ClusterServiceID: &internalID,
 					},
 				}
 				_, err = mockDB.HCPClusters(resourceID.SubscriptionID, resourceID.ResourceGroupName).Create(ctx, hcp, nil)

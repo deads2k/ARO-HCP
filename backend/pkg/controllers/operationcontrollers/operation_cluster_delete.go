@@ -83,6 +83,11 @@ func (c *operationClusterDelete) SynchronizeOperation(ctx context.Context, key c
 		return nil // no work to do
 	}
 
+	if len(operation.InternalID.String()) == 0 {
+		// we cannot proceed: yet.
+		// TODO when we update to make clusterserice creation async, we need to handle this correctly.
+		return nil
+	}
 	clusterStatus, err := c.clusterServiceClient.GetClusterStatus(ctx, operation.InternalID)
 	var ocmGetClusterError *ocmerrors.Error
 	if err != nil && errors.As(err, &ocmGetClusterError) && ocmGetClusterError.Status() == http.StatusNotFound {

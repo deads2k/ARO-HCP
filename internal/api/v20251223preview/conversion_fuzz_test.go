@@ -52,7 +52,7 @@ func TestRoundTripInternalExternalInternal(t *testing.T) {
 			// RevokeCredentialsOperationID does not roundtrip through the external type because it is purely an internal detail
 			j.RevokeCredentialsOperationID = ""
 			// ClusterServiceID does not roundtrip through the external type because it is purely an internal detail
-			j.ClusterServiceID = ocm.InternalID{}
+			j.ClusterServiceID = nil
 			j.ExistingCosmosUID = ""
 			// ExperimentalFeatures does not roundtrip through the external type because it is purely an internal detail
 			j.ExperimentalFeatures = api.ExperimentalFeatures{}

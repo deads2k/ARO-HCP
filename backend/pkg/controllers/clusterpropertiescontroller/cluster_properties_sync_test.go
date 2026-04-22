@@ -338,7 +338,7 @@ func newTestCluster(opts ...func(*api.HCPOpenShiftCluster)) *api.HCPOpenShiftClu
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID(testClusterServiceIDStr)),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID(testClusterServiceIDStr))),
 		},
 	}
 

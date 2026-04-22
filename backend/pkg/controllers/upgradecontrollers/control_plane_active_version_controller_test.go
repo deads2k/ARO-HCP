@@ -260,7 +260,7 @@ func createTestHCPCluster(t *testing.T, ctx context.Context, mockDB *databasetes
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
 			ProvisioningState: arm.ProvisioningStateSucceeded,
-			ClusterServiceID:  clusterInternalID,
+			ClusterServiceID:  &clusterInternalID,
 		},
 	}
 	_, err = mockDB.HCPClusters(testSubscriptionID, testResourceGroupName).Create(ctx, cluster, nil)

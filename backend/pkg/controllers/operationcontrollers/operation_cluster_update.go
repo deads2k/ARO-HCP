@@ -75,6 +75,11 @@ func (c *operationClusterUpdate) SynchronizeOperation(ctx context.Context, key c
 	if !c.ShouldProcess(ctx, operation) {
 		return nil // no work to do
 	}
+	if len(operation.InternalID.String()) == 0 {
+		// we cannot proceed: yet.
+		// TODO when we update to make clusterserice creation async, we need to handle this correctly.
+		return nil
+	}
 
 	clusterStatus, err := c.clusterServiceClient.GetClusterStatus(ctx, operation.InternalID)
 	if err != nil {

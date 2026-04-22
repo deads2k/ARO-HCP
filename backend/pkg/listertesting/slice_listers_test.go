@@ -332,7 +332,7 @@ func newTestCluster(subscriptionID, resourceGroupName, clusterName string) *api.
 			},
 		},
 		ServiceProviderProperties: api.HCPOpenShiftClusterServiceProviderProperties{
-			ClusterServiceID: api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/" + clusterName)),
+			ClusterServiceID: api.Ptr(api.Must(api.NewInternalID("/api/clusters_mgmt/v1/clusters/" + clusterName))),
 		},
 	}
 }
