@@ -18,6 +18,7 @@ This document is intended for ARO HCP developers and SREs. It provides an overvi
   - [Periodic Jobs](#periodic-jobs)
     - [Image Updater Tooling](#image-updater-tooling)
     - [Resource Group Cleanup](#resource-group-cleanup)
+    - [Cleanup-Sweeper Maintenance](#cleanup-sweeper-maintenance)
     - [Periodic E2E Tests](#periodic-e2e-tests)
 - [Managed Identity Reuse for E2E Tests](#managed-identity-reuse-for-e2e-tests)
 - [EV2 Pipeline Integration](#ev2-pipeline-integration)
@@ -215,6 +216,30 @@ These jobs automatically delete expired resource groups across different environ
 | **Environment** | Prod (uksouth) |
 | **Step Registry** | [delete-expired-prod-resource-groups](https://steps.ci.openshift.org/job?org=Azure&repo=ARO-HCP&branch=main&variant=periodic&test=delete-expired-prod-resource-groups) |
 | **Purpose** | Removes expired resource groups from the production environment that were created during testing. |
+
+---
+
+#### Cleanup-Sweeper Maintenance
+
+These periodic jobs run the `cleanup-sweeper` workflows used for shared leftovers and ordered resource cleanup.
+
+##### RG Ordered Cleanup
+
+| Property | Value |
+|----------|-------|
+| **Job Name** | [periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-rg-ordered](https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-rg-ordered) |
+| **Schedule** | Hourly at minute 5 (`5 * * * *`) |
+| **Step Registry** | [cleanup-sweeper-rg-ordered](https://steps.ci.openshift.org/job?org=Azure&repo=ARO-HCP&branch=main&variant=periodic&test=cleanup-sweeper-rg-ordered) |
+| **Purpose** | Runs `cleanup-sweeper` workflow `rg-ordered` (policy-driven ordered cleanup across subscriptions). |
+
+##### Shared Leftovers Cleanup
+
+| Property | Value |
+|----------|-------|
+| **Job Name** | [periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-shared-leftovers](https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-periodic-cleanup-sweeper-shared-leftovers) |
+| **Schedule** | Hourly at minute 35 (`35 * * * *`) |
+| **Step Registry** | [cleanup-sweeper-shared-leftovers](https://steps.ci.openshift.org/job?org=Azure&repo=ARO-HCP&branch=main&variant=periodic&test=cleanup-sweeper-shared-leftovers) |
+| **Purpose** | Runs `cleanup-sweeper` workflow `shared-leftovers` to clean orphaned shared resources (including role assignments). |
 
 ---
 

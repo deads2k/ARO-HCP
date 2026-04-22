@@ -31,7 +31,6 @@ STAGE_TESTING_SUBSCRIPTION_ID = b23756f7-4594-40a3-980f-10bb6168fc20
 E2E_TESTING_SUBSCRIPTION_ID = 974ebd46-8ad3-41e3-afef-7ef25fd5c371
 
 # Environments where automation accounts are deployed
-AUTOMATION_ACCOUNT_ENVS = dev stage int e2e
 
 # MSI mock pool size for boskos leasing in the E2E testing subscription
 MSI_MOCK_POOL_SIZE ?= 20
@@ -629,7 +628,7 @@ operator-roles.what-if:
 # Common
 #
 
-what-if: global.what-if acr.what-if region.what-if svc.what-if mgmt.what-if monitoring.what-if operator-roles.what-if automation-account.what-if
+what-if: global.what-if acr.what-if region.what-if svc.what-if mgmt.what-if monitoring.what-if operator-roles.what-if
 .PHONY: what-if
 
 infra: region svc.init mgmt.init monitoring
@@ -645,48 +644,3 @@ clean: svc.clean mgmt.clean region.clean
 local-cs-permissions: svc.dev.permissions mgmt.dev.permissions
 .PHONY: local-cs-permissions
 
-#
-# Automation Account creation
-#
-automation-account:
-	@for env in $(AUTOMATION_ACCOUNT_ENVS); do \
-		$(MAKE) automation-account-$$env; \
-	done
-.PHONY: automation-account
-
-automation-account.what-if:
-	@for env in $(AUTOMATION_ACCOUNT_ENVS); do \
-		$(MAKE) automation-account-$$env.what-if; \
-	done
-.PHONY: automation-account.what-if
-
-$(addprefix automation-account-,$(AUTOMATION_ACCOUNT_ENVS)):automation-account-%: configurations/automation-account.bicepparam
-	$(eval _aa_env = $(subst automation-account-,,$@))
-	$(eval _aa_resource_group = hcp-$(_aa_env)-automation-account)
-	$(eval _aa_subscription_id = $($(shell tr '[:lower:]' '[:upper:]' <<< $(_aa_env))_TESTING_SUBSCRIPTION_ID))
-	az group create \
-		--resource-group $(_aa_resource_group) --subscription $(_aa_subscription_id) \
-		--location eastus --tags persist=true && \
-	az deployment group create \
-		--name $(_aa_env)-automation-account \
-		--resource-group $(_aa_resource_group) \
-		--mode complete \
-		--subscription $(_aa_subscription_id) \
-		--template-file templates/automation-account.bicep \
-		$(PROMPT_TO_CONFIRM) \
-		--parameters configurations/automation-account.bicepparam \
-		--parameters environment=$(_aa_env)
-.PHONY: $(addprefix automation-account-,$(AUTOMATION_ACCOUNT_ENVS))
-
-$(addsuffix .what-if,$(addprefix automation-account-,$(AUTOMATION_ACCOUNT_ENVS))):automation-account-%.what-if: configurations/automation-account.bicepparam
-	$(eval _aa_env = $(subst .what-if,,$(subst automation-account-,,$@)))
-	$(eval _aa_resource_group = hcp-$(_aa_env)-automation-account)
-	$(eval _aa_subscription_id = $($(shell tr '[:lower:]' '[:upper:]' <<< $(_aa_env))_TESTING_SUBSCRIPTION_ID))
-	az deployment group what-if \
-		--name $(_aa_env)-automation-account \
-		--resource-group $(_aa_resource_group) \
-		--subscription $(_aa_subscription_id) \
-		--template-file templates/automation-account.bicep \
-		--parameters configurations/automation-account.bicepparam \
-		--parameters environment=$(_aa_env)
-.PHONY: $(addsuffix .what-if,$(addprefix automation-account-,$(AUTOMATION_ACCOUNT_ENVS)))
