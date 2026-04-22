@@ -70,7 +70,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			fastTestsOnly(integrationQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
@@ -82,7 +82,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(integrationQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
@@ -96,7 +96,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			fastTestsOnly(stageQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=30
 		Parallelism: 34,
@@ -107,7 +107,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(stageQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=30
 		Parallelism: 34,
@@ -121,7 +121,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			fastTestsOnly(prodQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
@@ -132,7 +132,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(prodQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
@@ -161,7 +161,7 @@ func setupCli() *cobra.Command {
 	ext.AddSuite(e.Suite{
 		Name:       "rp-api-compat-all/parallel",
 		Qualifiers: []string{fastTestsOnly(rpApiCompatBaseQualifier)},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
@@ -169,7 +169,7 @@ func setupCli() *cobra.Command {
 	ext.AddSuite(e.Suite{
 		Name:       "rp-api-compat-all/parallel/slow",
 		Qualifiers: []string{slowTestsOnly(rpApiCompatBaseQualifier)},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
