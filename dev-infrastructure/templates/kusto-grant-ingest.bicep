@@ -19,11 +19,12 @@ param clusterType string
 @description('Principal IDs to grant access to')
 param clusterLogPrincipalId string = ''
 param adminApiPrincipalId string = ''
+param exporterPrincipalId string = ''
 
 var hcpIngestors = clusterType == 'mgmt' ? [clusterLogPrincipalId] : []
 var svcIngestors = [clusterLogPrincipalId]
 
-var readers = clusterType == 'svc' ? [adminApiPrincipalId] : []
+var readers = clusterType == 'svc' ? [adminApiPrincipalId, exporterPrincipalId] : []
 
 var kustoRef = res.kustoRefFromId(kustoResourceId)
 

@@ -95,7 +95,7 @@ func (c *KustoLogsCurrentCollector) CollectMetricValues(ctx context.Context) {
 	logger := logr.FromContextOrDiscard(ctx)
 	startTime := time.Now()
 	if c.lastRun.Add(KustoQueryInterval).After(startTime) {
-		logger.V(1).Info("Skipping Kusto logs collection, last run was less than 30 minutes ago", "lastRun", c.lastRun, "startTime", startTime)
+		logger.V(1).Info("Skipping Kusto logs collection", "lastRun", c.lastRun, "startTime", startTime)
 		return
 	}
 	for _, clusterName := range c.clusterNames {
@@ -107,7 +107,8 @@ func (c *KustoLogsCurrentCollector) CollectMetricValues(ctx context.Context) {
 			InfraClusterName: clusterName,
 			TimestampMin:     time.Now().Add(-120 * time.Minute),
 			TimestampMax:     time.Now(),
-			Limit:            -1,
+			// Use magic number for now, will change to specific limit for each table, once kql generater is done
+			Limit: 100,
 		}
 
 		foundLogSources := make(map[string]time.Time)

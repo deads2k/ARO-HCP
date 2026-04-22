@@ -33,6 +33,11 @@ spec:
         - --cache-ttl={{ .Values.cacheTTL }}
         - --collection-interval={{ .Values.collectionInterval }}
         - --enabled-collectors={{ .Values.enabledCollectors }}
+{{- if contains "kusto-logs-current" .Values.enabledCollectors }}
+        - --cluster-names={{ .Values.clusterNames }}
+        - --kusto-cluster={{ .Values.kustoCluster }}
+        - --kusto-region={{ .Values.kustoRegion | replace " " "" | lower }}
+{{- end }}
         ports:
         - name: metrics
           containerPort: 8080
