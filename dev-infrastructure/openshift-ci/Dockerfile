@@ -40,3 +40,4 @@ RUN cd /tmp/aro-hcp && \
     GOFLAGS='-mod=readonly' GOBIN=/usr/local/bin make install-tools && \
     go clean -cache -modcache && \
     rm -rf /tmp/aro-hcp
+RUN mkdir -p /go/pkg/mod /go/bin && chmod -R 777 /go
