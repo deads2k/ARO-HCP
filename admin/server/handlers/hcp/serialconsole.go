@@ -90,7 +90,7 @@ func (h *HCPSerialConsoleHandler) ServeHTTP(writer http.ResponseWriter, request 
 	}
 
 	subscription, err := h.dbClient.Subscriptions().Get(request.Context(), resourceID.SubscriptionID)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return arm.NewCloudError(
 			http.StatusNotFound,
 			arm.CloudErrorCodeNotFound,

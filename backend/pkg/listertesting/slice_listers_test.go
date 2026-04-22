@@ -16,7 +16,6 @@ package listertesting
 
 import (
 	"context"
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,7 +64,7 @@ func TestSliceClusterLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent cluster", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, testResourceGroupName, "non-existent")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListForResourceGroup returns clusters in resource group", func(t *testing.T) {
@@ -101,7 +100,7 @@ func TestSliceNodePoolLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent node pool", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, testResourceGroupName, testClusterName, "non-existent")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListForResourceGroup returns node pools in resource group", func(t *testing.T) {
@@ -143,7 +142,7 @@ func TestSliceActiveOperationLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent operation", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, "non-existent")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListActiveOperationsForCluster returns operations for cluster", func(t *testing.T) {
@@ -179,7 +178,7 @@ func TestSliceExternalAuthLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent external auth", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, testResourceGroupName, testClusterName, "non-existent")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListForResourceGroup returns external auths in resource group", func(t *testing.T) {
@@ -221,7 +220,7 @@ func TestSliceServiceProviderClusterLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent service provider cluster", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, testResourceGroupName, "non-existent")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListForCluster returns service provider clusters for cluster", func(t *testing.T) {
@@ -256,7 +255,7 @@ func TestSliceSubscriptionLister(t *testing.T) {
 	t.Run("Get returns not found for non-existent subscription", func(t *testing.T) {
 		_, err := lister.Get(ctx, "22222222-2222-2222-2222-222222222222")
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 }
 
@@ -276,7 +275,7 @@ func TestSliceClusterListerWithEmptySlice(t *testing.T) {
 	t.Run("Get returns not found", func(t *testing.T) {
 		_, err := lister.Get(ctx, testSubscriptionID, testResourceGroupName, testClusterName)
 		require.Error(t, err)
-		assert.True(t, database.IsResponseError(err, http.StatusNotFound))
+		assert.True(t, database.IsNotFoundError(err))
 	})
 
 	t.Run("ListForResourceGroup returns empty slice", func(t *testing.T) {

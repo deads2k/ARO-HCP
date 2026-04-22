@@ -17,7 +17,6 @@ package mismatchcontrollers
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,7 +63,7 @@ func (c *backfillClusterUID) SyncOnce(ctx context.Context, keyObj controllerutil
 	logger := utils.LoggerFromContext(ctx)
 
 	cachedCluster, err := c.clusterLister.Get(ctx, keyObj.SubscriptionID, keyObj.ResourceGroupName, keyObj.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {
@@ -78,7 +77,7 @@ func (c *backfillClusterUID) SyncOnce(ctx context.Context, keyObj controllerutil
 
 	clusterCRUD := c.cosmosClient.HCPClusters(keyObj.SubscriptionID, keyObj.ResourceGroupName)
 	existingCluster, err := clusterCRUD.Get(ctx, keyObj.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {

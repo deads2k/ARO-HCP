@@ -212,7 +212,7 @@ func TestMockDBClient_CRUD_Cluster(t *testing.T) {
 
 	// Verify deletion
 	_, err = clusterCRUD.Get(ctx, clusterName)
-	if !database.IsResponseError(err, 404) {
+	if !database.IsNotFoundError(err) {
 		t.Errorf("Expected 404 after deletion, got: %v", err)
 	}
 }
@@ -360,7 +360,7 @@ func TestMockDBClient_CRUD_Subscription(t *testing.T) {
 
 	// Verify deletion
 	_, err = subscriptionCRUD.Get(ctx, subscriptionID)
-	if !database.IsResponseError(err, 404) {
+	if !database.IsNotFoundError(err) {
 		t.Errorf("Expected 404 after deletion, got: %v", err)
 	}
 }
@@ -634,7 +634,7 @@ func TestMockDBClient_ServiceProviderCluster_ETagConditionalReplace(t *testing.T
 			t.Fatal("Replace with wrong etag should fail")
 		}
 
-		if !database.IsResponseError(err, 412) {
+		if !database.IsPreconditionFailedError(err) {
 			t.Errorf("Expected 412 Precondition Failed, got: %v", err)
 		}
 	})
@@ -737,7 +737,7 @@ func TestMockDBClient_Controller_ETagConditionalReplace(t *testing.T) {
 			t.Fatal("Replace with wrong etag should fail")
 		}
 
-		if !database.IsResponseError(err, 412) {
+		if !database.IsPreconditionFailedError(err) {
 			t.Errorf("Expected 412 Precondition Failed, got: %v", err)
 		}
 	})

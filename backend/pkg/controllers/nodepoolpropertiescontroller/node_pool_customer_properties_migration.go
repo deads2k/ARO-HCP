@@ -17,7 +17,6 @@ package nodepoolpropertiescontroller
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -93,7 +92,7 @@ func (c *nodePoolCustomerPropertiesMigrationController) SyncOnce(ctx context.Con
 
 	// do the super cheap cache check first
 	cachedNodePool, err := c.nodePoolLister.Get(ctx, key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// we'll be re-fired if it is created again
 		return nil
 	}
@@ -109,7 +108,7 @@ func (c *nodePoolCustomerPropertiesMigrationController) SyncOnce(ctx context.Con
 	// Get the nodePool from Cosmos
 	nodePoolCRUD := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName).NodePools(key.HCPClusterName)
 	existingNodePool, err := nodePoolCRUD.Get(ctx, key.HCPNodePoolName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // nodePool doesn't exist, no work to do
 	}
 	if err != nil {

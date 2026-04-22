@@ -17,7 +17,6 @@ package clusterpropertiescontroller
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -96,7 +95,7 @@ func (c *clusterCustomerPropertiesMigrationController) SyncOnce(ctx context.Cont
 
 	// do the super cheap cache check first
 	cachedCluster, err := c.clusterLister.Get(ctx, key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		// we'll be re-fired if it is created again
 		return nil
 	}
@@ -112,7 +111,7 @@ func (c *clusterCustomerPropertiesMigrationController) SyncOnce(ctx context.Cont
 	// Get the cluster from Cosmos
 	clusterCRUD := c.cosmosClient.HCPClusters(key.SubscriptionID, key.ResourceGroupName)
 	existingCluster, err := clusterCRUD.Get(ctx, key.HCPClusterName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // cluster doesn't exist, no work to do
 	}
 	if err != nil {

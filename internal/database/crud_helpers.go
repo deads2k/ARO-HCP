@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"k8s.io/utils/ptr"
@@ -88,7 +87,7 @@ func get[InternalAPIType, CosmosAPIType any](ctx context.Context, containerClien
 	if newCosmosIDErr == nil {
 		return ret, nil
 	}
-	if !IsResponseError(newCosmosIDErr, http.StatusNotFound) {
+	if !IsNotFoundError(newCosmosIDErr) {
 		return nil, utils.TrackError(newCosmosIDErr)
 	}
 
@@ -98,7 +97,7 @@ func get[InternalAPIType, CosmosAPIType any](ctx context.Context, containerClien
 		return nil, utils.TrackError(err)
 	}
 	responseItem, err := containerClient.ReadItem(ctx, partitionKey, oldExactCosmosID, nil)
-	if IsResponseError(err, http.StatusBadRequest) && strings.Contains(err.Error(), "The request URL is invalid") {
+	if IsBadRequestError(err) && strings.Contains(err.Error(), "The request URL is invalid") {
 		// this happens when we're using the old key and the URL is too long.  This only seems to happen in some regions, but when it happens
 		// it is a record we'll never recover.  Every known case is for a controller status, so recreating them isn't a big deal.
 		logger.Error(err, "failed to get item", "oldExactCosmosID", oldExactCosmosID)
@@ -401,7 +400,7 @@ func replace[InternalAPIType, CosmosAPIType any](ctx context.Context, containerC
 
 func deleteResource(ctx context.Context, containerClient *azcosmos.ContainerClient, partitionKeyString string, resourceID *azcorearm.ResourceID) error {
 	typedObj, err := get[TypedDocument, TypedDocument](ctx, containerClient, partitionKeyString, resourceID)
-	if IsResponseError(err, http.StatusNotFound) {
+	if IsNotFoundError(err) {
 		return nil
 	}
 	if err != nil {

@@ -62,7 +62,7 @@ func (opsync *operationRequestCredential) SynchronizeOperation(ctx context.Conte
 	logger.Info("checking operation")
 
 	oldOperation, err := opsync.cosmosClient.Operations(key.SubscriptionID).Get(ctx, key.OperationName)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return nil // no work to do
 	}
 	if err != nil {

@@ -79,7 +79,7 @@ func writeError(ctx context.Context, w http.ResponseWriter, err error) error {
 		}
 	}
 
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		resourceID, err := utils.ResourceIDFromContext(ctx) // used for error reporting
 		if err != nil {
 			arm.WriteInternalServerError(w)
@@ -108,7 +108,7 @@ func predictedResponseStatus(err error) int {
 		}
 	}
 
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return http.StatusNotFound
 	}
 

@@ -532,7 +532,7 @@ func (f *Frontend) ArmSubscriptionGet(writer http.ResponseWriter, request *http.
 	subscriptionID := request.PathValue(PathSegmentSubscriptionID)
 
 	subscription, err := f.dbClient.Subscriptions().Get(ctx, subscriptionID)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		return arm.NewResourceNotFoundError(resourceID)
 	}
 	if err != nil {
@@ -574,7 +574,7 @@ func (f *Frontend) ArmSubscriptionPut(writer http.ResponseWriter, request *http.
 
 	var resultingSubscription *arm.Subscription
 	existingSubscription, err := f.dbClient.Subscriptions().Get(ctx, subscriptionID)
-	if database.IsResponseError(err, http.StatusNotFound) {
+	if database.IsNotFoundError(err) {
 		resultingSubscription, err = f.dbClient.Subscriptions().Create(ctx, &requestSubscription, nil)
 		if err != nil {
 			return utils.TrackError(err)

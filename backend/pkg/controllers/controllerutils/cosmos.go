@@ -17,7 +17,6 @@ package controllerutils
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
@@ -35,7 +34,7 @@ func MarkBillingDocumentDeleted(ctx context.Context, cosmosClient database.DBCli
 	err := cosmosClient.BillingDocs(resourceID.SubscriptionID).PatchByClusterID(ctx, resourceID, patchOperations)
 	if err == nil {
 		logger.Info("Updated billing for cluster deletion")
-	} else if database.IsResponseError(err, http.StatusNotFound) {
+	} else if database.IsNotFoundError(err) {
 		// Log the error but proceed with normal processing.
 		logger.Info("No billing document found")
 		err = nil
