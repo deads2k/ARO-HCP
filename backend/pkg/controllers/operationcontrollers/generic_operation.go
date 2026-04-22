@@ -17,6 +17,7 @@ package operationcontrollers
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -92,12 +93,28 @@ func NewGenericOperationController(
 	return c
 }
 
+func (c *genericOperation) controllerCRUD(key controllerutils.OperationKey) database.ResourceCRUD[api.Controller] {
+	parentResourceID := key.GetParentResourceID()
+	sub := parentResourceID.SubscriptionID
+	rg := parentResourceID.ResourceGroupName
+
+	switch {
+	case strings.EqualFold(parentResourceID.ResourceType.String(), api.NodePoolResourceType.String()):
+		return c.cosmosClient.HCPClusters(sub, rg).NodePools(parentResourceID.Parent.Name).Controllers(parentResourceID.Name)
+	case strings.EqualFold(parentResourceID.ResourceType.String(), api.ExternalAuthResourceType.String()):
+		return c.cosmosClient.HCPClusters(sub, rg).ExternalAuth(parentResourceID.Parent.Name).Controllers(parentResourceID.Name)
+	default:
+		return c.cosmosClient.HCPClusters(sub, rg).Controllers(parentResourceID.Name)
+	}
+}
+
 func (c *genericOperation) SyncOnce(ctx context.Context, keyObj any) error {
 	key := keyObj.(controllerutils.OperationKey)
-	parentResourceID := key.GetParentResourceID()
+	controllerCRUD := c.controllerCRUD(key)
+
 	defer utilruntime.HandleCrash(controllerutils.DegradedControllerPanicHandler(
 		ctx,
-		c.cosmosClient.HCPClusters(key.SubscriptionID, parentResourceID.ResourceGroupName).Controllers(parentResourceID.Name),
+		controllerCRUD,
 		c.name,
 		key.InitialController))
 
@@ -105,7 +122,7 @@ func (c *genericOperation) SyncOnce(ctx context.Context, keyObj any) error {
 
 	controllerWriteErr := controllerutils.WriteController(
 		ctx,
-		c.cosmosClient.HCPClusters(key.SubscriptionID, parentResourceID.ResourceGroupName).Controllers(parentResourceID.Name),
+		controllerCRUD,
 		c.name,
 		key.InitialController,
 		controllerutils.ReportSyncError(syncErr),

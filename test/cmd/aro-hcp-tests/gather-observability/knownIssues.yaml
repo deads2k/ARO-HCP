@@ -1,21 +1,7 @@
-knownIssues:
-- name: "BackendControllerRetryHotLoop"
-  labels:
-    name: "operationnodepoolcreate"
-  reason: "Nodepool create controller retry hot loops are observed during e2e runs. Needs investigation."
-- name: "BackendControllerRetryHotLoop"
-  labels:
-    name: "operationnodepooldelete"
-  reason: "Nodepool delete controller retry hot loops are observed during e2e runs. Needs investigation."
-- name: "BackendControllerRetryHotLoop"
-  labels:
-    name: "operationexternalauthcreate"
-  reason: "ExternalAuth create controller retry hot loops are observed during e2e runs. Needs investigation."
-- name: "BackendControllerRetryHotLoop"
-  labels:
-    name: "operationexternalauthupdate"
-  reason: "ExternalAuth update controller retry hot loops are observed during e2e runs. Needs investigation."
-- name: "BackendControllerRetryHotLoop"
-  labels:
-    name: "operationexternalauthdelete"
-  reason: "ExternalAuth delete controller retry hot loops are observed during e2e runs. Needs investigation."
+knownIssues: []
+
+# the following is an example definition of a known issue
+# - name: "BackendControllerRetryHotLoop"
+#   labels:
+#     name: "operationnodepoolcreate"
+#   reason: "Nodepool create controller retry hot loops are observed during e2e runs. Needs investigation."
