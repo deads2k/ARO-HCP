@@ -1,4 +1,16 @@
 ---
+# Source: frontend/templates/frontend-v2.poddisruptionbudget.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: aro-hcp-frontend-v2
+  namespace: 'aro-hcp'
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: aro-hcp-frontend-v2
+---
 # Source: frontend/templates/frontend.poddisruptionbudget.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -33,6 +45,23 @@ data:
   FRONTEND_MI_CLIENT_ID: '__frontendMsiClientId__'
   LOCATION: 'westus3'
 ---
+# Source: frontend/templates/frontend-v2.service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: aro-hcp-frontend-v2
+  name: aro-hcp-frontend-v2
+  namespace: 'aro-hcp'
+spec:
+  ports:
+  - port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app: aro-hcp-frontend-v2
+  type: ClusterIP
+---
 # Source: frontend/templates/frontend.service.yaml
 apiVersion: v1
 kind: Service
@@ -55,7 +84,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: aro-hcp-frontend
+    app.kubernetes.io/part-of: aro-hcp-frontend
     port: metrics
   name: aro-hcp-frontend-metrics
   namespace: 'aro-hcp'
@@ -66,7 +95,110 @@ spec:
     targetPort: 8081
     name: metrics
   selector:
-    app: aro-hcp-frontend
+    app.kubernetes.io/part-of: aro-hcp-frontend
+---
+# Source: frontend/templates/frontend-v2.deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: aro-hcp-frontend-v2
+  name: aro-hcp-frontend-v2
+  namespace: 'aro-hcp'
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: aro-hcp-frontend-v2
+  strategy:
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: aro-hcp-frontend-v2
+        app.kubernetes.io/part-of: aro-hcp-frontend
+        azure.workload.identity/use: "true"
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: 'topology.kubernetes.io/zone'
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: aro-hcp-frontend-v2
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: aro-hcp-frontend-v2
+      serviceAccountName: 'frontend'
+      containers:
+      - name: aro-hcp-frontend-v2
+        image: 'arohcpsvcdev.azurecr.io/arohcpfrontend@sha256:1234567890'
+        imagePullPolicy: Always
+        args: ["--clusters-service-url", "http://clusters-service.clusters-service.svc.cluster.local:8000", "--exit-on-panic=true"]
+        env:
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-config
+              key: DB_NAME
+        - name: DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-config
+              key: DB_URL
+        - name: LOCATION
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-config
+              key: LOCATION
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: ""
+        - name: OTEL_TRACES_EXPORTER
+          value: ""
+        - name: AUDIT_CONNECT_SOCKET
+          value: "false"
+        - name: AZURE_TOKEN_CREDENTIALS
+          value: "WorkloadIdentityCredential"
+        ports:
+        - containerPort: 8443
+          protocol: TCP
+        - containerPort: 8081
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
 ---
 # Source: frontend/templates/frontend.deployment.yaml
 apiVersion: apps/v1
@@ -92,6 +224,7 @@ spec:
     metadata:
       labels:
         app: aro-hcp-frontend
+        app.kubernetes.io/part-of: aro-hcp-frontend
         azure.workload.identity/use: "true"
     spec:
       topologySpreadConstraints:
@@ -249,7 +382,7 @@ spec:
         - "8443"
   selector:
     matchLabels:
-      app: "aro-hcp-frontend"
+      app.kubernetes.io/part-of: "aro-hcp-frontend"
 ---
 # Source: frontend/templates/allow-ingress.authorizationpolicy.yaml
 apiVersion: security.istio.io/v1beta1
@@ -285,7 +418,7 @@ spec:
         ports: ["8081"]
   selector:
     matchLabels:
-      app: "aro-hcp-frontend"
+      app.kubernetes.io/part-of: "aro-hcp-frontend"
 ---
 # Source: frontend/templates/authorizationpolicy.yaml
 apiVersion: security.istio.io/v1
@@ -295,6 +428,25 @@ metadata:
   namespace: 'aro-hcp'
 spec: {}
 ---
+# Source: frontend/templates/ext-authz-misev2.authorizationpolicy.yaml
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: ext-authz-misev2
+  namespace: 'aro-hcp'
+spec:
+  selector:
+    matchLabels:
+      app: aro-hcp-frontend-v2
+  action: CUSTOM
+  provider:
+    name: ext-authz-misev2
+  rules:
+  - to:
+    - operation:
+        paths: ["/*"]
+        notPaths: ["/metrics"]
+---
 # Source: frontend/templates/ext-authz.authorizationpolicy.yaml
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
@@ -302,6 +454,9 @@ metadata:
   name: ext-authz
   namespace: 'aro-hcp'
 spec:
+  selector:
+    matchLabels:
+      app: aro-hcp-frontend
   action: CUSTOM
   provider:
     name: ext-authz
@@ -353,6 +508,20 @@ spec:
   selector:
     matchLabels:
       app: aro-hcp-frontend
+  portLevelMtls:
+    8081:
+      mode: PERMISSIVE
+---
+# Source: frontend/templates/peerauthentication.yaml
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: aro-hcp-frontend-v2-metrics
+  namespace: 'aro-hcp'
+spec:
+  selector:
+    matchLabels:
+      app: aro-hcp-frontend-v2
   portLevelMtls:
     8081:
       mode: PERMISSIVE
@@ -409,7 +578,7 @@ spec:
     - 'aro-hcp'
   selector:
     matchLabels:
-      app: aro-hcp-frontend
+      app.kubernetes.io/part-of: aro-hcp-frontend
       port: metrics
 ---
 # Source: frontend/templates/frontend.virtualservice.yaml
@@ -424,6 +593,24 @@ spec:
   gateways:
   - aks-istio-ingress/aro-hcp-gateway-external
   http:
+  - match:
+    - headers:
+        x-ms-mise-version:
+          exact: "v2"
+      uri:
+        regex: '.+'
+    headers:
+      request:
+        add:
+          mise-inbound-policies-to-filter: "ARM Policy"
+      response:
+        add:
+          x-ms-served-by: "v2"
+    route:
+    - destination:
+        host: aro-hcp-frontend-v2
+        port:
+          number: 8443
   - match:
     - uri:
         regex: '.+'

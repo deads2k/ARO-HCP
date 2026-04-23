@@ -1,0 +1,1 @@
+{{ include "frontend.deployment" (dict "appName" "aro-hcp-frontend-v2" "Values" .Values "Release" .Release) }}

@@ -685,7 +685,10 @@ mise:
     authorityFQDN: sts.windows.net
     policyLabel: Geneva Actions
   image:
-    digest: sha256:40b9813f4d56d96efec48a441ff90680ede2ad5891d1384eb66420462a9dc0fe
+    digest: ""
+    repository: mise-1p-container-image
+  imageV2:
+    digest: ""
     repository: mise-1p-container-image
   sessiongate:
     audience: 6dae42f8-4368-4678-94ff-3960e28e3630

@@ -16,4 +16,4 @@ spec:
         - "{{ .Values.apiBindPort }}"
   selector:
     matchLabels:
-      app: "aro-hcp-frontend"
+      app.kubernetes.io/part-of: "aro-hcp-frontend"
