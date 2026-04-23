@@ -316,11 +316,13 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	billingDumpController := datadumpcontrollers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
 	dispatchRequestCredentialController := operationcontrollers.NewDispatchRequestCredentialController(
+		utilsclock.RealClock{},
 		b.options.CosmosDBClient,
 		b.options.ClustersServiceClient,
 		activeOperationInformer,
 	)
 	dispatchRevokeCredentialsController := operationcontrollers.NewDispatchRevokeCredentialsController(
+		utilsclock.RealClock{},
 		b.options.CosmosDBClient,
 		b.options.ClustersServiceClient,
 		activeOperationInformer,

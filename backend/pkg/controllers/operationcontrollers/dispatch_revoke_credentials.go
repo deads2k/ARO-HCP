@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/tools/cache"
+	utilsclock "k8s.io/utils/clock"
 
 	ocmerrors "github.com/openshift-online/ocm-sdk-go/errors"
 
@@ -36,16 +37,19 @@ import (
 )
 
 type dispatchRevokeCredentials struct {
+	clock                 utilsclock.PassiveClock
 	cosmosClient          database.DBClient
 	clustersServiceClient ocm.ClusterServiceClientSpec
 }
 
 func NewDispatchRevokeCredentialsController(
+	clock utilsclock.PassiveClock,
 	cosmosClient database.DBClient,
 	clustersServiceClient ocm.ClusterServiceClientSpec,
 	activeOperationInformer cache.SharedIndexInformer,
 ) controllerutils.Controller {
 	syncer := &dispatchRevokeCredentials{
+		clock:                 clock,
 		cosmosClient:          cosmosClient,
 		clustersServiceClient: clustersServiceClient,
 	}
@@ -106,7 +110,7 @@ func (c *dispatchRevokeCredentials) SynchronizeOperation(ctx context.Context, ke
 		logger.Info("cluster RevokeCredentialsOperationID mismatch",
 			"revoke_credentials_operation_id", cluster.ServiceProviderProperties.RevokeCredentialsOperationID)
 
-		apihelpers.CancelOperation(operation, localClock.Now())
+		apihelpers.CancelOperation(operation, c.clock.Now())
 
 		_, err = c.cosmosClient.Operations(key.SubscriptionID).Replace(ctx, operation, nil)
 		if err != nil {
