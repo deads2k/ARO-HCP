@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/client-go/tools/cache"
+
 	cmv1 "github.com/openshift-online/ocm-sdk-go/clustersmgmt/v1"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
@@ -36,16 +38,27 @@ type operationRevokeCredentials struct {
 	notificationClient   *http.Client
 }
 
-func NewOperationRevokeCredentialsSynchronizer(
+func NewOperationRevokeCredentialsController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	return &operationRevokeCredentials{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationRevokeCredentials{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
+
+	controller := NewGenericOperationController(
+		"OperationRevokeCredentials",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (opsync *operationRevokeCredentials) ShouldProcess(ctx context.Context, operation *api.Operation) bool {

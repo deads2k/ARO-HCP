@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	ocmerrors "github.com/openshift-online/ocm-sdk-go/errors"
 
@@ -36,19 +39,28 @@ type operationNodePoolDelete struct {
 	notificationClient   *http.Client
 }
 
-// NewOperationNodePoolDeleteSynchronizer periodically lists all clusters and for each out when the cluster was deleted and its state.
-func NewOperationNodePoolDeleteSynchronizer(
+// NewOperationNodePoolDeleteController periodically lists all clusters and for each out when the cluster was deleted and its state.
+func NewOperationNodePoolDeleteController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	c := &operationNodePoolDelete{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationNodePoolDelete{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
 
-	return c
+	controller := NewGenericOperationController(
+		"OperationNodePoolDelete",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (c *operationNodePoolDelete) ShouldProcess(ctx context.Context, operation *api.Operation) bool {

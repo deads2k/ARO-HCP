@@ -315,137 +315,76 @@ func (b *Backend) runBackendControllersUnderLeaderElection(ctx context.Context, 
 	csStateDumpController := datadumpcontrollers.NewCSStateDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers, b.options.ClustersServiceClient)
 	billingDumpController := datadumpcontrollers.NewBillingDumpController(b.options.CosmosDBClient, activeOperationLister, backendInformers)
 	doNothingController := controllers.NewDoNothingExampleController(b.options.CosmosDBClient, subscriptionLister)
-	operationClusterCreateController := operationcontrollers.NewGenericOperationController(
-		"OperationClusterCreate",
-		operationcontrollers.NewOperationClusterCreateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationClusterCreateController := operationcontrollers.NewOperationClusterCreateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationClusterUpdateController := operationcontrollers.NewGenericOperationController(
-		"OperationClusterUpdate",
-		operationcontrollers.NewOperationClusterUpdateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationClusterUpdateController := operationcontrollers.NewOperationClusterUpdateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationClusterDeleteController := operationcontrollers.NewGenericOperationController(
-		"OperationClusterDelete",
-		operationcontrollers.NewOperationClusterDeleteSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationClusterDeleteController := operationcontrollers.NewOperationClusterDeleteController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationNodePoolCreateController := operationcontrollers.NewGenericOperationController(
-		"OperationNodePoolCreate",
-		operationcontrollers.NewOperationNodePoolCreateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationNodePoolCreateController := operationcontrollers.NewOperationNodePoolCreateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationNodePoolUpdateController := operationcontrollers.NewGenericOperationController(
-		"OperationNodePoolUpdate",
-		operationcontrollers.NewOperationNodePoolUpdateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationNodePoolUpdateController := operationcontrollers.NewOperationNodePoolUpdateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationNodePoolDeleteController := operationcontrollers.NewGenericOperationController(
-		"OperationNodePoolDelete",
-		operationcontrollers.NewOperationNodePoolDeleteSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationNodePoolDeleteController := operationcontrollers.NewOperationNodePoolDeleteController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationExternalAuthCreateController := operationcontrollers.NewGenericOperationController(
-		"OperationExternalAuthCreate",
-		operationcontrollers.NewOperationExternalAuthCreateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationExternalAuthCreateController := operationcontrollers.NewOperationExternalAuthCreateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationExternalAuthUpdateController := operationcontrollers.NewGenericOperationController(
-		"OperationExternalAuthUpdate",
-		operationcontrollers.NewOperationExternalAuthUpdateSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationExternalAuthUpdateController := operationcontrollers.NewOperationExternalAuthUpdateController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationExternalAuthDeleteController := operationcontrollers.NewGenericOperationController(
-		"OperationExternalAuthDelete",
-		operationcontrollers.NewOperationExternalAuthDeleteSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationExternalAuthDeleteController := operationcontrollers.NewOperationExternalAuthDeleteController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationRequestCredentialController := operationcontrollers.NewGenericOperationController(
-		"OperationRequestCredential",
-		operationcontrollers.NewOperationRequestCredentialSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationRequestCredentialController := operationcontrollers.NewOperationRequestCredentialController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
-	operationRevokeCredentialsController := operationcontrollers.NewGenericOperationController(
-		"OperationRevokeCredentials",
-		operationcontrollers.NewOperationRevokeCredentialsSynchronizer(
-			b.options.CosmosDBClient,
-			b.options.ClustersServiceClient,
-			http.DefaultClient,
-		),
-		10*time.Second,
-		activeOperationInformer,
+	operationRevokeCredentialsController := operationcontrollers.NewOperationRevokeCredentialsController(
 		b.options.CosmosDBClient,
+		b.options.ClustersServiceClient,
+		http.DefaultClient,
+		activeOperationInformer,
 	)
 	clusterServiceMatchingClusterController := mismatchcontrollers.NewClusterServiceClusterMatchingController(b.options.CosmosDBClient, subscriptionLister, b.options.ClustersServiceClient)
-	cosmosMatchingNodePoolController := controllerutils.NewClusterWatchingController(
-		"CosmosMatchingNodePools", b.options.CosmosDBClient, backendInformers, 60*time.Minute,
-		mismatchcontrollers.NewCosmosNodePoolMatchingController(b.options.CosmosDBClient, b.options.ClustersServiceClient))
-	cosmosMatchingExternalAuthController := controllerutils.NewClusterWatchingController(
-		"CosmosMatchingExternalAuths", b.options.CosmosDBClient, backendInformers, 60*time.Minute,
-		mismatchcontrollers.NewCosmosExternalAuthMatchingController(b.options.CosmosDBClient, b.options.ClustersServiceClient))
-	cosmosMatchingClusterController := controllerutils.NewClusterWatchingController(
-		"CosmosMatchingClusters", b.options.CosmosDBClient, backendInformers, 60*time.Minute,
-		mismatchcontrollers.NewCosmosClusterMatchingController(utilsclock.RealClock{}, b.options.CosmosDBClient, b.options.ClustersServiceClient))
+	cosmosMatchingNodePoolController := mismatchcontrollers.NewCosmosNodePoolMatchingController(b.options.CosmosDBClient, b.options.ClustersServiceClient, backendInformers)
+	cosmosMatchingExternalAuthController := mismatchcontrollers.NewCosmosExternalAuthMatchingController(b.options.CosmosDBClient, b.options.ClustersServiceClient, backendInformers)
+	cosmosMatchingClusterController := mismatchcontrollers.NewCosmosClusterMatchingController(utilsclock.RealClock{}, b.options.CosmosDBClient, b.options.ClustersServiceClient, backendInformers)
 	alwaysSuccessClusterValidationController := validationcontrollers.NewClusterValidationController(
 		validations.NewAlwaysSuccessValidation(),
 		activeOperationLister,

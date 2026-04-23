@@ -22,6 +22,7 @@ import (
 	arohcpv1alpha1 "github.com/openshift-online/ocm-sdk-go/arohcp/v1alpha1"
 
 	"github.com/Azure/ARO-HCP/backend/pkg/controllers/controllerutils"
+	"github.com/Azure/ARO-HCP/backend/pkg/informers"
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/database"
 	"github.com/Azure/ARO-HCP/internal/ocm"
@@ -35,14 +36,24 @@ type cosmosNodePoolMatching struct {
 }
 
 // NewCosmosNodePoolMatchingController periodically looks for mismatched cluster-service and cosmos nodepool
-func NewCosmosNodePoolMatchingController(cosmosClient database.DBClient, clusterServiceClient ocm.ClusterServiceClientSpec) controllerutils.ClusterSyncer {
-	c := &cosmosNodePoolMatching{
+func NewCosmosNodePoolMatchingController(cosmosClient database.DBClient, clusterServiceClient ocm.ClusterServiceClientSpec, informers informers.BackendInformers) controllerutils.Controller {
+	syncer := &cosmosNodePoolMatching{
 		cooldownChecker:      controllerutils.NewTimeBasedCooldownChecker(1 * time.Hour),
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 	}
 
-	return c
+	// To find cluster-service nodepools that don't have matching cosmos nodepools, you have to be a level above nodepools:
+	// clusters, in order to do the "all nodepools from clusterservice".
+	controller := controllerutils.NewClusterWatchingController(
+		"CosmosMatchingNodePools",
+		cosmosClient,
+		informers,
+		60*time.Minute,
+		syncer,
+	)
+
+	return controller
 }
 
 func (c *cosmosNodePoolMatching) getAllCosmosObjs(ctx context.Context, keyObj controllerutils.HCPClusterKey) (map[string]*api.HCPOpenShiftClusterNodePool, []*api.HCPOpenShiftClusterNodePool, error) {

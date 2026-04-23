@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"k8s.io/client-go/tools/cache"
 
 	ocmerrors "github.com/openshift-online/ocm-sdk-go/errors"
 
@@ -36,19 +39,28 @@ type operationExternalAuthDelete struct {
 	notificationClient   *http.Client
 }
 
-// NewOperationExternalAuthDeleteSynchronizer periodically lists all clusters and for each out when the cluster was deleted and its state.
-func NewOperationExternalAuthDeleteSynchronizer(
+// NewOperationExternalAuthDeleteController periodically lists all clusters and for each out when the cluster was deleted and its state.
+func NewOperationExternalAuthDeleteController(
 	cosmosClient database.DBClient,
 	clusterServiceClient ocm.ClusterServiceClientSpec,
 	notificationClient *http.Client,
-) OperationSynchronizer {
-	c := &operationExternalAuthDelete{
+	activeOperationInformer cache.SharedIndexInformer,
+) controllerutils.Controller {
+	syncer := &operationExternalAuthDelete{
 		cosmosClient:         cosmosClient,
 		clusterServiceClient: clusterServiceClient,
 		notificationClient:   notificationClient,
 	}
 
-	return c
+	controller := NewGenericOperationController(
+		"OperationExternalAuthDelete",
+		syncer,
+		10*time.Second,
+		activeOperationInformer,
+		cosmosClient,
+	)
+
+	return controller
 }
 
 func (c *operationExternalAuthDelete) ShouldProcess(ctx context.Context, operation *api.Operation) bool {
