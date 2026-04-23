@@ -69,7 +69,7 @@ forwarder:
     buffer_dir: /var/kusto
     buffering_enabled: On
     upload_timeout: 1m
-    upload_file_size: 48M
+    upload_file_size: 16M
     buffer_file_delete_early: Off
     unify_tag: On
     store_dir_limit_size: 1.8GB

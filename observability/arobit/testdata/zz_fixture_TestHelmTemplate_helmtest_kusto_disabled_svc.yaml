@@ -188,7 +188,7 @@ data:
         azure_kusto_buffer_key frontendLogs
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -212,7 +212,7 @@ data:
         buffer_dir "/var/kusto"
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -236,7 +236,7 @@ data:
         buffer_dir "/var/kusto"
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -259,7 +259,7 @@ data:
         buffer_dir "/var/kusto"
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -283,7 +283,7 @@ data:
         buffer_dir "/var/kusto"
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -317,7 +317,7 @@ data:
         buffer_dir "/var/kusto"
         buffering_enabled           true 
         upload_timeout              1m
-        upload_file_size            48M
+        upload_file_size            16M
         buffer_file_delete_early    false
         unify_tag                   true
         store_dir_limit_size        1.8GB
@@ -420,7 +420,7 @@ spec:
         app: arobit-forwarder
         azure.workload.identity/use: "true"
       annotations:
-        checksum/configmap: 58b2807afa24ee46f3ba427bcab6b89eed552a06c7be382344ca476e428a96e0
+        checksum/configmap: fe3b7004c2bdd1d39da1fbc08d996aa6db2276b40255fe44b79815bef46a7f7d
     spec:
       priorityClassName: service-lifecycle-critical
       serviceAccountName: 'arobit-forwarder'
