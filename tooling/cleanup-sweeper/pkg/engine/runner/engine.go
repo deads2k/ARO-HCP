@@ -28,7 +28,7 @@ import (
 
 const (
 	// DefaultParallelism is used when Engine.Parallelism is not set.
-	DefaultParallelism = 8
+	DefaultParallelism = 4
 	// DefaultRetries is the minimum retry count for retryable operations.
 	DefaultRetries = 1
 )
