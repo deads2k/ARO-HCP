@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-metric-set
+  namespace: '{{ .Release.Namespace }}'
+data:
+  config: |
+    etcd:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    kubeAPIServer:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    kubeControllerManager:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    openshiftAPIServer:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    openshiftControllerManager:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]
+    cvo:
+      - action:       "keep"
+        regex:        ".*"
+        sourceLabels: ["__name__"]

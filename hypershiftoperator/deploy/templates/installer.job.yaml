@@ -27,6 +27,7 @@ spec:
             --registry-overrides "{{ .Values.registryOverrides }}" \
             --hypershift-image {{ .Values.image }}@{{ .Values.imageDigest }} \
             --platform-monitoring=None \
+            --metrics-set=SRE \
             --enable-size-tagging=true \
             --limit-crd-install=Azure \
             {{- if .Values.operatorEnvVars.sharedIngressIPTag }}
