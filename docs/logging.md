@@ -29,7 +29,9 @@ This separation ensures data isolation between platform infrastructure and custo
 
 Kusto clusters are provisioned per environment and region via Bicep templates with:
 
-- **Retention**: 14 days soft delete, 2 days hot cache
+- **Retention**:
+  - `ServiceLogs` database: 90 days soft delete, 2 days hot cache
+  - `HostedControlPlaneLogs` database: 14 days soft delete, 2 days hot cache
 - **Autoscaling**: Configurable min/max nodes (via `enableAutoScale` parameter)
 - **SKU**: Environment-specific (e.g., `Standard_D12_v2` for production, `Dev(No SLA)_Standard_D11_v2` for development)
 
