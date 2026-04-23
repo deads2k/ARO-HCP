@@ -127,6 +127,11 @@ func (c *dispatchRequestCredential) SynchronizeOperation(ctx context.Context, ke
 		return utils.TrackError(err)
 	}
 
+	// If this operation document update fails then we will abandon the credential
+	// created by the Clusters Service call above and start a new credential on the
+	// next retry. The abandoned credential will live on but never reach the client.
+	// Its backing certificate will eventually expire or be revoked.
+
 	operation.InternalID = csBreakGlassCredentialID
 
 	_, err = c.cosmosClient.Operations(key.SubscriptionID).Replace(ctx, operation, nil)

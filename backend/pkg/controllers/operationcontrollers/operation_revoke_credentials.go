@@ -153,6 +153,10 @@ func (opsync *operationRevokeCredentials) SynchronizeOperation(ctx context.Conte
 		return nil
 	}
 
+	// If we got this far then we know we're transitioning to a new status,
+	// and the only statuses that follow Deleting are Succeeded or Failed.
+	// So the logic below is for finalizing a completed operation.
+
 	// FIXME May want a version of patchOperation that acts on a transaction
 	//       so we can group these two writes together. For now, if the cluster
 	//       replace fails we'll just retry later since the operation status
