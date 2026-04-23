@@ -200,6 +200,9 @@ param csPostgresServerVersion string
 @description('The size of the Postgres server for CS')
 param csPostgresServerStorageSizeGB int
 
+@description('The SKU of the Postgres server for CS')
+param csPostgresServerSku string
+
 @description('Enable enhanced metrics for the CS PostgreSQL server')
 param csPostgresEnhancedMetricsEnabled bool
 
@@ -233,6 +236,9 @@ param maestroPostgresServerMinTLSVersion string
 
 @description('The size of the Postgres server for Maestro')
 param maestroPostgresServerStorageSizeGB int
+
+@description('The SKU of the Postgres server for Maestro')
+param maestroPostgresServerSku string
 
 @description('The name of the Maestro Postgres database')
 param maestroPostgresDatabaseName string
@@ -800,6 +806,7 @@ module maestroServer '../modules/maestro/maestro-server.bicep' = {
     postgresServerVersion: maestroPostgresServerVersion
     postgresServerMinTLSVersion: maestroPostgresServerMinTLSVersion
     postgresServerStorageSizeGB: maestroPostgresServerStorageSizeGB
+    postgresServerSku: maestroPostgresServerSku
     postgresZoneRedundantMode: determineZoneRedundancyForRegion(location, maestroPostgresZoneRedundantMode)
       ? 'ZoneRedundant'
       : 'SameZone'
@@ -836,6 +843,7 @@ module cs '../modules/cluster-service.bicep' = {
     postgresServerMinTLSVersion: csPostgresServerMinTLSVersion
     postgresServerVersion: csPostgresServerVersion
     postgresServerStorageSizeGB: csPostgresServerStorageSizeGB
+    postgresServerSku: csPostgresServerSku
     postgresEnhancedMetricsEnabled: csPostgresEnhancedMetricsEnabled
     csDatabaseName: csPostgresDatabaseName
     privateEndpointSubnetId: nodeSubnetCreation.outputs.subnetId

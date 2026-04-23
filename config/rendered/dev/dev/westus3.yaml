@@ -198,6 +198,7 @@ clustersService:
     name: arohcp-dev-dbcs-usw3
     password: ""
     private: false
+    serverSku: Standard_D2s_v3
     serverStorageSizeGB: 128
     serverVersion: "17"
     zoneRedundantMode: Auto
@@ -509,6 +510,7 @@ maestro:
     name: arohcp-dev-dbmaestro-usw3
     password: ""
     private: false
+    serverSku: Standard_D2s_v3
     serverStorageSizeGB: 32
     serverVersion: "15"
     zoneRedundantMode: Auto

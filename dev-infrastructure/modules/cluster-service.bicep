@@ -35,6 +35,9 @@ param postgresServerVersion string
 ])
 param postgresServerStorageSizeGB int
 
+@description('The SKU of the Postgres server for CS')
+param postgresServerSku string
+
 @description('Defines if the Postgres server is private')
 param postgresServerPrivate bool
 
@@ -146,6 +149,7 @@ module csPostgres 'postgres/postgres.bicep' = if (deployPostgres) {
     backupRetentionDays: postgresBackupRetentionDays
     geoRedundantBackup: postgresGeoRedundantBackup
     storageSizeGB: postgresServerStorageSizeGB
+    sku: postgresServerSku
     private: postgresServerPrivate
     subnetId: privateEndpointSubnetId
     vnetId: privateEndpointVnetId

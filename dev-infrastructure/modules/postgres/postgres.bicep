@@ -7,7 +7,7 @@ param name string
 
 param location string = resourceGroup().location
 
-param sku string = 'Standard_D2s_v3'
+param sku string
 param tier string = 'GeneralPurpose'
 param minTLSVersion string
 

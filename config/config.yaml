@@ -850,6 +850,7 @@ defaults:
     postgres:
       name: "arohcp-{{ .ctx.environment }}-dbmaestro-{{ .ctx.regionShort }}" # [globally-unique]
       serverVersion: '15'
+      serverSku: 'Standard_D2s_v3'
       serverStorageSizeGB: 32
       deploy: true
       private: false
@@ -907,6 +908,7 @@ defaults:
       password: ''
       minTLSVersion: 'TLSV1.2'
       serverVersion: '17'
+      serverSku: 'Standard_D2s_v3'
       serverStorageSizeGB: 128
       databaseName: clusters-service
       zoneRedundantMode: 'Auto'

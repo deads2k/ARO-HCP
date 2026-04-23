@@ -834,6 +834,10 @@
         "serverStorageSizeGB": {
           "type": "integer"
         },
+        "serverSku": {
+          "type": "string",
+          "description": "The SKU name for the PostgreSQL server (e.g. Standard_D2s_v3)."
+        },
         "serverVersion": {
           "type": "string"
         },
@@ -884,6 +888,7 @@
         "name",
         "private",
         "serverStorageSizeGB",
+        "serverSku",
         "serverVersion",
         "minTLSVersion",
         "databaseName",
