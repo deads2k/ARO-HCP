@@ -15,7 +15,42 @@
 package database
 
 import (
+	"context"
+	"errors"
+
 	"k8s.io/utils/clock"
+
+	"github.com/Azure/ARO-HCP/internal/utils"
+	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
 
 var localClock clock.Clock = clock.RealClock{}
+
+// CancelActiveOperations queries for operation documents with a non-terminal
+// status using the filters specified in opts. For every document returned in
+// the query result, CancelActiveOperations adds patch operations to the given
+// DBTransaction to mark the document as canceled.
+func CancelActiveOperations(ctx context.Context, dbClient DBClient, transaction DBTransaction, opts *DBClientListActiveOperationDocsOptions) ([]string, error) {
+	var now = localClock.Now()
+	var operationsToCancel []string
+
+	errs := []error{}
+	subscriptionID := transaction.GetPartitionKey()
+	iterator := dbClient.Operations(subscriptionID).ListActiveOperations(opts)
+	for _, operation := range iterator.Items(ctx) {
+		operationToWrite := operation.DeepCopy()
+		apihelpers.CancelOperation(operationToWrite, now)
+
+		_, err := dbClient.Operations(subscriptionID).AddReplaceToTransaction(ctx, transaction, operationToWrite, nil)
+		if err != nil {
+			errs = append(errs, utils.TrackError(err))
+		}
+
+		operationsToCancel = append(operationsToCancel, operation.OperationID.Name)
+	}
+	if err := iterator.GetError(); err != nil {
+		errs = append(errs, utils.TrackError(err))
+	}
+
+	return operationsToCancel, errors.Join(errs...)
+}

@@ -405,6 +405,7 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	const operationRequest = database.OperationRequestRevokeCredentials
 
 	ctx := request.Context()
+	logger := utils.LoggerFromContext(ctx)
 
 	resourceID, err := utils.ResourceIDFromContext(ctx)
 	if err != nil {
@@ -438,7 +439,6 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 	}
 
 	if !subscription.HasRegisteredFeature(api.FeatureExperimentalReleaseFeatures) {
-		logger := utils.LoggerFromContext(ctx)
 		logger.Info("admin credential revocation denied: AFEC feature not registered",
 			"subscriptionId", clusterResourceID.SubscriptionID,
 			"requiredFeature", api.FeatureExperimentalReleaseFeatures,
@@ -467,12 +467,15 @@ func (f *Frontend) ArmResourceActionRevokeCredentials(writer http.ResponseWriter
 
 	// Just as deleting an ARM resource cancels any other operations on the resource,
 	// revoking credentials cancels any credential requests in progress.
-	err = f.CancelActiveOperations(ctx, transaction, &database.DBClientListActiveOperationDocsOptions{
+	operationsToCancel, err := database.CancelActiveOperations(ctx, f.dbClient, transaction, &database.DBClientListActiveOperationDocsOptions{
 		Request:    api.Ptr(database.OperationRequestRequestCredential),
 		ExternalID: clusterResourceID,
 	})
 	if err != nil {
 		return utils.TrackError(err)
+	}
+	if len(operationsToCancel) > 0 {
+		logger.Info("canceling RequestCredential operations", "operationsToCancel", operationsToCancel)
 	}
 
 	operationDoc := database.NewOperation(
