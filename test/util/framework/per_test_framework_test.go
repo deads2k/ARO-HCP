@@ -15,6 +15,7 @@
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -120,6 +121,30 @@ func TestIsIgnorableResourceGroupCleanupError(t *testing.T) {
 			name: "ResourceGroupNotFound returns true",
 			err:  &azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"},
 			want: true,
+		},
+		{
+			name: "joined error with all not-found errors",
+			err: errors.Join(
+				&azcore.ResponseError{StatusCode: http.StatusNotFound},
+				&azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "ResourceGroupNotFound"},
+			),
+			want: true,
+		},
+		{
+			name: "joined error with one real failure and one not-found",
+			err: errors.Join(
+				&azcore.ResponseError{StatusCode: http.StatusNotFound},
+				&azcore.ResponseError{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"},
+			),
+			want: false,
+		},
+		{
+			name: "joined error with all real failures",
+			err: errors.Join(
+				&azcore.ResponseError{StatusCode: http.StatusForbidden, ErrorCode: "AuthorizationFailed"},
+				&azcore.ResponseError{StatusCode: http.StatusConflict, ErrorCode: "SomeOtherError"},
+			),
+			want: false,
 		},
 	}
 

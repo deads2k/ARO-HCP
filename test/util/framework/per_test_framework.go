@@ -276,6 +276,15 @@ func isIgnorableResourceGroupCleanupError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range joined.Unwrap() {
+			if !isIgnorableResourceGroupCleanupError(e) {
+				return false
+			}
+		}
+		return true
+	}
+
 	return isResourceGroupNotFoundError(err)
 }
 
