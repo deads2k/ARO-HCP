@@ -2,11 +2,11 @@
 
 ## Prepare
 
-* have a `KUBECONFIG` for a SC and MC, e.g. for the [integrated DEV environment](../dev-infrastructure/docs/development-setup.md#access-integrated-dev-environment)
+* have a `KUBECONFIG` for a SC and MC, e.g. for your [personal DEV environment](../docs/personal-dev.md)
 * port-forward RP running on SC: `kubectl port-forward -n aro-hcp svc/aro-hcp-frontend 8443:8443`
 * (optional but useful) port-forward CS running on SC: `kubectl port-forward -n clusters-service svc/clusters-service 8001:8000`
 * (optional but useful) port-forward Maestro running on SC: `kubectl port-forward -n maestro svc/maestro 8002:8000`
-* ensure that the environment variable `$LOCATION` is either unset or set to the integrated dev environment's region
+* ensure that the environment variable `$LOCATION` is either unset or set to your dev environment's region
 
 ## Register the subscription with the RP
 
