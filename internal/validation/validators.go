@@ -41,6 +41,12 @@ import (
 	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
 
+// immutableByCompare and immutableByReflect are local copies of the helpers
+// removed in k8s.io/apimachinery v0.35.1 (previously in pkg/api/validate/immutable.go).
+// The upstream replacement (validate.Immutable) relies on the k8s ratcheting
+// framework and always returns an error on update without comparing values.
+// Our validation calls these without ratcheting, so we keep the old comparison
+// semantics.
 func immutableByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
