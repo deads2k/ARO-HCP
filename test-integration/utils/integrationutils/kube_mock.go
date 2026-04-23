@@ -83,9 +83,8 @@ func NewKubernetesClientSets(sessionNamespace string) *KubernetesClientSets {
 	// Standard kubernetes fake client
 	fc := fake.NewClientset()
 
-	// Sessiongate fake client — NewClientset requires OpenAPI schemas
-	// for FieldManagedObjectTracker, which the Session CRD doesn't generate.
-	sf := sessiongatefake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewClientset unusable without OpenAPI schema generation
+	// Sessiongate fake client
+	sf := sessiongatefake.NewClientset()
 	stopCh := make(chan struct{})
 
 	// Build routing map by API group. To add a new client, add it here.
