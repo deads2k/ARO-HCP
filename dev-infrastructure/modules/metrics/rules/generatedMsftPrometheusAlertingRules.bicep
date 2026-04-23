@@ -1344,7 +1344,7 @@ resource msftMise 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
           correlationId: 'MiseEnvoyScrapeDown/{{ $labels.cluster }}'
           description: 'Prometheus scrape for envoy-stats job in namespace mise is failing or missing.'
           info: 'Prometheus scrape for envoy-stats job in namespace mise is failing or missing.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/mise-tsg.html'
           summary: 'Envoy scrape target down for namespace=mise'
           title: 'Envoy scrape target down for namespace=mise'
         }

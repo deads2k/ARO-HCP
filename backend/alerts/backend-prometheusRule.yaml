@@ -23,7 +23,7 @@ spec:
         severity: info
       annotations:
         description: 'The Backend operation error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
         summary: 'High Error Rate on Backend Operations'
     - alert: BackendControllerRetryHotLoop
       # A ratio of retries to total adds that is rate-independent:
@@ -49,7 +49,7 @@ spec:
         severity: warning
       annotations:
         description: 'Backend controller workqueue {{ $labels.name }} has a retry ratio of > 50% sustained over 10 minutes, indicating most queue activity is failed retries rather than fresh work.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
         summary: 'Backend controller workqueue {{ $labels.name }} retry hot loop'
     - alert: BackendControllerQueueDepthHigh
       expr: |
@@ -63,7 +63,7 @@ spec:
         severity: warning
       annotations:
         description: 'Backend controller workqueue {{ $labels.name }} has had a depth > 10 for more than 5 minutes, indicating work is accumulating faster than it can be processed.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
         summary: 'Backend controller workqueue {{ $labels.name }} depth is high'
     - alert: BackendControllerPanic
       expr: |
@@ -75,5 +75,5 @@ spec:
         severity: warning
       annotations:
         description: 'Backend controller {{ $labels.controller }} has panicked {{ printf "%.0f" $value }} time(s) in the last 5 minutes.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
         summary: 'Backend controller {{ $labels.controller }} is panicking'

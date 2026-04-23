@@ -24,7 +24,7 @@ spec:
         severity: warning
       annotations:
         description: 'Maestro gRPC server has {{ $value }} registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
         summary: 'Maestro has too many gRPC source client connections'
     - alert: MaestroRESTAPIErrorRate
       # Fires when the 5xx error rate on the Maestro REST API exceeds
@@ -41,7 +41,7 @@ spec:
         severity: warning
       annotations:
         description: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
         summary: 'Maestro REST API error rate is high'
     - alert: MaestroGRPCServerErrorRate
       # Fires when the gRPC error rate exceeds 5%. The gRPC server
@@ -58,7 +58,7 @@ spec:
         severity: warning
       annotations:
         description: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
         summary: 'Maestro gRPC server error rate is high'
     - alert: MaestroSpecControllerReconcileErrors
       # Fires when the spec controller reconcile error rate exceeds
@@ -75,5 +75,5 @@ spec:
         severity: warning
       annotations:
         description: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: {{ $value | humanizePercentage }}.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
         summary: 'Maestro spec controller reconcile error rate is high'

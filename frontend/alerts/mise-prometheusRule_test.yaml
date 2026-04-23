@@ -18,7 +18,7 @@ tests:
       exp_annotations:
         summary: "Envoy scrape target down for namespace=mise"
         description: "Prometheus scrape for envoy-stats job in namespace mise is failing or missing."
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/mise-tsg.html'
 # Test: Service cluster exists and mise metric is present - no alert
 - interval: 1s
   input_series:
@@ -48,4 +48,4 @@ tests:
       exp_annotations:
         summary: "Envoy scrape target down for namespace=mise"
         description: "Prometheus scrape for envoy-stats job in namespace mise is failing or missing."
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/mise-tsg.html'
