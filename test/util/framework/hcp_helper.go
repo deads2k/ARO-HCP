@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -339,15 +340,20 @@ func UpdateHCPCluster(
 
 // stateConflictBackoff is the retry config for transient state conflicts (ARO-25884).
 var stateConflictBackoff = wait.Backoff{
-	Steps:    3,               // up to 3 attempts total
+	Steps:    5,               // up to 5 attempts total
 	Duration: 1 * time.Minute, // initial wait before first retry
-	Factor:   2.0,             // double the wait each retry (1m, 2m)
+	Factor:   2.0,             // double the wait each retry (1m, 2m, 4m, 8m)
 	Jitter:   0.1,             // ±10% randomization to avoid thundering herd
 }
+
+// csStateConflictPattern matches the cluster-service error message format:
+// "Cluster '<id>' is in state '<state>', can't update"
+var csStateConflictPattern = regexp.MustCompile(`is in state '[^']+', can't update`)
 
 // isTransientUpdateError detects errors worth retrying during cluster updates:
 //   - HTTP 500: e.g. Cosmos DB ETag conflict after cluster-service commit
 //   - HTTP 409: Conflict
+//   - HTTP 400: cluster-service state conflict when cluster is in a transitional state
 func isTransientUpdateError(err error) bool {
 	if err == nil {
 		return false
@@ -356,8 +362,15 @@ func isTransientUpdateError(err error) bool {
 	if !errors.As(err, &responseError) {
 		return false
 	}
-	return responseError.StatusCode == http.StatusInternalServerError ||
-		responseError.StatusCode == http.StatusConflict
+	if responseError.StatusCode == http.StatusInternalServerError ||
+		responseError.StatusCode == http.StatusConflict {
+		return true
+	}
+	if responseError.StatusCode == http.StatusBadRequest &&
+		csStateConflictPattern.MatchString(responseError.Error()) {
+		return true
+	}
+	return false
 }
 
 // UpdateHCPCluster20251223 updates an HCP cluster using the v20251223preview SDK and waits for the operation to complete.
