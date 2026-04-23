@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/watchlist"
 
 	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 
@@ -833,5 +834,12 @@ func controllerInformerTestCase() informerTestCase {
 				return false
 			}, 5*time.Second, 100*time.Millisecond, "expected delete event for ctrl-np")
 		},
+	}
+}
+
+func TestListWatchWithoutWatchListSemantics(t *testing.T) {
+	wrapper := &listWatchWithoutWatchListSemantics{}
+	if !watchlist.DoesClientNotSupportWatchListSemantics(wrapper) {
+		t.Error("expected DoesClientNotSupportWatchListSemantics to return true for our wrapper")
 	}
 }
