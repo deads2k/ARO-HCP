@@ -64,29 +64,44 @@ var _ = Describe("Engineering", func() {
 			kubeClient, err := kubernetes.NewForConfig(restConfig)
 			Expect(err).NotTo(HaveOccurred(), "Failed to create Kubernetes client")
 
-			// No way to directly port-forward to a service
-			// So we need to find a pod for the service and port-forward to that
-			By("finding a pod for the aro-hcp-exporter service")
-			podName, err := getExporterPodName(cancelCtx, kubeClient)
-			Expect(err).NotTo(HaveOccurred(), "Failed to find exporter pod")
-
-			By("port-forwarding to the exporter pod")
-			localPort, stopChan, err := startPortForward(cancelCtx, restConfig, podName)
-			Expect(err).NotTo(HaveOccurred(), "Failed to set up port-forward")
-			defer close(stopChan)
-
-			By("querying the /metrics endpoint")
-			metricsURL := fmt.Sprintf("http://localhost:%d/metrics", localPort)
+			var localPort int
+			var stopChan chan struct{}
+			connected := false
+			defer func() {
+				if connected {
+					close(stopChan)
+				}
+			}()
 
 			httpClient := http.Client{
 				Timeout: 30 * time.Second,
 			}
 			Eventually(func() bool {
+				// (Re-)establish port-forward if needed.
+				if !connected {
+					By("finding a pod for the aro-hcp-exporter service")
+					podName, err := getExporterPodName(cancelCtx, kubeClient)
+					if err != nil {
+						return false
+					}
+					By("port-forwarding to the exporter pod")
+					localPort, stopChan, err = startPortForward(cancelCtx, restConfig, podName)
+					if err != nil {
+						return false
+					}
+					connected = true
+				}
+
+				By("querying the /metrics endpoint")
+				metricsURL := fmt.Sprintf("http://localhost:%d/metrics", localPort)
 				req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, metricsURL, nil)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp, err := httpClient.Do(req)
 				if err != nil {
+					GinkgoWriter.Printf("Failed to get metrics endpoint: %v", err)
+					close(stopChan)
+					connected = false
 					return false
 				}
 				defer resp.Body.Close()
@@ -97,15 +112,20 @@ var _ = Describe("Engineering", func() {
 
 				body, err := io.ReadAll(resp.Body)
 				if err != nil {
+					GinkgoWriter.Printf("Failed to read metrics response body: %v", err)
+					close(stopChan)
+					connected = false
 					return false
 				}
 
-				By("verifying expected metric is present")
 				metricsOutput := string(body)
 
+				By("verifying public_ip_count_by_region_service_tag is present")
 				if !strings.Contains(metricsOutput, "public_ip_count_by_region_service_tag") {
 					return false
 				}
+
+				By("verifying kusto_logs_age_in_seconds is present")
 				if !strings.Contains(metricsOutput, "kusto_logs_age_in_seconds") {
 					return false
 				}
