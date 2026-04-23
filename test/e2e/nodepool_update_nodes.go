@@ -128,9 +128,9 @@ var _ = Describe("Customer", func() {
 			}
 			Expect(creationErrors).To(BeEmpty(), "nodepool creation errors: %v", creationErrors)
 
-			By("verifying nodes count and status after initial creation")
+			By("verifying nodes count and ready status")
 			totalNodeCount := mainNodeCount + oneNodeCount
-			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodeCount(customerClusterName, totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 
 			By("scaling up the nodepool replicas from 2 to 3 replicas")
@@ -153,9 +153,9 @@ var _ = Describe("Customer", func() {
 			Expect(scaleUpResp.Properties.Replicas).NotTo(BeNil(), "scale up response Properties.Replicas was nil")
 			Expect(*scaleUpResp.Properties.Replicas).To(Equal(int32(mainNodeCount)))
 
-			By("verifying nodes count and status after scaling up")
+			By("verifying nodes count and ready status")
 			totalNodeCount = mainNodeCount + oneNodeCount
-			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodeCount(customerClusterName, totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 
 			nodePoolsClient := tc.Get20240610ClientFactoryOrDie(ctx).NewNodePoolsClient()
@@ -180,9 +180,9 @@ var _ = Describe("Customer", func() {
 			Expect(scaleDownResp.Properties.Replicas).NotTo(BeNil(), "scale down response Properties.Replicas was nil")
 			Expect(*scaleDownResp.Properties.Replicas).To(Equal(int32(mainNodeCount)))
 
-			By("verifying nodes count and status after scaling down")
+			By("verifying nodes count and ready status")
 			totalNodeCount = mainNodeCount + oneNodeCount
-			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodeCount(customerClusterName, totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 
 			By("updating the one-replica nodepool replicas to 0 and enabling autoscaling with a PATCH")
@@ -211,10 +211,10 @@ var _ = Describe("Customer", func() {
 			Expect(*autoscaleResp.Properties.AutoScaling.Min).To(Equal(int32(2)))
 			Expect(*autoscaleResp.Properties.AutoScaling.Max).To(Equal(int32(3)))
 
-			By("verifying nodes count and status after enabling autoscaling")
+			By("verifying nodes count and ready status")
 			oneNodeCount = 2
 			totalNodeCount = mainNodeCount + oneNodeCount
-			Expect(verifiers.VerifyNodeCount(totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
+			Expect(verifiers.VerifyNodeCount(customerClusterName, totalNodeCount).Verify(ctx, adminRESTConfig)).To(Succeed())
 			Expect(verifiers.VerifyNodesReady().Verify(ctx, adminRESTConfig)).To(Succeed())
 		})
 })
