@@ -64,15 +64,17 @@ func setupCli() *cobra.Command {
 	// The tests that a suite is composed of can be filtered by CEL expressions. By
 	// default, the qualifiers only apply to tests from this extension.
 	integrationQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.DevelopmentOnly[0], labels.StageAndProdOnly[0])
+	integrationTestTimeout := 150 * time.Minute
 	ext.AddSuite(e.Suite{
 		Name: "integration/parallel",
 		Qualifiers: []string{
 			fastTestsOnly(integrationQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
+		TestTimeout: &integrationTestTimeout,
 	})
 
 	ext.AddSuite(e.Suite{
@@ -80,10 +82,11 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(integrationQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
+		TestTimeout: &integrationTestTimeout,
 	})
 
 	stageQuery := fmt.Sprintf(`labels.exists(l, l=="%s") && !labels.exists(l, l=="%s") && !labels.exists(l, l=="%s")`, labels.RequireNothing[0], labels.IntegrationOnly[0], labels.DevelopmentOnly[0])
@@ -93,7 +96,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			fastTestsOnly(stageQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=30
 		Parallelism: 34,
@@ -104,7 +107,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(stageQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=30
 		Parallelism: 34,
@@ -118,7 +121,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			fastTestsOnly(prodQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
@@ -129,7 +132,7 @@ func setupCli() *cobra.Command {
 		Qualifiers: []string{
 			slowTestsOnly(prodQuery),
 		},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=15
 		Parallelism: 19,
@@ -158,7 +161,7 @@ func setupCli() *cobra.Command {
 	ext.AddSuite(e.Suite{
 		Name:       "rp-api-compat-all/parallel",
 		Qualifiers: []string{fastTestsOnly(rpApiCompatBaseQualifier)},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
@@ -166,7 +169,7 @@ func setupCli() *cobra.Command {
 	ext.AddSuite(e.Suite{
 		Name:       "rp-api-compat-all/parallel/slow",
 		Qualifiers: []string{slowTestsOnly(rpApiCompatBaseQualifier)},
-		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly avobe the number of
+		// Spec parallelism is limited by the leased identity containers. We set suite parallelism slightly above the number of
 		// leased identity containers to avoid multi-HCP tests blocking single-HCP tests from obtaining a lease.
 		// LEASED_MSI_CONTAINERS=20
 		Parallelism: 24,
