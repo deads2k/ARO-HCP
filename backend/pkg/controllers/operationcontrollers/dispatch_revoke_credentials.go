@@ -118,7 +118,7 @@ func (c *dispatchRevokeCredentials) SynchronizeOperation(ctx context.Context, ke
 
 	// Dispatch the revocation request to Clusters Service.
 
-	logger.Info("dispatching operation")
+	logger.Info("dispatching DELETE break_glass_credentials to Clusters Service")
 	err = c.clustersServiceClient.DeleteBreakGlassCredentials(ctx, operation.InternalID)
 	var ocmError *ocmerrors.Error
 	if errors.As(err, &ocmError) && ocmError.Status() == http.StatusBadRequest {

@@ -116,7 +116,7 @@ func (c *dispatchRequestCredential) SynchronizeOperation(ctx context.Context, ke
 
 	// Dispatch the credential request to Clusters Service.
 
-	logger.Info("dispatching operation")
+	logger.Info("dispatching POST break_glass_credentials to Clusters Service")
 	csBreakGlassCredential, err := c.clustersServiceClient.PostBreakGlassCredential(ctx, *cluster.ServiceProviderProperties.ClusterServiceID)
 	if err != nil {
 		return utils.TrackError(err)
