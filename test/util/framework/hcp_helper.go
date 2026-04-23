@@ -261,10 +261,8 @@ func waitForHCPClusterDeletion(
 	}
 }
 
-// UpdateHCPCluster sends a PATCH (BeginUpdate) request for an HCP cluster and waits for completion
-// within the provided timeout. It returns the final update response or an error.
 // UpdateHCPCluster updates an HCP cluster using the v20240610preview SDK and waits for the operation to complete.
-// Transient 500 and 409 errors are retried automatically with exponential backoff.
+// Transient 500, 409, and CS state conflict 400 errors are retried automatically with exponential backoff.
 func UpdateHCPCluster(
 	ctx context.Context,
 	hcpClient *hcpsdk20240610preview.HcpOpenShiftClustersClient,
@@ -418,6 +416,9 @@ func UpdateHCPCluster20251223(
 			return false, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating: %w", hcpClusterName, resourceGroupName, err)
 		}
 
+		// The v20251223 variant does not call checkOperationResult because
+		// the v20251223 SDK does not yet have a matching Get response type
+		// to compare against. The v20240610 variant above does this check.
 		hcpOpenShiftCluster = &operationResult.HcpOpenShiftCluster
 		return true, nil
 	})
