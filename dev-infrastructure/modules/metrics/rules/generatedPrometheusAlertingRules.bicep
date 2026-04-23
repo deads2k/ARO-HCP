@@ -991,7 +991,7 @@ resource arobitRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01
 '''
           info: '''The Arobit forwarder metrics endpoint on cluster {{ $labels.cluster }} has been unreachable for 15 minutes.
 '''
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
           title: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
         }
@@ -1024,6 +1024,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 The metric fluentbit_output_proc_bytes_total only counts bytes from chunks that were sent successfully, this indicates a problem with the output plugin or low input.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
           title: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
         }
@@ -1056,6 +1057,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 Ingestion pauses when Fluent Bit\'s internal memory or storage buffers are full, typically caused by backpressure from a slow or failing output.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
           title: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
         }
@@ -1088,6 +1090,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 Retries occur when the azure_kusto output encounters a recoverable error (e.g. transient network failure, HTTP 429/5xx from Kusto).
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
           title: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
         }
@@ -1118,6 +1121,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
           info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is encountering errors sending log chunks to Kusto.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
           title: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
         }
@@ -1148,6 +1152,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
           info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has chunks that exceeded the configured Retry_Limit for the Kusto output.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
           title: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
         }

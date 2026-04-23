@@ -15,7 +15,7 @@ spec:
       annotations:
         description: |
           The Arobit forwarder metrics endpoint on cluster {{ $labels.cluster }} has been unreachable for 15 minutes.
-        runbook_url: TBD # https://runbooks.prometheus-operator.dev/runbooks/prometheus/prometheusdown
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         summary: Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.
     - alert: LowOutputBytesProcessed
       expr: sum(rate(fluentbit_output_proc_bytes_total{name=~"azure_kusto.*"}[5m])) by (cluster, pod) < 50
@@ -23,6 +23,7 @@ spec:
       labels:
         severity: warning
       annotations:
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         description: |
           Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} output is low.
           The metric fluentbit_output_proc_bytes_total only counts bytes from chunks that were sent successfully, this indicates a problem with the output plugin or low input.
@@ -34,6 +35,7 @@ spec:
       labels:
         severity: warning
       annotations:
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         description: |
           Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has paused collecting new log data for at least 5 minutes.
           Ingestion pauses when Fluent Bit's internal memory or storage buffers are full, typically caused by backpressure from a slow or failing output.
@@ -45,6 +47,7 @@ spec:
       labels:
         severity: warning
       annotations:
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         description: |
           Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is retrying chunk delivery.
           Retries occur when the azure_kusto output encounters a recoverable error (e.g. transient network failure, HTTP 429/5xx from Kusto).
@@ -56,6 +59,7 @@ spec:
       labels:
         severity: warning
       annotations:
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         description: |
           Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is encountering errors sending log chunks to Kusto.
           Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
@@ -66,6 +70,7 @@ spec:
       labels:
         severity: warning
       annotations:
+        runbook_url: https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html
         description: |
           Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has chunks that exceeded the configured Retry_Limit for the Kusto output.
           Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
