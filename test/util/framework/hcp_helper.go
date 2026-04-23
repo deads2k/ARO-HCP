@@ -41,6 +41,7 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -261,6 +262,8 @@ func waitForHCPClusterDeletion(
 
 // UpdateHCPCluster sends a PATCH (BeginUpdate) request for an HCP cluster and waits for completion
 // within the provided timeout. It returns the final update response or an error.
+// UpdateHCPCluster updates an HCP cluster using the v20240610preview SDK and waits for the operation to complete.
+// Transient 500 and 409 errors are retried automatically with exponential backoff.
 func UpdateHCPCluster(
 	ctx context.Context,
 	hcpClient *hcpsdk20240610preview.HcpOpenShiftClustersClient,
@@ -272,46 +275,93 @@ func UpdateHCPCluster(
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, fmt.Errorf("timeout '%f' minutes exceeded during UpdateHCPCluster for cluster %s in resource group %s", timeout.Minutes(), hcpClusterName, resourceGroupName))
 	defer cancel()
 
-	poller, err := hcpClient.BeginUpdate(ctx, resourceGroupName, hcpClusterName, update, nil)
-	if err != nil {
-		return nil, err
-	}
+	var hcpOpenShiftCluster *hcpsdk20240610preview.HcpOpenShiftCluster
+	attempt := 0
 
-	operationResult, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
-		Frequency: StandardPollInterval,
-	})
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+	err := wait.ExponentialBackoffWithContext(ctx, stateConflictBackoff, func(ctx context.Context) (bool, error) {
+		attempt++
+		if attempt > 1 {
+			ginkgo.GinkgoLogr.Info("Retrying cluster update",
+				"cluster", hcpClusterName,
+				"attempt", attempt)
 		}
-		return nil, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating: %w", hcpClusterName, resourceGroupName, err)
-	}
 
-	switch m := any(operationResult).(type) {
-	case hcpsdk20240610preview.HcpOpenShiftClustersClientUpdateResponse:
-		// Verify the operationResult content matches the current cluster model.
-		// When an asynchronous operation completes successfully, the RP's result
-		// endpoint for the operation is supposed to respond as though the operation
-		// were completed synchronously. In production, ARM would call this endpoint
-		// automatically. In this context, the poller calls it automatically.
-		expect, err := GetHCPCluster(ctx, hcpClient, resourceGroupName, hcpClusterName)
+		poller, err := hcpClient.BeginUpdate(ctx, resourceGroupName, hcpClusterName, update, nil)
 		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				return nil, fmt.Errorf("failed getting hcpCluster=%q in resourcegroup=%q, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+			if isTransientUpdateError(err) {
+				return false, nil
 			}
-			return nil, err
+			return false, err
 		}
-		err = checkOperationResult(&expect.HcpOpenShiftCluster, &m.HcpOpenShiftCluster)
+
+		operationResult, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
+			Frequency: StandardPollInterval,
+		})
 		if err != nil {
-			return nil, err
+			if isTransientUpdateError(err) {
+				return false, nil
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return false, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+			}
+			return false, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating: %w", hcpClusterName, resourceGroupName, err)
 		}
-		return &m.HcpOpenShiftCluster, nil
-	default:
-		return nil, fmt.Errorf("unknown type %T", m)
+
+		switch m := any(operationResult).(type) {
+		case hcpsdk20240610preview.HcpOpenShiftClustersClientUpdateResponse:
+			expect, err := GetHCPCluster(ctx, hcpClient, resourceGroupName, hcpClusterName)
+			if err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					return false, fmt.Errorf("failed getting hcpCluster=%q in resourcegroup=%q, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+				}
+				return false, err
+			}
+			if err := checkOperationResult(&expect.HcpOpenShiftCluster, &m.HcpOpenShiftCluster); err != nil {
+				return false, err
+			}
+			hcpOpenShiftCluster = &m.HcpOpenShiftCluster
+			return true, nil
+		default:
+			return false, fmt.Errorf("unknown type %T", m)
+		}
+	})
+
+	if err != nil && attempt > 1 {
+		ginkgo.GinkgoLogr.Info("Cluster update failed after retries",
+			"cluster", hcpClusterName,
+			"resourceGroup", resourceGroupName,
+			"attempts", attempt,
+			"error", err.Error())
 	}
+
+	return hcpOpenShiftCluster, err
 }
 
-// UpdateHCPCluster20251223 updates an HCP cluster using the v20251223preview SDK and waits for the operation to complete
+// stateConflictBackoff is the retry config for transient state conflicts (ARO-25884).
+var stateConflictBackoff = wait.Backoff{
+	Steps:    3,               // up to 3 attempts total
+	Duration: 1 * time.Minute, // initial wait before first retry
+	Factor:   2.0,             // double the wait each retry (1m, 2m)
+	Jitter:   0.1,             // ±10% randomization to avoid thundering herd
+}
+
+// isTransientUpdateError detects errors worth retrying during cluster updates:
+//   - HTTP 500: e.g. Cosmos DB ETag conflict after cluster-service commit
+//   - HTTP 409: Conflict
+func isTransientUpdateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var responseError *azcore.ResponseError
+	if !errors.As(err, &responseError) {
+		return false
+	}
+	return responseError.StatusCode == http.StatusInternalServerError ||
+		responseError.StatusCode == http.StatusConflict
+}
+
+// UpdateHCPCluster20251223 updates an HCP cluster using the v20251223preview SDK and waits for the operation to complete.
+// Transient 500 and 409 errors are retried automatically with exponential backoff.
 func UpdateHCPCluster20251223(
 	ctx context.Context,
 	hcpClient *hcpsdk20251223preview.HcpOpenShiftClustersClient,
@@ -323,22 +373,51 @@ func UpdateHCPCluster20251223(
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, fmt.Errorf("timeout '%f' minutes exceeded during UpdateHCPCluster20251223 for cluster %s in resource group %s", timeout.Minutes(), hcpClusterName, resourceGroupName))
 	defer cancel()
 
-	poller, err := hcpClient.BeginUpdate(ctx, resourceGroupName, hcpClusterName, update, nil)
-	if err != nil {
-		return nil, err
-	}
+	var hcpOpenShiftCluster *hcpsdk20251223preview.HcpOpenShiftCluster
+	attempt := 0
 
-	operationResult, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
-		Frequency: StandardPollInterval,
-	})
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+	err := wait.ExponentialBackoffWithContext(ctx, stateConflictBackoff, func(ctx context.Context) (bool, error) {
+		attempt++
+		if attempt > 1 {
+			ginkgo.GinkgoLogr.Info("Retrying cluster update",
+				"cluster", hcpClusterName,
+				"attempt", attempt)
 		}
-		return nil, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating: %w", hcpClusterName, resourceGroupName, err)
+
+		poller, err := hcpClient.BeginUpdate(ctx, resourceGroupName, hcpClusterName, update, nil)
+		if err != nil {
+			if isTransientUpdateError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		operationResult, err := poller.PollUntilDone(ctx, &runtime.PollUntilDoneOptions{
+			Frequency: StandardPollInterval,
+		})
+		if err != nil {
+			if isTransientUpdateError(err) {
+				return false, nil
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				return false, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating, caused by: %w, error: %w", hcpClusterName, resourceGroupName, context.Cause(ctx), err)
+			}
+			return false, fmt.Errorf("failed waiting for hcpCluster=%q in resourcegroup=%q to finish updating: %w", hcpClusterName, resourceGroupName, err)
+		}
+
+		hcpOpenShiftCluster = &operationResult.HcpOpenShiftCluster
+		return true, nil
+	})
+
+	if err != nil && attempt > 1 {
+		ginkgo.GinkgoLogr.Info("Cluster update failed after retries",
+			"cluster", hcpClusterName,
+			"resourceGroup", resourceGroupName,
+			"attempts", attempt,
+			"error", err.Error())
 	}
 
-	return &operationResult.HcpOpenShiftCluster, nil
+	return hcpOpenShiftCluster, err
 }
 
 // GetHCPCluster fetches an HCP cluster
