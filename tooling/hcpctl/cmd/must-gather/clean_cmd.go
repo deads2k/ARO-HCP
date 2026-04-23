@@ -199,11 +199,11 @@ func walkAndMatchRegexPatterns(logger logr.Logger, configPath string, patterns [
 		}
 		for _, replacement := range patterns {
 			matches := replacement.Regex.FindAllString(string(content), -1)
-			if len(matches) > 0 {
-				if _, exists := matchedReplacements[matches[0]]; exists {
+			for _, match := range matches {
+				if _, exists := matchedReplacements[match]; exists {
 					continue
 				}
-				matchedReplacements[matches[0]] = fmt.Sprintf(replacement.ReplacementPattern, replacementIndex)
+				matchedReplacements[match] = fmt.Sprintf(replacement.ReplacementPattern, replacementIndex)
 				replacementIndex++
 			}
 		}
