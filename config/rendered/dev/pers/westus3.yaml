@@ -198,7 +198,7 @@ clustersService:
     name: arohcp-pers-dbcs-usw3test
     password: TheBlurstOfTimes
     private: false
-    serverSku: Standard_D2s_v3
+    serverSku: Standard_D8s_v3
     serverStorageSizeGB: 128
     serverVersion: "17"
     zoneRedundantMode: Auto
