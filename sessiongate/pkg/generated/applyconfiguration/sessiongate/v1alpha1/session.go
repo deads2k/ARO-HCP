@@ -18,7 +18,11 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+
+	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
+	internal "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/internal"
 )
 
 // SessionApplyConfiguration represents a declarative configuration of the Session type for use
@@ -39,6 +43,42 @@ func Session(name, namespace string) *SessionApplyConfiguration {
 	b.WithKind("Session")
 	b.WithAPIVersion("sessiongate.aro-hcp.azure.com/v1alpha1")
 	return b
+}
+
+// ExtractSession extracts the applied configuration owned by fieldManager from
+// session. If no managedFields are found in session for fieldManager, a
+// SessionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// session must be a unmodified Session API object that was retrieved from the Kubernetes API.
+// ExtractSession provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractSession(session *sessiongatev1alpha1.Session, fieldManager string) (*SessionApplyConfiguration, error) {
+	return extractSession(session, fieldManager, "")
+}
+
+// ExtractSessionStatus is the same as ExtractSession except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractSessionStatus(session *sessiongatev1alpha1.Session, fieldManager string) (*SessionApplyConfiguration, error) {
+	return extractSession(session, fieldManager, "status")
+}
+
+func extractSession(session *sessiongatev1alpha1.Session, fieldManager string, subresource string) (*SessionApplyConfiguration, error) {
+	b := &SessionApplyConfiguration{}
+	err := managedfields.ExtractInto(session, internal.Parser().Type("com.github.Azure.ARO-HCP.sessiongate.pkg.apis.sessiongate.v1alpha1.Session"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(session.Name)
+	b.WithNamespace(session.Namespace)
+
+	b.WithKind("Session")
+	b.WithAPIVersion("sessiongate.aro-hcp.azure.com/v1alpha1")
+	return b, nil
 }
 func (b SessionApplyConfiguration) IsApplyConfiguration() {}
 

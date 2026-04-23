@@ -178,7 +178,7 @@ type SessionStatus struct {
 	// - "CredentialsAvailable": True when session credentials have been created
 	// - "NetworkPathAvailable": True when the network path to the HCP is established
 	// The status of each condition is one of True, False, or Unknown.
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
 	// +optional
 	// expiresAt is the timestamp when the session will expire and become invalid.
