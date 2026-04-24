@@ -15,6 +15,7 @@ This document is intended for ARO HCP developers and SREs. It provides an overvi
     - [Environment-Specific E2E Tests](#environment-specific-e2e-tests)
   - [Postsubmit Jobs](#postsubmit-jobs)
     - [E2E test container image (`aro-hcp-e2e-tests`)](#e2e-test-container-image-aro-hcp-e2e-tests)
+    - [Image Build, Push and CSPR CD](#image-build-push-and-cd)
     - [EV2 Gating E2E Tests](#ev2-gating-e2e-tests)
   - [Periodic Jobs](#periodic-jobs)
     - [Image Updater Tooling](#image-updater-tooling)
@@ -133,7 +134,21 @@ These optional jobs allow testing against specific Azure environments before mer
 
 ### Postsubmit Jobs
 
-Postsubmit jobs are triggered by EV2 pipelines via the Gangway API to run E2E gating tests against a specific ARO-HCP commit. Unlike periodic jobs, these jobs receive a `base_sha` parameter that pins the test execution to the exact commit being deployed, ensuring E2E tests validate the code that was actually promoted rather than HEAD.
+Postsubmit jobs run after a PR is merged to the main branch.
+
+#### Image Build, Push and CSPR CD
+
+| Job | Always Runs | Purpose |
+|-----|-------------|---------|
+| images | Yes | Build and promote all service images |
+| baseimage-generator-images | Yes | Build and promote the CI base image |
+| images-push | Yes | Push promoted images to the service ACR |
+| cspr | Yes | Deploy to the [CSPR environment](cspr.md) |
+| global-pipeline-postsubmit | No (config/infra changes only) | Deploy shared global resources to the dev environment |
+
+#### EV2 Gating E2E Tests
+
+EV2 gating E2E tests are triggered programmatically by EV2 pipelines via the Gangway API to run E2E gating tests against a specific ARO-HCP commit. Unlike periodic jobs, these jobs receive a `base_sha` parameter that pins the test execution to the exact commit being deployed, ensuring E2E tests validate the code that was actually promoted rather than HEAD.
 
 These jobs are defined in the `e2e` variant configuration ([Azure-ARO-HCP-main__e2e.yaml](https://github.com/openshift/release/blob/master/ci-operator/config/Azure/ARO-HCP/Azure-ARO-HCP-main__e2e.yaml)) and use `run_if_changed: ^$` to prevent automatic triggering on merge — they are only triggered programmatically via the [prow-job-executor](https://github.com/Azure/ARO-Tools/tree/main/tools/prow-job-executor).
 
@@ -162,8 +177,6 @@ quay-proxy.ci.openshift.org/aro-hcp/aro-hcp-e2e-tests:latest
 Read [Summary of available registries](https://docs.ci.openshift.org/how-tos/use-registries-in-build-farm/#summary-of-available-registries), the table contains link to **app.ci** cluster.
 
 Follow [How do I gain access to QCI?](https://docs.ci.openshift.org/how-tos/use-registries-in-build-farm/#how-do-i-gain-access-to-qci) in the OpenShift CI docs for RBAC on **app.ci** and logging in to **`quay-proxy.ci.openshift.org`** (human users or service accounts). Once you can authenticate, use the pullspec above with `podman pull` (see the same page for the `podman login` pattern with your **app.ci** identity).
-
-#### EV2 Gating E2E Tests
 
 ##### Integration Environment
 

@@ -81,7 +81,7 @@ clustersService:
 
 ARO HCP combines various service components to form the hosted control plane management stack. Images for components that are not ARO HCP specific are sourced from Red Hat registries and repositories like quay.io (OCP, CS, Maestro, Hypershift) or registry.redhat.io (ACM).
 
-The component images that are ARO HCP specific (RP frontend, RP backend, Admin API, oc-mirror), are built directly within the [ARO HCP repository](https://github.com/Azure/aro-hcp) with [GitHub Actions](../.github/workflows/services-ci.yml) and pushed to the `arohcpsvcdev` ACR in the RH DEV environment. These images are then mirrored to the respective service ACRs in the other environments using the [on-demand sync](#on-demand-sync) process.
+The component images that are ARO HCP specific (RP frontend, RP backend, Admin API, oc-mirror), are built by [Prow CI](prow.md) using job definitions from the [openshift/release](https://github.com/openshift/release/tree/master/ci-operator/jobs/Azure/ARO-HCP) repository and pushed to the `arohcpsvcdev` ACR in the RH DEV environment. These images are then mirrored to the respective service ACRs in the other environments using the [on-demand sync](#on-demand-sync) process.
 
 ## Image Pulling
 
