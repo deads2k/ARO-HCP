@@ -23,8 +23,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -34,11 +38,27 @@ import (
 
 	certificatesv1alpha1 "github.com/openshift/hypershift/api/certificates/v1alpha1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	hypershiftclientset "github.com/openshift/hypershift/client/clientset/clientset"
-	certificatesclientv1alpha1 "github.com/openshift/hypershift/client/clientset/clientset/typed/certificates/v1alpha1"
-	hypershiftinformers "github.com/openshift/hypershift/client/informers/externalversions"
 
 	"github.com/Azure/ARO-HCP/sessiongate/pkg/mc"
+)
+
+var (
+	hostedControlPlaneGVR = schema.GroupVersionResource{
+		Group:    hypershiftv1beta1.GroupVersion.Group,
+		Version:  hypershiftv1beta1.GroupVersion.Version,
+		Resource: "hostedcontrolplanes",
+	}
+	hostedControlPlaneGR = schema.GroupResource{
+		Group:    hostedControlPlaneGVR.Group,
+		Resource: hostedControlPlaneGVR.Resource,
+	}
+
+	csrApprovalGVR = schema.GroupVersionResource{
+		Group:    certificatesv1alpha1.SchemeGroupVersion.Group,
+		Version:  certificatesv1alpha1.SchemeGroupVersion.Version,
+		Resource: "certificatesigningrequestapprovals",
+	}
+	csrApprovalGVK = certificatesv1alpha1.SchemeGroupVersion.WithKind("CertificateSigningRequestApproval")
 )
 
 // ManagementClusterQuerier provides read access to management cluster resources via informer listers.
@@ -67,22 +87,17 @@ func (f *ManagementClusterProviderFactory) BuildManagementClusterProvider(ctx co
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
-	hypershiftClientset, err := hypershiftclientset.NewForConfig(kubeConfig)
+	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create hypershift clientset: %w", err)
-	}
-	certificatesClientset, err := certificatesclientv1alpha1.NewForConfig(kubeConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create certificates clientset: %w", err)
+		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
 	return &ManagementClusterProvider{
-		HypershiftClient: hypershiftClientset,
-		HypershiftInformers: hypershiftinformers.NewSharedInformerFactoryWithOptions(
-			hypershiftClientset,
+		DynamicClient: dynamicClient,
+		DynamicInformers: dynamicinformer.NewDynamicSharedInformerFactory(
+			dynamicClient,
 			time.Second*300,
 		),
-		CertificatesClient: certificatesClientset,
-		KubeClient:         kubeClient,
+		KubeClient: kubeClient,
 		KubeInformers: kubeinformers.NewSharedInformerFactoryWithOptions(
 			kubeClient,
 			time.Second*300,
@@ -96,29 +111,25 @@ func (f *ManagementClusterProviderFactory) BuildManagementClusterProvider(ctx co
 
 // managementClusterProvider implements ManagementClusterProvider
 type ManagementClusterProvider struct {
-	HypershiftClient    hypershiftclientset.Interface
-	HypershiftInformers hypershiftinformers.SharedInformerFactory
-	CertificatesClient  certificatesclientv1alpha1.CertificatesV1alpha1Interface
-	KubeClient          kubernetes.Interface
-	KubeInformers       kubeinformers.SharedInformerFactory
-	stopCh              chan struct{}
+	DynamicClient    dynamic.Interface
+	DynamicInformers dynamicinformer.DynamicSharedInformerFactory
+	KubeClient       kubernetes.Interface
+	KubeInformers    kubeinformers.SharedInformerFactory
+	stopCh           chan struct{}
 }
 
 func (d *ManagementClusterProvider) GetHostedControlPlane(namespace string) (*hypershiftv1beta1.HostedControlPlane, error) {
-	hcpList, err := d.HypershiftInformers.Hypershift().V1beta1().HostedControlPlanes().Lister().HostedControlPlanes(namespace).List(labels.Everything())
+	objs, err := d.DynamicInformers.ForResource(hostedControlPlaneGVR).Lister().ByNamespace(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list HostedControlPlanes: %w", err)
 	}
-	if len(hcpList) == 0 {
-		return nil, apierrors.NewNotFound(
-			schema.GroupResource{Group: "hypershift.openshift.io", Resource: "hostedcontrolplanes"},
-			namespace,
-		)
+	if len(objs) == 0 {
+		return nil, apierrors.NewNotFound(hostedControlPlaneGR, namespace)
 	}
-	if len(hcpList) > 1 {
+	if len(objs) > 1 {
 		return nil, fmt.Errorf("multiple HostedControlPlanes found for namespace %s", namespace)
 	}
-	return hcpList[0], nil
+	return unstructuredToHostedControlPlane(objs[0])
 }
 
 func (d *ManagementClusterProvider) GetCSR(name string) (*certificatesv1.CertificateSigningRequest, error) {
@@ -126,7 +137,52 @@ func (d *ManagementClusterProvider) GetCSR(name string) (*certificatesv1.Certifi
 }
 
 func (d *ManagementClusterProvider) GetCSRApproval(hostedControlPlaneNamespace, name string) (*certificatesv1alpha1.CertificateSigningRequestApproval, error) {
-	return d.HypershiftInformers.Certificates().V1alpha1().CertificateSigningRequestApprovals().Lister().CertificateSigningRequestApprovals(hostedControlPlaneNamespace).Get(name)
+	obj, err := d.DynamicInformers.ForResource(csrApprovalGVR).Lister().ByNamespace(hostedControlPlaneNamespace).Get(name)
+	if err != nil {
+		return nil, err
+	}
+	return unstructuredToCSRApproval(obj)
+}
+
+// unstructuredToHostedControlPlane converts a runtime.Object (expected to be
+// *unstructured.Unstructured, as produced by the dynamic informer) into the
+// typed HostedControlPlane via runtime.DefaultUnstructuredConverter.
+func unstructuredToHostedControlPlane(obj runtime.Object) (*hypershiftv1beta1.HostedControlPlane, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured for HostedControlPlane, got %T", obj)
+	}
+	hcp := &hypershiftv1beta1.HostedControlPlane{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), hcp); err != nil {
+		return nil, fmt.Errorf("failed to convert unstructured to HostedControlPlane: %w", err)
+	}
+	return hcp, nil
+}
+
+// unstructuredToCSRApproval converts a runtime.Object (expected to be
+// *unstructured.Unstructured, as produced by the dynamic informer) into the
+// typed CertificateSigningRequestApproval via runtime.DefaultUnstructuredConverter.
+func unstructuredToCSRApproval(obj runtime.Object) (*certificatesv1alpha1.CertificateSigningRequestApproval, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured for CertificateSigningRequestApproval, got %T", obj)
+	}
+	approval := &certificatesv1alpha1.CertificateSigningRequestApproval{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), approval); err != nil {
+		return nil, fmt.Errorf("failed to convert unstructured to CertificateSigningRequestApproval: %w", err)
+	}
+	return approval, nil
+}
+
+// csrApprovalToUnstructured converts a typed CertificateSigningRequestApproval
+// into an *unstructured.Unstructured suitable for dynamic-client apply.
+func csrApprovalToUnstructured(approval *certificatesv1alpha1.CertificateSigningRequestApproval) (*unstructured.Unstructured, error) {
+	approval.SetGroupVersionKind(csrApprovalGVK)
+	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(approval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert CertificateSigningRequestApproval to unstructured: %w", err)
+	}
+	return &unstructured.Unstructured{Object: raw}, nil
 }
 
 // Management cluster provider lifecycle methods on SessionController.
@@ -165,7 +221,7 @@ func (c *SessionController) registerMCProvider(ctx context.Context, resourceId s
 	}
 
 	// Register CSR Approval informer
-	csrApprovalInformer := provider.HypershiftInformers.Certificates().V1alpha1().CertificateSigningRequestApprovals().Informer()
+	csrApprovalInformer := provider.DynamicInformers.ForResource(csrApprovalGVR).Informer()
 	if err := registerInformer(csrApprovalInformer, sessionKeyFromOwnershipAnnotation, c.workqueue); err != nil {
 		close(provider.stopCh)
 		return fmt.Errorf("failed to register CSR approval informer: %w", err)
@@ -174,10 +230,15 @@ func (c *SessionController) registerMCProvider(ctx context.Context, resourceId s
 	// Register HostedControlPlane informer.
 	// Only enqueue sessions on HCP creation/deletion and when the HCP Available condition
 	// changes to avoid unnecessary reconciliations from unrelated HCP status updates.
-	hcpInformer := provider.HypershiftInformers.Hypershift().V1beta1().HostedControlPlanes().Informer()
+	hcpInformer := provider.DynamicInformers.ForResource(hostedControlPlaneGVR).Informer()
 	enqueueSessionsForHCP := func(obj interface{}) {
-		hcp, ok := obj.(*hypershiftv1beta1.HostedControlPlane)
+		u, ok := obj.(*unstructured.Unstructured)
 		if !ok {
+			return
+		}
+		hcp, err := unstructuredToHostedControlPlane(u)
+		if err != nil {
+			klog.ErrorS(err, "failed to convert HostedControlPlane from unstructured")
 			return
 		}
 		for _, key := range c.sessionKeysForHCP(resourceId, hcp) {
@@ -187,12 +248,20 @@ func (c *SessionController) registerMCProvider(ctx context.Context, resourceId s
 	if _, err := hcpInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: enqueueSessionsForHCP,
 		UpdateFunc: func(old, cur interface{}) {
-			oldHCP, ok := old.(*hypershiftv1beta1.HostedControlPlane)
+			oldU, ok := old.(*unstructured.Unstructured)
 			if !ok {
 				return
 			}
-			curHCP, ok := cur.(*hypershiftv1beta1.HostedControlPlane)
+			curU, ok := cur.(*unstructured.Unstructured)
 			if !ok {
+				return
+			}
+			oldHCP, err := unstructuredToHostedControlPlane(oldU)
+			if err != nil {
+				return
+			}
+			curHCP, err := unstructuredToHostedControlPlane(curU)
+			if err != nil {
 				return
 			}
 			oldAvailable := meta.FindStatusCondition(oldHCP.Status.Conditions, "Available")
@@ -200,7 +269,7 @@ func (c *SessionController) registerMCProvider(ctx context.Context, resourceId s
 			if !hasConditionStatusChanged(oldAvailable, curAvailable) {
 				return
 			}
-			enqueueSessionsForHCP(curHCP)
+			enqueueSessionsForHCP(curU)
 		},
 		DeleteFunc: enqueueSessionsForHCP,
 	}); err != nil {
@@ -209,23 +278,23 @@ func (c *SessionController) registerMCProvider(ctx context.Context, resourceId s
 
 	klog.InfoS("starting management cluster provider informers", "resourceID", resourceId)
 	provider.KubeInformers.Start(provider.stopCh)
-	provider.HypershiftInformers.Start(provider.stopCh)
+	provider.DynamicInformers.Start(provider.stopCh)
 
 	klog.InfoS("waiting for management cluster provider caches to sync", "resourceID", resourceId)
 	timeoutCtx, cancel := context.WithTimeout(ctx, cacheSyncTimeout)
 	defer cancel()
 
 	cachesToSync := []cache.InformerSynced{
-		provider.KubeInformers.Certificates().V1().CertificateSigningRequests().Informer().HasSynced,
-		provider.HypershiftInformers.Certificates().V1alpha1().CertificateSigningRequestApprovals().Informer().HasSynced,
-		provider.HypershiftInformers.Hypershift().V1beta1().HostedControlPlanes().Informer().HasSynced,
+		csrInformer.HasSynced,
+		csrApprovalInformer.HasSynced,
+		hcpInformer.HasSynced,
 	}
 
 	if !cache.WaitForCacheSync(timeoutCtx.Done(), cachesToSync...) {
 		// close stopCh first: Shutdown() calls wg.Wait() which blocks until
 		// all informer goroutines exit, and they only exit when stopCh is closed.
 		close(provider.stopCh)
-		provider.HypershiftInformers.Shutdown()
+		provider.DynamicInformers.Shutdown()
 		provider.KubeInformers.Shutdown()
 		return fmt.Errorf("timeout waiting for caches to sync for management cluster: %s", resourceId)
 	}
@@ -266,7 +335,7 @@ func (c *SessionController) unregisterMCProvider(resourceId string) error {
 	// close stopCh first: Shutdown() calls wg.Wait() which blocks until
 	// all informer goroutines exit, and they only exit when stopCh is closed.
 	close(provider.stopCh)
-	provider.HypershiftInformers.Shutdown()
+	provider.DynamicInformers.Shutdown()
 	provider.KubeInformers.Shutdown()
 
 	delete(c.mcProviders, resourceId)

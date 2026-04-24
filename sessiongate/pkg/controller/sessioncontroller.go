@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	certapplyv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
-	certificatesv1alpha1apply "github.com/openshift/hypershift/client/applyconfiguration/certificates/v1alpha1"
+	certificatesv1alpha1 "github.com/openshift/hypershift/api/certificates/v1alpha1"
 
 	sessiongatev1alpha1 "github.com/Azure/ARO-HCP/sessiongate/pkg/apis/sessiongate/v1alpha1"
 	sessiongatv1alpha1applyconfigurations "github.com/Azure/ARO-HCP/sessiongate/pkg/generated/applyconfiguration/sessiongate/v1alpha1"
@@ -281,7 +282,11 @@ func (c *SessionController) syncSession(ctx context.Context, session *sessiongat
 		case action.CSR != nil:
 			_, err = mc.KubeClient.CertificatesV1().CertificateSigningRequests().Apply(ctx, action.CSR, metav1.ApplyOptions{FieldManager: ControllerAgentName, Force: true})
 		case action.CSRApproval != nil:
-			_, err = mc.CertificatesClient.CertificateSigningRequestApprovals(action.CSRApproval.Namespace).Apply(ctx, action.CSRApproval.Approval, metav1.ApplyOptions{FieldManager: ControllerAgentName, Force: true})
+			var approvalObj *unstructured.Unstructured
+			approvalObj, err = csrApprovalToUnstructured(action.CSRApproval.Approval)
+			if err == nil {
+				_, err = mc.DynamicClient.Resource(csrApprovalGVR).Namespace(action.CSRApproval.Namespace).Apply(ctx, action.CSRApproval.Approval.Name, approvalObj, metav1.ApplyOptions{FieldManager: ControllerAgentName, Force: true})
+			}
 		case action.DeleteSession:
 			err = c.sessiongateClient.SessiongateV1alpha1().Sessions(session.Namespace).Delete(ctx, session.Name, metav1.DeleteOptions{})
 		case action.DeleteCSR:
@@ -304,7 +309,7 @@ type actions struct {
 
 type csrApprovalAction struct {
 	Namespace string
-	Approval  *certificatesv1alpha1apply.CertificateSigningRequestApprovalApplyConfiguration
+	Approval  *certificatesv1alpha1.CertificateSigningRequestApproval
 }
 
 func (a *actions) validate() error {
@@ -629,10 +634,12 @@ func (c *SessionController) generateCredentials(ctx context.Context, session *se
 			if csrApproval == nil {
 				return true, &actions{CSRApproval: &csrApprovalAction{
 					Namespace: session.Spec.HostedControlPlane.Namespace,
-					Approval: certificatesv1alpha1apply.CertificateSigningRequestApproval(
-						csrName,
-						session.Spec.HostedControlPlane.Namespace,
-					),
+					Approval: &certificatesv1alpha1.CertificateSigningRequestApproval{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      csrName,
+							Namespace: session.Spec.HostedControlPlane.Namespace,
+						},
+					},
 				}}, nil
 			}
 			// approval is in place, so we just need to wait some more - the CSR informer will let us know when the CSR changed
