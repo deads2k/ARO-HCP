@@ -27,6 +27,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
@@ -39,6 +40,39 @@ import (
 	"github.com/Azure/ARO-HCP/internal/api"
 	"github.com/Azure/ARO-HCP/internal/utils/apihelpers"
 )
+
+// immutableByCompare and immutableByReflect are local copies of the helpers
+// removed in k8s.io/apimachinery v0.35.1 (previously in pkg/api/validate/immutable.go).
+// The upstream replacement (validate.Immutable) relies on the k8s ratcheting
+// framework and always returns an error on update without comparing values.
+// Our validation calls these without ratcheting, so we keep the old comparison
+// semantics.
+func immutableByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+	if value == nil && oldValue == nil {
+		return nil
+	}
+	if value == nil || oldValue == nil || *value != *oldValue {
+		return field.ErrorList{
+			field.Forbidden(fldPath, "field is immutable"),
+		}
+	}
+	return nil
+}
+
+func immutableByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+	if !equality.Semantic.DeepEqual(value, oldValue) {
+		return field.ErrorList{
+			field.Forbidden(fldPath, "field is immutable"),
+		}
+	}
+	return nil
+}
 
 func NoExtraWhitespace(_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *string) field.ErrorList {
 	if value == nil {
