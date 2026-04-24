@@ -13,6 +13,9 @@ param databaseName string
 @description('Kusto data connection resource name')
 param kustoDataConnectionName string
 
+@description('Azure Region Location')
+param location string = resourceGroup().location
+
 @description('Whether the arobit Kusto cluster is enabled in this region')
 param kustoEnabled bool
 
@@ -29,7 +32,7 @@ resource kustoCluster 'Microsoft.Kusto/clusters@2024-04-13' existing = if (kusto
 // Kusto Event Hub data connection for AKS audit logs
 resource kustoDataConnection 'Microsoft.Kusto/clusters/databases/dataConnections@2024-04-13' = if (kustoEnabled && eventhubEnabled && manageInstance) {
   name: '${kustoName}/${databaseName}/${kustoDataConnectionName}'
-  location: resourceGroup().location
+  location: location
   kind: 'EventHub'
   properties: {
     eventHubResourceId: auditLogsEventHubId

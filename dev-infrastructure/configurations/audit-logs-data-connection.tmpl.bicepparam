@@ -1,5 +1,6 @@
 using '../templates/audit-logs-data-connection.bicep'
 
+param location = '{{ .kusto.location }}'
 param kustoName = '{{ .kusto.kustoName }}'
 param auditLogsKustoConsumerGroupName = '{{ .auditLogsEventHub.kustoConsumerGroupName }}'
 param auditLogsEventHubId = '__auditLogsEventHubId__'
