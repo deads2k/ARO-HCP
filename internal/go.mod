@@ -21,9 +21,9 @@ require (
 	github.com/microsoft/kiota-serialization-multipart-go v1.1.2
 	github.com/microsoft/kiota-serialization-text-go v1.1.2
 	github.com/openshift-online/ocm-sdk-go v0.1.498
-	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc
+	github.com/openshift/api v0.0.0-20260304122341-cf5d8996109f
 	github.com/openshift/cluster-version-operator v1.0.1-0.20260202115537-557510ea0603
-	github.com/openshift/hypershift/api v0.0.0-20260226113135-8ab86680f975
+	github.com/openshift/hypershift/api v0.0.0-20260424195428-c1a8bb61ff14
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/contrib/exporters/autoexport v0.64.0
@@ -61,6 +61,7 @@ require (
 	github.com/golang/glog v1.2.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -75,8 +76,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
-	github.com/onsi/gomega v1.39.1 // indirect
 	github.com/openshift-online/ocm-api-model/clientapi v0.0.453 // indirect
 	github.com/openshift-online/ocm-api-model/model v0.0.453 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect

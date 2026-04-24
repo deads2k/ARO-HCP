@@ -35,15 +35,14 @@ require (
 	github.com/go-json-experiment/json v0.0.0-20250517221953-25912455fbc8 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.6.7 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/openshift-online/ocm-api-model/clientapi v0.0.453 // indirect
 	github.com/openshift-online/ocm-api-model/model v0.0.453 // indirect
-	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc // indirect
-	github.com/openshift/hypershift/api v0.0.0-20260226113135-8ab86680f975 // indirect
+	github.com/openshift/api v0.0.0-20260304122341-cf5d8996109f // indirect
+	github.com/openshift/hypershift/api v0.0.0-20260424195428-c1a8bb61ff14 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

@@ -69,9 +69,9 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/openshift-online/maestro v0.0.0-20260213014104-081c1f6df17b // indirect
 	github.com/openshift-online/ocm-api-model/model v0.0.453 // indirect
-	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc // indirect
+	github.com/openshift/api v0.0.0-20260304122341-cf5d8996109f // indirect
 	github.com/openshift/cluster-version-operator v1.0.1-0.20260202115537-557510ea0603 // indirect
-	github.com/openshift/hypershift/api v0.0.0-20260226113135-8ab86680f975 // indirect
+	github.com/openshift/hypershift/api v0.0.0-20260424195428-c1a8bb61ff14 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

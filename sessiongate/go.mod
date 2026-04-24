@@ -8,8 +8,8 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice v1.0.0
 	github.com/google/go-cmp v0.7.0
 	github.com/openshift-eng/openshift-tests-extension v0.0.0-20260408205138-ec501c2bf4a5
-	github.com/openshift/hypershift v0.1.70
-	github.com/openshift/hypershift/api v0.0.0-20260226113135-8ab86680f975
+	github.com/openshift/hypershift v0.0.0-20260424195428-c1a8bb61ff14
+	github.com/openshift/hypershift/api v0.0.0-20260424195428-c1a8bb61ff14
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/sync v0.20.0
@@ -58,9 +58,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/onsi/ginkgo/v2 v2.28.1 // indirect
-	github.com/onsi/gomega v1.39.1 // indirect
-	github.com/openshift/api v0.0.0-20260130140113-71e91db96ffc // indirect
+	github.com/openshift/api v0.0.0-20260304122341-cf5d8996109f // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -96,7 +94,8 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
 
+// these match hypershift
 replace (
-	github.com/aws/karpenter-provider-aws => github.com/aws/karpenter-provider-aws v1.0.0
-	sigs.k8s.io/karpenter => sigs.k8s.io/karpenter v1.0.0
+	github.com/aws/karpenter-provider-aws => github.com/openshift/aws-karpenter-provider-aws v0.0.0-20260207025257-2e871ee4d207
+	sigs.k8s.io/karpenter => github.com/openshift/kubernetes-sigs-karpenter v0.0.0-20260206012902-048debf98313
 )
