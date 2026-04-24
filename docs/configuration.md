@@ -208,7 +208,7 @@ Check the section about [Materializing Configuration](#materializing-configurati
 Propagation of configuration changes varies depending on the environment:
 
 - **[config.yaml](../config/config.yaml)**:
-  - Only the **dev** and **cspr** environments are automatically reconciled with new changes for configuration, infrastructure, and service deployments.
+  - Only the **cspr** environment is automatically reconciled with new changes for configuration, infrastructure, and service deployments via [Prow](prow.md).
   - personal development environments (**pers**) are fully controlled by developers. If there are relevant changes, notify developers so they can apply updates manually.
 
 - **[ADO sdp-pipelines/hcp/config.clouds-overlay.yaml](https://dev.azure.com/msazure/AzureRedHatOpenShift/_git/sdp-pipelines?path=/hcp/config.clouds-overlay.yaml)**:
