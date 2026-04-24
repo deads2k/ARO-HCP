@@ -31,7 +31,7 @@ import (
 const (
 	KustoLogsCurrentCollectorName = "kusto-logs-current"
 	KustoLogsCurrentQueryTimeout  = 1 * time.Minute
-	KustoQueryInterval            = 15 * time.Minute
+	KustoQueryInterval            = 5 * time.Minute
 )
 
 var (

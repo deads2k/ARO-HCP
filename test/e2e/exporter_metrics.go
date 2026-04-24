@@ -126,11 +126,7 @@ var _ = Describe("Engineering", func() {
 				}
 
 				By("verifying kusto_logs_age_in_seconds is present")
-				if !strings.Contains(metricsOutput, "kusto_logs_age_in_seconds") {
-					return false
-				}
-
-				return true
+				return strings.Contains(metricsOutput, "kusto_logs_age_in_seconds")
 			}).WithTimeout(30 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
 		})
 })
