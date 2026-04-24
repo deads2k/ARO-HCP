@@ -21,8 +21,8 @@ imageRegistry: ""
 imageRepository: ""
 # Image Digest
 imageDigest: ""
-# log verbosity level
-logLevel: "debug"
+# log verbosity level. It is a go-logr/logr verbosity level.
+logLevel: 4
 # Number of replicas of the service to run.
 replicas: 1
 # Location of the JSON web key set used to verify tokens.

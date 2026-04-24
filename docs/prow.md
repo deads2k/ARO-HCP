@@ -14,6 +14,7 @@ This document is intended for ARO HCP developers and SREs. It provides an overvi
     - [E2E Parallel](#e2e-parallel)
     - [Environment-Specific E2E Tests](#environment-specific-e2e-tests)
   - [Postsubmit Jobs](#postsubmit-jobs)
+    - [E2E test container image (`aro-hcp-e2e-tests`)](#e2e-test-container-image-aro-hcp-e2e-tests)
     - [Image Build, Push and CSPR CD](#image-build-push-and-cd)
     - [EV2 Gating E2E Tests](#ev2-gating-e2e-tests)
   - [Periodic Jobs](#periodic-jobs)
@@ -151,6 +152,32 @@ EV2 gating E2E tests are triggered programmatically by EV2 pipelines via the Gan
 
 These jobs are defined in the `e2e` variant configuration ([Azure-ARO-HCP-main__e2e.yaml](https://github.com/openshift/release/blob/master/ci-operator/config/Azure/ARO-HCP/Azure-ARO-HCP-main__e2e.yaml)) and use `run_if_changed: ^$` to prevent automatic triggering on merge — they are only triggered programmatically via the [prow-job-executor](https://github.com/Azure/ARO-Tools/tree/main/tools/prow-job-executor).
 
+#### E2E test container image (`aro-hcp-e2e-tests`)
+
+The **`aro-hcp-e2e-tests`** image is the OpenShift CI image that carries the `aro-hcp-tests` binary. The Dockerfile lives in this repository as [test/Containerfile.e2e](../test/Containerfile.e2e). CI wiring and promotion rules are maintained in [openshift/release](https://github.com/openshift/release).
+
+**Promotion:** Successful merges to `Azure/ARO-HCP` `main` run the branch **image postsubmit** (see [`branch-ci-Azure-ARO-HCP-main-images`](https://prow.ci.openshift.org/?job=branch-ci-Azure-ARO-HCP-main-images)), which builds the image and pushes it to the CI app registry so other jobs and developers can pull a tag that matches hash of merge commit or `latest`.
+
+**What is inside the image** (from [test/Containerfile.e2e](../test/Containerfile.e2e)):
+
+- **Base:** `registry.ci.openshift.org/aro-hcp/aro-hcp-ci-images:aro-hcp-e2e-base-ci`
+- **Source tree:** the full ARO-HCP checkout at `/opt/app-root/src/github.com/Azure/ARO-HCP`
+- **Build:** it compiles **`tooling/hcpctl`**, **`tooling/templatize`**, **`test/prow-job-executor`** and **`test/aro-hcp-tests`**. Building **`aro-hcp-tests`** also runs **`az bicep build`** on the Bicep under `demo/bicep` and `test/e2e-setup/bicep`, writing JSON into `test/e2e/test-artifacts/generated-test-artifacts/` (those files are Makefile prerequisites for the test binary)
+- **Image size / speed:** Go module and build caches are removed after the build (`go clean -cache -modcache`, and `go.work.sum` is dropped) so the runtime image stays smaller than a naive dev build
+- **Permissions:** the working directory is world-writable (`chmod 777`) for CI workloads that expect an open tree
+
+**Pull URL:** after promotion, the image is available from the build farm registry, for example:
+
+```text
+quay-proxy.ci.openshift.org/aro-hcp/aro-hcp-e2e-tests:latest
+```
+
+##### Pulling `aro-hcp-e2e-tests` with Podman
+
+Read [Summary of available registries](https://docs.ci.openshift.org/how-tos/use-registries-in-build-farm/#summary-of-available-registries), the table contains link to **app.ci** cluster.
+
+Follow [How do I gain access to QCI?](https://docs.ci.openshift.org/how-tos/use-registries-in-build-farm/#how-do-i-gain-access-to-qci) in the OpenShift CI docs for RBAC on **app.ci** and logging in to **`quay-proxy.ci.openshift.org`** (human users or service accounts). Once you can authenticate, use the pullspec above with `podman pull` (see the same page for the `podman login` pattern with your **app.ci** identity).
+
 ##### Integration Environment
 
 | Property | Value |
@@ -179,7 +206,7 @@ These jobs are defined in the `e2e` variant configuration ([Azure-ARO-HCP-main__
 | **Purpose** | Runs end-to-end parallel tests against the production environment after EV2 promotions. |
 
 > [!NOTE]
-> These postsubmit jobs build the `aro-hcp-e2e-tools` image from source at the pinned commit, so the test binary always matches the code being deployed. The ARO-HCP commit is extracted from the `EV2_ROLLOUT_VERSION` and passed as `--base-sha` to the prow-job-executor.
+> These postsubmit jobs build the **`aro-hcp-e2e-tests`** image (see [E2E test container image](#e2e-test-container-image-aro-hcp-e2e-tests)) from source at the pinned commit, so the test binary always matches the code being deployed. The ARO-HCP commit is extracted from the `EV2_ROLLOUT_VERSION` and passed as `--base-sha` to the prow-job-executor.
 
 ### Periodic Jobs
 
@@ -668,6 +695,7 @@ To modify or add jobs:
 ## Related Documentation
 
 - [OpenShift CI Documentation](https://docs.ci.openshift.org/docs/)
+- [Use registries in the build farm](https://docs.ci.openshift.org/how-tos/use-registries-in-build-farm/)
 - [Prow Documentation](https://docs.prow.k8s.io/)
 - [ARO HCP E2E Testing](../test/e2e/README.md)
 - [ARO HCP Environments](environments.md)
