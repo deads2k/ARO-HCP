@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/blang/semver/v4"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/utils/set"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 
 	"github.com/Azure/ARO-HCP/test/util/framework"
 )
@@ -73,11 +76,12 @@ func VerifyNodesReady() HostedClusterVerifier {
 }
 
 type verifyNodeCount struct {
-	expected int
+	clusterName string
+	expected    int
 }
 
 func (v verifyNodeCount) Name() string {
-	return fmt.Sprintf("VerifyNodeCount(%d)", v.expected)
+	return fmt.Sprintf("VerifyNodeCount(cluster=%s, expected=%d)", v.clusterName, v.expected)
 }
 
 func (v verifyNodeCount) Verify(ctx context.Context, adminRESTConfig *rest.Config) error {
@@ -92,16 +96,72 @@ func (v verifyNodeCount) Verify(ctx context.Context, adminRESTConfig *rest.Confi
 	}
 
 	if len(nodes.Items) != v.expected {
-		return fmt.Errorf("expected %d nodes, found %d", v.expected, len(nodes.Items))
+		if len(nodes.Items) == 0 {
+			return fmt.Errorf("cluster %s: expected %d nodes, found 0", v.clusterName, v.expected)
+		}
+		return fmt.Errorf("cluster %s: expected %d nodes, found %d; nodes per pool: %s",
+			v.clusterName, v.expected, len(nodes.Items), formatNodesByPool(nodes.Items))
 	}
 
 	return nil
 }
 
-func VerifyNodeCount(expected int) HostedClusterVerifier {
+func VerifyNodeCount(clusterName string, expected int) HostedClusterVerifier {
 	return verifyNodeCount{
-		expected: expected,
+		clusterName: clusterName,
+		expected:    expected,
 	}
+}
+
+// nodePoolNameRegex matches valid ARO-HCP node pool resource names
+// Same pattern as internal/validation/validators.go nodePoolResourceName, which is unexported.
+var nodePoolNameRegex = regexp.MustCompile(`^[a-zA-Z][-a-zA-Z0-9]{1,13}[a-zA-Z0-9]$`)
+
+// extractNodePoolName extracts the node pool name from a node's node pool label value.
+// The node pool label format is "<HostedCluster prefix>-<nodePoolName>". This scans left to right
+// for each "-" and returns the first suffix that matches the node pool name regex.
+// Falls back to the full label if no suffix matches.
+func extractNodePoolName(nodePoolLabel string) string {
+	for i := range len(nodePoolLabel) {
+		if nodePoolLabel[i] == '-' {
+			suffix := nodePoolLabel[i+1:]
+			if nodePoolNameRegex.MatchString(suffix) {
+				return suffix
+			}
+		}
+	}
+	return nodePoolLabel
+}
+
+// formatNodesByPool groups node names by their node pool name (extracted from the
+// node's node pool label value) and returns a sorted, human-readable summary such as:
+//
+//	np-scale-down: [node-1, node-2], np-scale-up: [node-3]
+func formatNodesByPool(nodes []corev1.Node) string {
+	const noLabel = "<no-nodepool-label>"
+	byNodePool := make(map[string][]string)
+	for i := range nodes {
+		nodePoolLabel, ok := nodes[i].Labels[hypershiftv1beta1.NodePoolLabel]
+		nodePoolName := noLabel
+		if ok {
+			nodePoolName = extractNodePoolName(nodePoolLabel)
+		}
+		byNodePool[nodePoolName] = append(byNodePool[nodePoolName], nodes[i].Name)
+	}
+
+	nodePoolNames := make([]string, 0, len(byNodePool))
+	for name := range byNodePool {
+		nodePoolNames = append(nodePoolNames, name)
+	}
+	sort.Strings(nodePoolNames)
+
+	parts := make([]string, 0, len(nodePoolNames))
+	for _, nodePoolName := range nodePoolNames {
+		nodeNames := byNodePool[nodePoolName]
+		sort.Strings(nodeNames)
+		parts = append(parts, fmt.Sprintf("%s: [%s]", nodePoolName, strings.Join(nodeNames, ", ")))
+	}
+	return strings.Join(parts, ", ")
 }
 
 type verifyNodePoolReadyAndSchedulableNodeCount struct {
