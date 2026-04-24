@@ -1,0 +1,33 @@
+rule_files:
+- kusto-logs-age-prometheusRule.yaml
+evaluation_interval: 1m
+tests:
+# KustoLogsDataStale - alert fires when age exceeds 1 hour
+- interval: 1m
+  input_series:
+  - series: 'kusto_logs_age_in_seconds{kusto_cluster="testcluster",cluster="sc-test",table="ContainerLog"}'
+    values: "3700+0x20"
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: KustoLogsDataStale
+    exp_alerts:
+    - exp_labels:
+        alertname: KustoLogsDataStale
+        severity: warning
+        kusto_cluster: testcluster
+        cluster: sc-test
+        table: ContainerLog
+      exp_annotations:
+        description: |
+          Kusto log data for table ContainerLog on cluster sc-test (Kusto cluster testcluster) is stale. Check the ingestion pipeline.
+        runbook_url: TBD
+        summary: Kusto log data is stale for ContainerLog on sc-test.
+# KustoLogsDataStale - no alert when age is under 1 hour
+- interval: 1m
+  input_series:
+  - series: 'kusto_logs_age_in_seconds{kusto_cluster="testcluster",cluster="sc-test",table="ContainerLog"}'
+    values: "1800+0x20"
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: KustoLogsDataStale
+    exp_alerts: []

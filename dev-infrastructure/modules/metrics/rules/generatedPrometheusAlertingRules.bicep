@@ -1586,3 +1586,45 @@ resource kubeNodeRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-
     ]
   }
 }
+
+resource kustoLogsAgeRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = {
+  name: 'kusto-logs-age-rules'
+  location: location
+  properties: {
+    interval: 'PT1M'
+    rules: [
+      {
+        actions: [
+          for g in actionGroups: {
+            actionGroupId: g
+            actionProperties: {
+              'IcM.Title': '#$.labels.cluster#: #$.annotations.title#'
+              'IcM.CorrelationId': '#$.annotations.correlationId#'
+            }
+          }
+        ]
+        alert: 'KustoLogsDataStale'
+        enabled: true
+        labels: {
+          severity: 'warning'
+        }
+        annotations: {
+          correlationId: 'KustoLogsDataStale/{{ $labels.cluster }}/{{ $labels.kusto_cluster }}/{{ $labels.table }}'
+          description: '''Kusto log data for table {{ $labels.table }} on cluster {{ $labels.cluster }} (Kusto cluster {{ $labels.kusto_cluster }}) is stale. Check the ingestion pipeline.
+'''
+          info: '''Kusto log data for table {{ $labels.table }} on cluster {{ $labels.cluster }} (Kusto cluster {{ $labels.kusto_cluster }}) is stale. Check the ingestion pipeline.
+'''
+          runbook_url: 'TBD'
+          summary: 'Kusto log data is stale for {{ $labels.table }} on {{ $labels.cluster }}.'
+          title: 'Kusto log data is stale for {{ $labels.table }} on {{ $labels.cluster }}.'
+        }
+        expression: 'kusto_logs_age_in_seconds > 3600'
+        for: 'PT15M'
+        severity: 3
+      }
+    ]
+    scopes: [
+      azureMonitoring
+    ]
+  }
+}

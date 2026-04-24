@@ -150,7 +150,7 @@ func (c *KustoLogsCurrentCollector) CollectMetricValues(ctx context.Context) {
 				prometheus.MustNewConstMetric(
 					KustoLogsAgeInSecondsDesc,
 					prometheus.GaugeValue,
-					float64(time.Since(foundLogSources[logSource])),
+					float64(time.Since(foundLogSources[logSource]).Seconds()),
 					c.kustoCluster,
 					clusterName,
 					logSource,
