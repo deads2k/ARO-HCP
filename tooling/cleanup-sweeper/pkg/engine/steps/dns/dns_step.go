@@ -44,6 +44,7 @@ const NSRecordSetResourceType = "Microsoft.Network/dnszones/NS"
 type DeleteNSDelegationRecordsStepConfig struct {
 	ResourceGroupName string
 	Credential        azcore.TokenCredential
+	ClientOptions     *azcorearm.ClientOptions
 	LocksClient       *armlocks.ManagementLocksClient
 	ResourcesClient   *armresources.Client
 	SubsClient        *armsubscriptions.Client
@@ -163,6 +164,7 @@ func (s *deleteNSDelegationRecordsStep) Discover(ctx context.Context) ([]runner.
 		delegationTargets, err := discoverNSDelegationRecordTargets(
 			ctx,
 			s.cfg.Credential,
+			s.cfg.ClientOptions,
 			s.cfg.SubsClient,
 			parentZone,
 			recordSetName,
@@ -187,12 +189,13 @@ func (s *deleteNSDelegationRecordsStep) Delete(ctx context.Context, target runne
 	if err != nil {
 		return err
 	}
-	return deleteNSRecordSet(ctx, s.cfg.Credential, subscriptionID, resourceGroup, zoneName, recordSetName)
+	return deleteNSRecordSet(ctx, s.cfg.Credential, s.cfg.ClientOptions, subscriptionID, resourceGroup, zoneName, recordSetName)
 }
 
 func discoverNSDelegationRecordTargets(
 	ctx context.Context,
 	credential azcore.TokenCredential,
+	clientOptions *azcorearm.ClientOptions,
 	subsClient *armsubscriptions.Client,
 	parentZone, recordSetName string,
 	logger logr.Logger,
@@ -221,13 +224,13 @@ func discoverNSDelegationRecordTargets(
 			}
 
 			subID := *sub.SubscriptionID
-			dnsClient, err := armdns.NewZonesClient(subID, credential, nil)
+			dnsClient, err := armdns.NewZonesClient(subID, credential, clientOptions)
 			if err != nil {
 				wrappedErr := fmt.Errorf("failed creating DNS zones client for subscription %q: %w", subID, err)
 				errs = append(errs, wrappedErr)
 				continue
 			}
-			recordSetsClient, err := armdns.NewRecordSetsClient(subID, credential, nil)
+			recordSetsClient, err := armdns.NewRecordSetsClient(subID, credential, clientOptions)
 			if err != nil {
 				wrappedErr := fmt.Errorf("failed creating DNS record-sets client for subscription %q: %w", subID, err)
 				errs = append(errs, wrappedErr)
@@ -288,8 +291,13 @@ func discoverNSDelegationRecordTargets(
 	return targets, errors.Join(errs...)
 }
 
-func deleteNSRecordSet(ctx context.Context, credential azcore.TokenCredential, subscriptionID, resourceGroup, zoneName, recordSetName string) error {
-	recordSetsClient, err := armdns.NewRecordSetsClient(subscriptionID, credential, nil)
+func deleteNSRecordSet(
+	ctx context.Context,
+	credential azcore.TokenCredential,
+	clientOptions *azcorearm.ClientOptions,
+	subscriptionID, resourceGroup, zoneName, recordSetName string,
+) error {
+	recordSetsClient, err := armdns.NewRecordSetsClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return err
 	}

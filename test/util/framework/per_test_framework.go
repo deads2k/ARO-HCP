@@ -578,6 +578,9 @@ func (tc *perItOrDescribeTestContext) runOrderedResourceGroupCleanup(ctx context
 	}
 
 	ctx = logr.NewContext(ctx, ginkgo.GinkgoLogr)
+	if opts.ClientOptions == nil {
+		opts.ClientOptions = tc.perBinaryInvocationTestContext.getClientFactoryOptions()
+	}
 
 	workflow, err := cleanupengine.ResourceGroupOrderedCleanupWorkflow(
 		ctx, resourceGroupName, subscriptionID, credential, opts,
