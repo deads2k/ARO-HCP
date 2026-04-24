@@ -55,14 +55,18 @@ type secretValidator struct {
 }
 
 var secretValidators = map[string]secretValidator{
-	"acm-d-password":             {validate: validateNonEmptyString},
-	"acm-d-username":             {validate: validateNonEmptyString},
-	"component-sync-pull-secret": {validate: validatePullSecret, base64Encoded: true},
-	"ocmirror-pull-secret":       {validate: validatePullSecret, base64Encoded: true},
-	"prow-token":                 {validate: validateJWT},
-	"quay-io-bearer":             {validate: validateNonEmptyString},
-	"quay-password":              {validate: validateNonEmptyString},
-	"quay-username":              {validate: validateNonEmptyString},
+	"acm-d-password":               {validate: validateNonEmptyString},
+	"acm-d-username":               {validate: validateNonEmptyString},
+	"component-sync-pull-secret":   {validate: validatePullSecret, base64Encoded: true},
+	"ocmirror-pull-secret":         {validate: validatePullSecret, base64Encoded: true},
+	"prow-token":                   {validate: validateJWT},
+	"quay-io-bearer":               {validate: validateNonEmptyString},
+	"quay-password":                {validate: validateNonEmptyString},
+	"quay-username":                {validate: validateNonEmptyString},
+	"redhat-pending-quay-password": {validate: validateNonEmptyString},
+	"redhat-pending-quay-username": {validate: validateNonEmptyString},
+	"redhat-prod-quay-password":    {validate: validateNonEmptyString},
+	"redhat-prod-quay-username":    {validate: validateNonEmptyString},
 }
 
 func validatePullSecret(data []byte) error {
