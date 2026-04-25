@@ -27,21 +27,18 @@ resourceGroups:
     parameters: configurations/output-global.tmpl.bicepparam
     deploymentLevel: ResourceGroup
     outputOnly: true
-    # AROSLSRE-718: geneva-output and mise-output temporarily disabled due to ARM
-    # regression rejecting Microsoft.Graph/applications@beta with internal extension.
-    # Re-enable when the ARM provider team resolves the issue.
-    # - name: geneva-output
-    #   action: ARM
-    #   template: templates/entra-app-lookup.bicep
-    #   parameters: configurations/geneva-identities-lookup.tmpl.bicepparam
-    #   deploymentLevel: ResourceGroup
-    #   outputOnly: true
-    # - name: mise-output
-    #   action: ARM
-    #   template: templates/entra-app-lookup.bicep
-    #   parameters: configurations/mise-identity-lookup.tmpl.bicepparam
-    #   deploymentLevel: ResourceGroup
-    #   outputOnly: true
+  - name: geneva-output
+    action: ARM
+    template: templates/entra-app-lookup.bicep
+    parameters: configurations/geneva-identities-lookup.tmpl.bicepparam
+    deploymentLevel: ResourceGroup
+    outputOnly: true
+  - name: mise-output
+    action: ARM
+    template: templates/entra-app-lookup.bicep
+    parameters: configurations/mise-identity-lookup.tmpl.bicepparam
+    deploymentLevel: ResourceGroup
+    outputOnly: true
 # Query parameters from regional deployment, e.g. Azure Monitor workspace ID
 - name: regional
   resourceGroup: '{{ .regionRG }}'
@@ -344,21 +341,19 @@ resourceGroups:
       resourceGroup: global
       step: output
       name: globalMSIId
-    # AROSLSRE-718: inputVariables for geneva-output and mise-output temporarily
-    # disabled. Re-enable with the steps above.
-    # inputVariables:
-    #   genevaActionsAppId:
-    #     resourceGroup: global
-    #     step: geneva-output
-    #     name: appId
-    #   tenantId:
-    #     resourceGroup: global
-    #     step: geneva-output
-    #     name: tenantId
-    #   miseAppId:
-    #     resourceGroup: global
-    #     step: mise-output
-    #     name: appId
+    inputVariables:
+      genevaActionsAppId:
+        resourceGroup: global
+        step: geneva-output
+        name: appId
+      tenantId:
+        resourceGroup: global
+        step: geneva-output
+        name: tenantId
+      miseAppId:
+        resourceGroup: global
+        step: mise-output
+        name: appId
     automatedRetry:
       errorContainsAny:
       - "500 Internal Server Error"
