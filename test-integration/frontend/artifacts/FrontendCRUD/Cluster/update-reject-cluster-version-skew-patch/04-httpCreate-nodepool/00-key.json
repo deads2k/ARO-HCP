@@ -1,3 +1,4 @@
 {
+	"id": "42c3ad79-86ce-59f9-9765-27ddde471208",
 	"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/update-reject-cluster-version-skew/nodePools/workers"
 }

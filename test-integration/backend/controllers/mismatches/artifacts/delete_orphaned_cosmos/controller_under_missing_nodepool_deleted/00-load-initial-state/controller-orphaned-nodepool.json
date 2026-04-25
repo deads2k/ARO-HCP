@@ -1,5 +1,5 @@
 {
-	"id": "|subscriptions|a433a095-1277-44f1-8453-8d61a4d848c2|resourcegroups|unimportantpostponement|providers|microsoft.redhatopenshift|hcpopenshiftclusters|monstrousprecinct|nodepools|missingnodepool|hcpopenshiftcontrollers|orphanedcontroller",
+	"id": "fc7b947a-1c1b-5315-a33f-fc75c35058c9",
 	"partitionKey": "a433a095-1277-44f1-8453-8d61a4d848c2",
 	"properties": {
 		"cosmosMetadata": {

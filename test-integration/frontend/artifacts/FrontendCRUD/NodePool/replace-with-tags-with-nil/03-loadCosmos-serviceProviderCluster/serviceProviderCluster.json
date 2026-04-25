@@ -1,5 +1,5 @@
 {
-	"id": "|subscriptions|6b690bec-0c16-4ecb-8f67-781caf40bba7|resourcegroups|resourcegroupname|providers|microsoft.redhatopenshift|hcpopenshiftclusters|replace-tags-nil|serviceproviderclusters|default",
+	"id": "36ed7fa3-73da-59fd-a0d8-083ee4cfe492",
 	"partitionKey": "6b690bec-0c16-4ecb-8f67-781caf40bba7",
 	"properties": {
 		"resourceId": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/replace-tags-nil/serviceProviderClusters/default",

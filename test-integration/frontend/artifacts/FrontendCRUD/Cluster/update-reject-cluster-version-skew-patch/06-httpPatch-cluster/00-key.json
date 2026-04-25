@@ -1,3 +1,4 @@
 {
+	"id": "694d0683-d420-56ac-86c0-69067f1affd2",
 	"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/update-reject-cluster-version-skew"
 }

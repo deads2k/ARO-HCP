@@ -1,3 +1,4 @@
 {
+	"id": "d1d6980f-187f-510b-92fe-db0a20ba14be",
 	"resourceID": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/major-upgrade/nodePools/np421"
 }

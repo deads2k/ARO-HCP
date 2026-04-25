@@ -1,5 +1,5 @@
 {
-	"id": "|subscriptions|6b690bec-0c16-4ecb-8f67-781caf40bba7|resourcegroups|resourcegroupname|providers|microsoft.redhatopenshift|hcpopenshiftclusters|major-upgrade-valid|nodepools|np422|serviceprovidernodepools|default",
+	"id": "aaad7907-3b99-5fa5-928e-9e84cc3af5a7",
 	"partitionKey": "6b690bec-0c16-4ecb-8f67-781caf40bba7",
 	"properties": {
 		"resourceId": "/subscriptions/6b690bec-0c16-4ecb-8f67-781caf40bba7/resourceGroups/resourceGroupName/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/major-upgrade-valid/nodePools/np422/serviceProviderNodePools/default",

@@ -4,6 +4,7 @@
 	"_rid": "sIMIAKLq4TwCAAAAAAAAAA==",
 	"_self": "dbs/sIMIAA==/colls/sIMIAKLq4Tw=/docs/sIMIAKLq4TwCAAAAAAAAAA==/",
 	"_ts": 1767910967,
+	"id": "e0464b60-8841-527f-b26c-3515a4208adb",
 	"partitionKey": "subscriptionid",
 	"properties": {
 		"cosmosMetadata": {
