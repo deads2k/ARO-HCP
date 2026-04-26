@@ -2960,7 +2960,7 @@
             "targetVersion": {
               "description": "The target istio version that will be updated to",
               "type": "string",
-              "pattern": "^[a-zA-Z0-9-]+$"
+              "enum": ["asm-1-26", "asm-1-27", "asm-1-28", "asm-1-29"]
             },
             "ingressGatewayIPAddressName": {
               "type": "string"
@@ -2969,9 +2969,17 @@
               "$ref": "#/definitions/keyColonValueCSV"
             }
           },
+          "x-cel-validations": [
+            {
+              "rule": "self.versions.split(',').exists(v, v == self.targetVersion)",
+              "message": "targetVersion must be included in the versions list"
+            }
+          ],
           "additionalProperties": false,
           "required": [
-            "ingressGatewayIPAddressName"
+            "ingressGatewayIPAddressName",
+            "targetVersion",
+            "versions"
           ]
         },
         "opsIngress": {
@@ -3007,6 +3015,24 @@
           "$ref": "#/definitions/prometheus"
         }
       },
+      "x-cel-validations": [
+        {
+          "rule": "self.istio.targetVersion == 'asm-1-26' ? semver(self.aks.kubernetesVersion) >= semver('1.29.0') && semver(self.aks.kubernetesVersion) < semver('1.35.0') : true",
+          "message": "asm-1-26 requires AKS Kubernetes version between 1.29.0 (inclusive) and 1.35.0 (exclusive)"
+        },
+        {
+          "rule": "self.istio.targetVersion == 'asm-1-27' ? semver(self.aks.kubernetesVersion) >= semver('1.29.0') && semver(self.aks.kubernetesVersion) < semver('1.36.0') : true",
+          "message": "asm-1-27 requires AKS Kubernetes version between 1.29.0 (inclusive) and 1.36.0 (exclusive)"
+        },
+        {
+          "rule": "self.istio.targetVersion == 'asm-1-28' ? semver(self.aks.kubernetesVersion) >= semver('1.30.0') && semver(self.aks.kubernetesVersion) < semver('1.36.0') : true",
+          "message": "asm-1-28 requires AKS Kubernetes version between 1.30.0 (inclusive) and 1.36.0 (exclusive)"
+        },
+        {
+          "rule": "self.istio.targetVersion == 'asm-1-29' ? semver(self.aks.kubernetesVersion) >= semver('1.31.0') && semver(self.aks.kubernetesVersion) < semver('1.36.0') : true",
+          "message": "asm-1-29 requires AKS Kubernetes version between 1.31.0 (inclusive) and 1.36.0 (exclusive)"
+        }
+      ],
       "additionalProperties": false,
       "required": [
         "rg",
