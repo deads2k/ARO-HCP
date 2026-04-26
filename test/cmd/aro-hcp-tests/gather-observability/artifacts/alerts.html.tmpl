@@ -16,14 +16,44 @@
       padding: 16px 24px;
     }
 
-    /* --- Summary bar --- */
+    /* --- Summary cards --- */
     .summary-bar {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
-      align-items: center;
-      margin: 12px 0 24px 0;
+      margin: 16px 0 24px 0;
     }
+    .summary-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px 28px;
+      text-align: center;
+      min-width: 120px;
+      flex: 1;
+    }
+    .summary-card-number {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .summary-card-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+    .color-total             { color: #e6edf3; }
+    .color-unknown           { color: #da3633; }
+    .color-known             { color: #d29922; }
+    .color-severity-critical { color: #da3633; }
+    .color-severity-error    { color: #d29922; }
+    .color-severity-warning  { color: #d29922; }
+    .color-severity-info     { color: #316dca; }
+    .color-severity-verbose  { color: #8b949e; }
+
     .badge {
       display: inline-block;
       padding: 4px 12px;
@@ -38,8 +68,6 @@
     .severity-warning  { background-color: #d29922; color: #000; }
     .severity-info     { background-color: #316dca; color: #fff; }
     .severity-verbose  { background-color: #484f58; color: #e6edf3; }
-    .badge-known       { background-color: #9e6a03; color: #fff; }
-    .badge-unknown     { background-color: #da3633; color: #fff; }
 
     .meta {
       color: #8b949e;
@@ -47,17 +75,6 @@
       margin-bottom: 4px;
     }
     .meta span { margin-right: 20px; }
-
-    /* --- Section headers --- */
-    .section-header {
-      font-size: 15px;
-      font-weight: 700;
-      margin: 28px 0 10px 0;
-      padding: 8px 14px;
-      border-radius: 4px;
-    }
-    .section-header-unknown { background-color: #da3633; }
-    .section-header-known   { background-color: #9e6a03; }
 
     .no-alerts {
       color: #3fb950;
@@ -72,7 +89,6 @@
       border: 1px solid #30363d;
       border-radius: 6px;
       padding: 16px 20px;
-      margin: 10px 0;
       border-left: 4px solid #da3633;
     }
     .alert-card-known {
@@ -93,13 +109,6 @@
     .condition-fired    { color: #f85149; font-weight: 700; }
     .condition-resolved { color: #3fb950; font-weight: 700; }
 
-    .alert-cluster {
-      color: #8b949e;
-      font-size: 13px;
-    }
-    .alert-cluster strong {
-      color: #c9d1d9;
-    }
     .alert-time {
       color: #8b949e;
       font-size: 13px;
@@ -120,22 +129,6 @@
       line-height: 1.6;
       color: #c9d1d9;
       margin-bottom: 8px;
-    }
-
-    /* Known issue reason */
-    .known-reason {
-      font-size: 13px;
-      color: #d29922;
-      margin-bottom: 8px;
-      padding: 6px 10px;
-      background: rgba(158, 106, 3, 0.15);
-      border-radius: 4px;
-      border-left: 3px solid #9e6a03;
-    }
-    .known-reason strong {
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      font-size: 11px;
     }
 
     /* Labels grid */
@@ -160,10 +153,10 @@
     }
 
     /* Collapsible known-issue alerts */
-    details.alert-card-known {
+    details.known-details {
       list-style: none;
     }
-    details.alert-card-known > summary {
+    details.known-details > summary {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -172,17 +165,17 @@
       user-select: none;
       list-style: none;
     }
-    details.alert-card-known > summary::-webkit-details-marker { display: none; }
-    details.alert-card-known > summary::before {
+    details.known-details > summary::-webkit-details-marker { display: none; }
+    details.known-details > summary::before {
       content: "\25B6";
       font-size: 10px;
       color: #8b949e;
       transition: transform 0.15s;
     }
-    details[open].alert-card-known > summary::before {
+    details[open].known-details > summary::before {
       transform: rotate(90deg);
     }
-    details.alert-card-known > summary .badge { padding: 2px 8px; font-size: 12px; }
+    details.known-details > summary .badge { padding: 2px 8px; font-size: 12px; }
     .alert-title-inline {
       font-size: 15px;
       font-weight: 700;
@@ -205,6 +198,93 @@
     .alert-details-body {
       margin-top: 12px;
     }
+
+    /* --- Duration bar --- */
+    .duration-bar {
+      height: 3px;
+      background: #21262d;
+      overflow: hidden;
+    }
+    .duration-bar-fill {
+      height: 100%;
+    }
+    .alert-row {
+      margin: 10px 0;
+    }
+    .duration-bar-fill-unknown { background: #da3633; }
+    .duration-bar-fill-known   { background: #9e6a03; }
+
+    /* --- Time slider --- */
+    .time-slider-group {
+      padding: 12px 0 16px 0;
+      border-bottom: 1px solid #30363d;
+      margin-bottom: 16px;
+    }
+    .time-slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .time-slider-label {
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8b949e;
+    }
+    .time-slider-values {
+      font-size: 13px;
+      color: #e6edf3;
+      font-family: monospace;
+    }
+    .time-slider-track {
+      position: relative;
+      height: 24px;
+      background: #21262d;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .time-slider-range {
+      position: absolute;
+      height: 100%;
+      background: #58a6ff;
+      opacity: 0.3;
+      border-radius: 4px;
+    }
+    .time-slider-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      background: #58a6ff;
+      border: 2px solid #0d1117;
+      border-radius: 50%;
+      cursor: grab;
+      z-index: 2;
+    }
+    .time-slider-handle:hover { background: #79c0ff; }
+    .time-slider-handle:active { cursor: grabbing; }
+    .time-slider-ticks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 10px;
+      color: #8b949e;
+      font-family: monospace;
+    }
+    .time-slider-reset {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 2px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 12px;
+    }
+    .time-slider-reset:hover { color: #e6edf3; border-color: #8b949e; }
 
     /* Collapsible PromQL */
     details.query-details {
@@ -252,88 +332,120 @@
 <body>
 
   <div class="meta">
-    <span>Time window: {{.TimeWindow.Start}} &mdash; {{.TimeWindow.End}}</span>
     <span>Scope: {{.Scope}}</span>
   </div>
 
   {{if .HasAlerts}}
   <div class="summary-bar">
+    <div class="summary-card">
+      <div class="summary-card-number color-total">{{.Summary.Total}}</div>
+      <div class="summary-card-label">Total</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-card-number color-unknown">{{.UnknownCount}}</div>
+      <div class="summary-card-label">Alerts</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-card-number color-known">{{.KnownCount}}</div>
+      <div class="summary-card-label">Known Alerts</div>
+    </div>
     {{range $sev, $count := .SeverityCounts}}
-    <span class="badge {{severityClass $sev}}">{{$sev}}: {{$count}}</span>
+    <div class="summary-card">
+      <div class="summary-card-number color-{{severityClass $sev}}">{{$count}}</div>
+      <div class="summary-card-label">{{$sev}}</div>
+    </div>
     {{end}}
-    <span class="badge badge-unknown">Unknown: {{.UnknownCount}}</span>
-    <span class="badge badge-known">Known: {{.KnownCount}}</span>
   </div>
 
-  {{range .Alerts}}
-  {{if .Metadata.KnownIssue}}
-  <details class="alert-card alert-card-known">
-    <summary>
-      <span class="badge {{severityClass .Alert.Severity}}">{{.Alert.Severity}}</span>
-      <span class="{{conditionClass .Alert.Condition}}">{{.Alert.Condition}}</span>
-      <span class="alert-title-inline">{{.Alert.Name}}</span>
-      <span class="known-reason-inline">{{.Metadata.KnownIssueReason}} <strong>Known Issue</strong></span>
-    </summary>
-    <div class="alert-details-body">
-      <div class="alert-header">
-        <span class="alert-time">
-          Fired: {{formatTime .Alert.StartsAt}} {{relativeTime $.TimeWindow.Start .Alert.StartsAt}}{{if .Alert.EndsAt}} &middot; Resolved: {{formatTime .Alert.EndsAt}} {{relativeTime $.TimeWindow.Start .Alert.EndsAt}}{{end}}
-        </span>
-      </div>
-      {{if .Alert.Description}}<div class="alert-description">{{.Alert.Description}}</div>{{end}}
-
-      {{if .Alert.Labels}}
-      <div class="alert-labels">
-        {{range $k, $v := .Alert.Labels}}<span class="label-chip"><span class="label-key">{{$k}}</span>=<span>{{$v}}</span></span>{{end}}
-      </div>
-      {{end}}
-
-      {{with annotation .Alert.Annotations "runbook_url"}}{{if ne . "TBD"}}
-      <div class="alert-links"><a href="{{.}}" target="_blank" rel="noopener">View Runbook &rarr;</a></div>
-      {{end}}{{end}}
-
-      {{if .Alert.Expression}}
-      <details class="query-details">
-        <summary>View PromQL Query</summary>
-        <div class="alert-expr">{{.Alert.Expression}}</div>
-      </details>
-      {{end}}
+  <div class="time-slider-group" id="timeSliderContainer">
+    <div class="time-slider-header">
+      <span class="time-slider-label">Time Range</span>
+      <span>
+        <span class="time-slider-values" id="timeSliderValues"></span>
+        <button class="time-slider-reset" id="resetTimeSlider">Reset</button>
+      </span>
     </div>
-  </details>
+    <div class="time-slider-track" id="timeSliderTrack">
+      <div class="time-slider-range" id="timeSliderRange"></div>
+      <div class="time-slider-handle" id="timeSliderStart" data-handle="start"></div>
+      <div class="time-slider-handle" id="timeSliderEnd" data-handle="end"></div>
+    </div>
+    <div class="time-slider-ticks">
+      <span id="tickStart"></span>
+      <span id="tickEnd"></span>
+    </div>
+  </div>
+
+  {{range $i, $a := .Alerts}}
+  <div class="alert-row" data-alert-idx="{{$i}}">
+  {{if $a.Metadata.KnownIssue}}
+  <div class="alert-card alert-card-known">
+    <details class="known-details">
+      <summary>
+        <span class="badge {{severityClass $a.Alert.Severity}}">{{$a.Alert.Severity}}</span>
+        <span class="{{conditionClass $a.Alert.Condition}}">{{$a.Alert.Condition}}</span>
+        <span class="alert-title-inline">{{$a.Alert.Name}}</span>
+        <span class="known-reason-inline">{{$a.Metadata.KnownIssueReason}} <strong>Known Issue</strong></span>
+      </summary>
+      <div class="alert-details-body">
+        <div class="alert-header">
+          <span class="alert-time">
+            Fired: {{formatTime $a.Alert.StartsAt}} {{relativeTime $.TimeWindow.Start $a.Alert.StartsAt}}{{if $a.Alert.EndsAt}} &middot; Resolved: {{formatTime $a.Alert.EndsAt}} {{relativeTime $.TimeWindow.Start $a.Alert.EndsAt}}{{end}}
+          </span>
+        </div>
+        {{if $a.Alert.Description}}<div class="alert-description">{{$a.Alert.Description}}</div>{{end}}
+
+        {{if $a.Alert.Labels}}
+        <div class="alert-labels">
+          {{range $k, $v := $a.Alert.Labels}}<span class="label-chip"><span class="label-key">{{$k}}</span>=<span>{{$v}}</span></span>{{end}}
+        </div>
+        {{end}}
+
+        {{with annotation $a.Alert.Annotations "runbook_url"}}{{if ne . "TBD"}}
+        <div class="alert-links"><a href="{{.}}" target="_blank" rel="noopener">View Runbook &rarr;</a></div>
+        {{end}}{{end}}
+
+        {{if $a.Alert.Expression}}
+        <details class="query-details">
+          <summary>View PromQL Query</summary>
+          <div class="alert-expr">{{$a.Alert.Expression}}</div>
+        </details>
+        {{end}}
+      </div>
+    </details>
+  </div>
   {{else}}
   <div class="alert-card">
     <div class="alert-header">
-      <span class="badge {{severityClass .Alert.Severity}}">{{.Alert.Severity}}</span>
-      <span class="{{conditionClass .Alert.Condition}}">{{.Alert.Condition}}</span>
+      <span class="badge {{severityClass $a.Alert.Severity}}">{{$a.Alert.Severity}}</span>
+      <span class="{{conditionClass $a.Alert.Condition}}">{{$a.Alert.Condition}}</span>
       <span class="alert-time">
-        Fired: {{formatTime .Alert.StartsAt}} {{relativeTime $.TimeWindow.Start .Alert.StartsAt}}{{if .Alert.EndsAt}} &middot; Resolved: {{formatTime .Alert.EndsAt}} {{relativeTime $.TimeWindow.Start .Alert.EndsAt}}{{end}}
+        Fired: {{formatTime $a.Alert.StartsAt}} {{relativeTime $.TimeWindow.Start $a.Alert.StartsAt}}{{if $a.Alert.EndsAt}} &middot; Resolved: {{formatTime $a.Alert.EndsAt}} {{relativeTime $.TimeWindow.Start $a.Alert.EndsAt}}{{end}}
       </span>
     </div>
-    <div class="alert-title">{{.Alert.Name}}</div>
-    {{if .Alert.Description}}<div class="alert-description">{{.Alert.Description}}</div>{{end}}
+    <div class="alert-title">{{$a.Alert.Name}}</div>
+    {{if $a.Alert.Description}}<div class="alert-description">{{$a.Alert.Description}}</div>{{end}}
 
-    {{if .Alert.Labels}}
+    {{if $a.Alert.Labels}}
     <div class="alert-labels">
-      {{range $k, $v := .Alert.Labels}}<span class="label-chip"><span class="label-key">{{$k}}</span>=<span>{{$v}}</span></span>{{end}}
+      {{range $k, $v := $a.Alert.Labels}}<span class="label-chip"><span class="label-key">{{$k}}</span>=<span>{{$v}}</span></span>{{end}}
     </div>
     {{end}}
 
-    {{with annotation .Alert.Annotations "runbook_url"}}{{if ne . "TBD"}}
+    {{with annotation $a.Alert.Annotations "runbook_url"}}{{if ne . "TBD"}}
     <div class="alert-links"><a href="{{.}}" target="_blank" rel="noopener">View Runbook &rarr;</a></div>
     {{end}}{{end}}
 
-    {{if .Alert.Expression}}
+    {{if $a.Alert.Expression}}
     <details class="query-details">
       <summary>View PromQL Query</summary>
-      <div class="alert-expr">{{.Alert.Expression}}</div>
+      <div class="alert-expr">{{$a.Alert.Expression}}</div>
     </details>
     {{end}}
   </div>
   {{end}}
-  {{end}}
-
-  {{if not .HasUnknownAlerts}}
-  <div class="no-alerts">No unknown alerts. All {{.KnownCount}} alerts matched known issues.</div>
+  <div class="duration-bar"><div class="duration-bar-fill {{if $a.Metadata.KnownIssue}}duration-bar-fill-known{{else}}duration-bar-fill-unknown{{end}}" id="bar-{{$i}}"></div></div>
+  </div>
   {{end}}
 
   {{else}}
@@ -342,5 +454,105 @@
 
   <!-- workaround for spyglass cutting off page bottoms -->
   <div style="height: 20px;"></div>
+
+  <script>
+  (function() {
+    var windowStart = new Date("{{.TimeWindow.Start}}").getTime();
+    var windowEnd = new Date("{{.TimeWindow.End}}").getTime();
+    var totalDuration = windowEnd - windowStart;
+    if (totalDuration <= 0) return;
+
+    var alerts = [
+      {{range $i, $a := .Alerts}}{ idx: {{$i}}, start: {{if $a.Alert.StartsAt}}new Date("{{formatTime $a.Alert.StartsAt}} UTC").getTime(){{else}}0{{end}}, end: {{if $a.Alert.EndsAt}}new Date("{{formatTime $a.Alert.EndsAt}} UTC").getTime(){{else}}windowEnd{{end}} },
+      {{end}}
+    ];
+
+    function fmt(ms) {
+      var d = new Date(ms);
+      return d.getUTCHours().toString().padStart(2,'0') + ':' + d.getUTCMinutes().toString().padStart(2,'0') + ':' + d.getUTCSeconds().toString().padStart(2,'0');
+    }
+
+    // Duration bars
+    var track = document.getElementById('timeSliderTrack');
+    alerts.forEach(function(a) {
+      var bar = document.getElementById('bar-' + a.idx);
+      if (!bar || !a.start) return;
+      var left = ((a.start - windowStart) / totalDuration) * 100;
+      var width = Math.max(((a.end - a.start) / totalDuration) * 100, 0.5);
+      bar.style.marginLeft = left + '%';
+      bar.style.width = width + '%';
+    });
+
+    // Time slider
+    var filterStart = windowStart;
+    var filterEnd = windowEnd;
+    var startHandle = document.getElementById('timeSliderStart');
+    var endHandle = document.getElementById('timeSliderEnd');
+    var range = document.getElementById('timeSliderRange');
+    var dragging = null;
+
+    document.getElementById('tickStart').textContent = fmt(windowStart);
+    document.getElementById('tickEnd').textContent = fmt(windowEnd);
+
+    function updateSlider() {
+      var sp = ((filterStart - windowStart) / totalDuration) * 100;
+      var ep = ((filterEnd - windowStart) / totalDuration) * 100;
+      startHandle.style.left = sp + '%';
+      endHandle.style.left = ep + '%';
+      range.style.left = sp + '%';
+      range.style.width = (ep - sp) + '%';
+      document.getElementById('timeSliderValues').textContent = fmt(filterStart) + ' \u2014 ' + fmt(filterEnd);
+    }
+
+    function filterCards() {
+      alerts.forEach(function(a) {
+        var card = document.querySelector('[data-alert-idx="' + a.idx + '"]');
+        if (!card) return;
+        var visible = a.start <= filterEnd && a.end >= filterStart;
+        card.style.display = visible ? '' : 'none';
+      });
+    }
+
+    function onDrag(e) {
+      if (!dragging) return;
+      var rect = track.getBoundingClientRect();
+      var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      var t = windowStart + pct * totalDuration;
+      if (dragging === 'start') filterStart = Math.min(t, filterEnd - 1000);
+      else filterEnd = Math.max(t, filterStart + 1000);
+      updateSlider();
+    }
+    function stopDrag() {
+      if (dragging) { dragging = null; filterCards(); }
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+    startHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault(); dragging = 'start';
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', stopDrag);
+    });
+    endHandle.addEventListener('mousedown', function(e) {
+      e.preventDefault(); dragging = 'end';
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', stopDrag);
+    });
+    track.addEventListener('click', function(e) {
+      if (e.target === startHandle || e.target === endHandle) return;
+      var rect = track.getBoundingClientRect();
+      var pct = (e.clientX - rect.left) / rect.width;
+      var t = windowStart + pct * totalDuration;
+      if (Math.abs(t - filterStart) < Math.abs(t - filterEnd)) filterStart = Math.min(t, filterEnd - 1000);
+      else filterEnd = Math.max(t, filterStart + 1000);
+      updateSlider(); filterCards();
+    });
+    document.getElementById('resetTimeSlider').addEventListener('click', function() {
+      filterStart = windowStart; filterEnd = windowEnd;
+      updateSlider(); filterCards();
+    });
+
+    updateSlider();
+  })();
+  </script>
 </body>
 </html>
