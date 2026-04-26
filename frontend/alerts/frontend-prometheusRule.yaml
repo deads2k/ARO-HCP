@@ -20,7 +20,7 @@ spec:
         severity: info
       annotations:
         description: 'The 95th percentile of frontend request latency has exceeded 5 seconds over the past hour.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
         summary: 'Frontend latency is high: 95th percentile exceeds 5 seconds'
     - alert: FrontendClusterServiceErrorRate
       expr: |
@@ -33,7 +33,7 @@ spec:
         severity: info
       annotations:
         description: 'The Frontend Cluster Service 5xx error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
         summary: 'High 4xx|5xx Error Rate on Frontend Cluster Service'
     - alert: FrontendHighAuditLogErrorRate
       expr: |
@@ -47,7 +47,7 @@ spec:
         severity: info
       annotations:
         summary: "High Frontend audit log error rate."
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
         description: "Audit log error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}."
     - alert: FrontendAuditLogConnectionDegraded
       expr: |
@@ -57,5 +57,5 @@ spec:
         severity: info
       annotations:
         summary: "Frontend audit log connection is degraded."
-        runbook_url: 'TBD'
+        runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
         description: "The frontend failed to connect to the audit server and is running with a no-op audit client. No audit logs are being sent."

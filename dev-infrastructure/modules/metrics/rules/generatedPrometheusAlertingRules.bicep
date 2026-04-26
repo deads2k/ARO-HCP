@@ -373,7 +373,7 @@ resource frontend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
           correlationId: 'FrontendLatency/{{ $labels.cluster }}'
           description: 'The 95th percentile of frontend request latency has exceeded 5 seconds over the past hour.'
           info: 'The 95th percentile of frontend request latency has exceeded 5 seconds over the past hour.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
           summary: 'Frontend latency is high: 95th percentile exceeds 5 seconds'
           title: 'Frontend latency is high: 95th percentile exceeds 5 seconds'
         }
@@ -400,7 +400,7 @@ resource frontend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
           correlationId: 'FrontendClusterServiceErrorRate/{{ $labels.cluster }}'
           description: 'The Frontend Cluster Service 5xx error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
           info: 'The Frontend Cluster Service 5xx error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
           summary: 'High 4xx|5xx Error Rate on Frontend Cluster Service'
           title: 'High 4xx|5xx Error Rate on Frontend Cluster Service'
         }
@@ -427,7 +427,7 @@ resource frontend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
           correlationId: 'FrontendHighAuditLogErrorRate/{{ $labels.cluster }}'
           description: 'Audit log error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
           info: 'Audit log error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
           summary: 'High Frontend audit log error rate.'
           title: 'High Frontend audit log error rate.'
         }
@@ -454,7 +454,7 @@ resource frontend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' =
           correlationId: 'FrontendAuditLogConnectionDegraded/{{ $labels.cluster }}'
           description: 'The frontend failed to connect to the audit server and is running with a no-op audit client. No audit logs are being sent.'
           info: 'The frontend failed to connect to the audit server and is running with a no-op audit client. No audit logs are being sent.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/frontend-tsg.html'
           summary: 'Frontend audit log connection is degraded.'
           title: 'Frontend audit log connection is degraded.'
         }
@@ -680,7 +680,7 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'BackendOperationErrorRate/{{ $labels.cluster }}'
           description: 'The Backend operation error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
           info: 'The Backend operation error rate is above 5% for the last hour. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
           summary: 'High Error Rate on Backend Operations'
           title: 'High Error Rate on Backend Operations'
         }
@@ -707,7 +707,7 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'BackendControllerRetryHotLoop/{{ $labels.cluster }}/{{ $labels.name }}'
           description: 'Backend controller workqueue {{ $labels.name }} has a retry ratio of > 50% sustained over 10 minutes, indicating most queue activity is failed retries rather than fresh work.'
           info: 'Backend controller workqueue {{ $labels.name }} has a retry ratio of > 50% sustained over 10 minutes, indicating most queue activity is failed retries rather than fresh work.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
           summary: 'Backend controller workqueue {{ $labels.name }} retry hot loop'
           title: 'Backend controller workqueue {{ $labels.name }} retry hot loop'
         }
@@ -734,7 +734,7 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'BackendControllerQueueDepthHigh/{{ $labels.cluster }}/{{ $labels.name }}'
           description: 'Backend controller workqueue {{ $labels.name }} has had a depth > 10 for more than 5 minutes, indicating work is accumulating faster than it can be processed.'
           info: 'Backend controller workqueue {{ $labels.name }} has had a depth > 10 for more than 5 minutes, indicating work is accumulating faster than it can be processed.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
           summary: 'Backend controller workqueue {{ $labels.name }} depth is high'
           title: 'Backend controller workqueue {{ $labels.name }} depth is high'
         }
@@ -761,7 +761,7 @@ resource backend 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'BackendControllerPanic/{{ $labels.cluster }}/{{ $labels.controller }}'
           description: 'Backend controller {{ $labels.controller }} has panicked {{ printf "%.0f" $value }} time(s) in the last 5 minutes.'
           info: 'Backend controller {{ $labels.controller }} has panicked {{ printf "%.0f" $value }} time(s) in the last 5 minutes.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/backend-tsg.html'
           summary: 'Backend controller {{ $labels.controller }} is panicking'
           title: 'Backend controller {{ $labels.controller }} is panicking'
         }
@@ -868,7 +868,7 @@ resource maestro 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'MaestroGRPCSourceClientExcessConnections/{{ $labels.cluster }}'
           description: 'Maestro gRPC server has {{ $value }} registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
           info: 'Maestro gRPC server has {{ $value }} registered source clients, which is unusually high. Only clusters-service and backend are expected as source clients. This may indicate a connection leak or clients failing to unregister.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
           summary: 'Maestro has too many gRPC source client connections'
           title: 'Maestro has too many gRPC source client connections'
         }
@@ -895,7 +895,7 @@ resource maestro 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'MaestroRESTAPIErrorRate/{{ $labels.cluster }}'
           description: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
           info: 'Maestro REST API 5xx error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
           summary: 'Maestro REST API error rate is high'
           title: 'Maestro REST API error rate is high'
         }
@@ -922,7 +922,7 @@ resource maestro 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'MaestroGRPCServerErrorRate/{{ $labels.cluster }}'
           description: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
           info: 'Maestro gRPC server error rate is above 5% for the last 5 minutes. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
           summary: 'Maestro gRPC server error rate is high'
           title: 'Maestro gRPC server error rate is high'
         }
@@ -949,7 +949,7 @@ resource maestro 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01' = 
           correlationId: 'MaestroSpecControllerReconcileErrors/{{ $labels.cluster }}'
           description: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: {{ $value | humanizePercentage }}.'
           info: 'Maestro spec controller reconcile error rate is above 10% for the last 10 minutes. Resources may not be reaching management clusters. Current value: {{ $value | humanizePercentage }}.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/runbooks/maestro/index.html'
           summary: 'Maestro spec controller reconcile error rate is high'
           title: 'Maestro spec controller reconcile error rate is high'
         }
@@ -991,7 +991,7 @@ resource arobitRules 'Microsoft.AlertsManagement/prometheusRuleGroups@2023-03-01
 '''
           info: '''The Arobit forwarder metrics endpoint on cluster {{ $labels.cluster }} has been unreachable for 15 minutes.
 '''
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
           title: 'Arobit forwarder metrics endpoint is unreachable on cluster {{ $labels.cluster }}.'
         }
@@ -1024,6 +1024,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 The metric fluentbit_output_proc_bytes_total only counts bytes from chunks that were sent successfully, this indicates a problem with the output plugin or low input.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
           title: 'No log data delivered to Kusto by {{ $labels.pod }} for 15 minutes.'
         }
@@ -1056,6 +1057,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 Ingestion pauses when Fluent Bit\'s internal memory or storage buffers are full, typically caused by backpressure from a slow or failing output.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
           title: 'Fluent Bit input ingestion paused on {{ $labels.pod }} due to backpressure.'
         }
@@ -1088,6 +1090,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
 Retries occur when the azure_kusto output encounters a recoverable error (e.g. transient network failure, HTTP 429/5xx from Kusto).
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
           title: 'High Kusto output retry rate on {{ $labels.pod }} (> 3/s for 5 min).'
         }
@@ -1118,6 +1121,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
           info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} is encountering errors sending log chunks to Kusto.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
           title: 'Unrecoverable Kusto output errors on {{ $labels.pod }} - log data is being dropped.'
         }
@@ -1148,6 +1152,7 @@ Investigate the Fluent Bit logs for the specific error details and check the Kus
           info: '''Fluent Bit pod {{ $labels.pod }} on cluster {{ $labels.cluster }} has chunks that exceeded the configured Retry_Limit for the Kusto output.
 Investigate the Fluent Bit logs for the specific error details and check the Kusto instance health.
 '''
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/arobit.html'
           summary: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
           title: 'Kusto output retries exhausted on {{ $labels.pod }} - chunks discarded after max retries.'
         }
@@ -1534,7 +1539,7 @@ resource kubeContainerOomRules 'Microsoft.AlertsManagement/prometheusRuleGroups@
           correlationId: 'KubeContainerOOMKilled/{{ $labels.cluster }}/{{ $labels.container }}/{{ $labels.namespace }}/{{ $labels.pod }}'
           description: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} on cluster {{ $labels.cluster }} has been OOMKilled. This indicates the container exceeded its memory limit and was terminated by the kernel.'
           info: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} on cluster {{ $labels.cluster }} has been OOMKilled. This indicates the container exceeded its memory limit and was terminated by the kernel.'
-          runbook_url: 'TBD'
+          runbook_url: 'https://eng.ms/docs/cloud-ai-platform/azure-core/azure-cloud-native-and-management-platform/control-plane-bburns/azure-red-hat-openshift/azure-redhat-openshift-team-doc/hcp/troubleshooting/service-lifecycle.html'
           summary: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled'
           title: 'Container {{ $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} was OOMKilled'
         }
