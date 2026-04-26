@@ -42,7 +42,9 @@ func RoleAssignmentsSweeperWorkflow(
 		return nil, fmt.Errorf("azure credential is required")
 	}
 
-	roleAssignmentsClient, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, credential, nil)
+	clientOptions := normalizeARMClientOptions(opts.ClientOptions)
+
+	roleAssignmentsClient, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create role assignments client: %w", err)
 	}

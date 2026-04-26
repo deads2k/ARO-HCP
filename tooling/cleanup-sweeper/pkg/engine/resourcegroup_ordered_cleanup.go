@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azcorearm "github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/keyvault/armkeyvault"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v8"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armlocks"
@@ -52,6 +53,7 @@ type WorkflowOptions struct {
 	DryRun          bool
 	Parallelism     int
 	ContinueOnError bool
+	ClientOptions   *azcorearm.ClientOptions
 }
 
 // ResourceGroupOrderedCleanupWorkflow builds an ordered cleanup workflow for a
@@ -102,7 +104,9 @@ func ResourceGroupOrderedCleanupWorkflow(
 		return nil, fmt.Errorf("azure credential is required")
 	}
 
-	rgClient, err := armresources.NewResourceGroupsClient(subscriptionID, credential, nil)
+	clientOptions := normalizeARMClientOptions(opts.ClientOptions)
+
+	rgClient, err := armresources.NewResourceGroupsClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource groups client: %w", err)
 	}
@@ -129,30 +133,30 @@ func ResourceGroupOrderedCleanupWorkflow(
 		return nil, fmt.Errorf("failed to get resource group %q: %w", resourceGroupName, err)
 	}
 
-	resourcesClient, err := armresources.NewClient(subscriptionID, credential, nil)
+	resourcesClient, err := armresources.NewClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resources client: %w", err)
 	}
-	locksClient, err := armlocks.NewManagementLocksClient(subscriptionID, credential, nil)
+	locksClient, err := armlocks.NewManagementLocksClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create management locks client: %w", err)
 	}
-	providersClient, err := armresources.NewProvidersClient(subscriptionID, credential, nil)
+	providersClient, err := armresources.NewProvidersClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create providers client: %w", err)
 	}
 	apiVersionCache := armsteps.NewAPIVersionCache(providersClient)
 
-	clientFactory, err := armnetwork.NewClientFactory(subscriptionID, credential, nil)
+	clientFactory, err := armnetwork.NewClientFactory(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create network client factory: %w", err)
 	}
 	nspClient := clientFactory.NewSecurityPerimetersClient()
-	vaultsClient, err := armkeyvault.NewVaultsClient(subscriptionID, credential, nil)
+	vaultsClient, err := armkeyvault.NewVaultsClient(subscriptionID, credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vaults client: %w", err)
 	}
-	subsClient, err := armsubscriptions.NewClient(credential, nil)
+	subsClient, err := armsubscriptions.NewClient(credential, clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subscriptions client: %w", err)
 	}
@@ -247,6 +251,7 @@ func ResourceGroupOrderedCleanupWorkflow(
 			dnssteps.MustNewDeleteNSDelegationRecordsStep(dnssteps.DeleteNSDelegationRecordsStepConfig{
 				ResourceGroupName: resourceGroupName,
 				Credential:        credential,
+				ClientOptions:     clientOptions,
 				LocksClient:       locksClient,
 				ResourcesClient:   resourcesClient,
 				SubsClient:        subsClient,
