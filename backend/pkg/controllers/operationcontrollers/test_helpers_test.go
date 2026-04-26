@@ -37,18 +37,19 @@ func mustParseTime(s string) time.Time {
 
 // Common test constants
 const (
-	testSubscriptionID      = "00000000-0000-0000-0000-000000000000"
-	testResourceGroupName   = "test-rg"
-	testClusterName         = "test-cluster"
-	testNodePoolName        = "test-nodepool"
-	testExternalAuthName    = "test-external-auth"
-	testClusterServiceIDStr = "/api/clusters_mgmt/v1/clusters/abc123"
-	testNodePoolIDStr       = "/api/clusters_mgmt/v1/clusters/abc123/node_pools/np123"
-	testExternalAuthIDStr   = "/api/clusters_mgmt/v1/clusters/abc123/external_auth_config/external_auths/ea123"
-	testOperationName       = "test-operation-id"
-	testTenantID            = "11111111-1111-1111-1111-111111111111"
-	testAzureLocation       = "eastus"
-	testClusterUID          = "00000000-0000-0000-0000-000000000000"
+	testSubscriptionID            = "00000000-0000-0000-0000-000000000000"
+	testResourceGroupName         = "test-rg"
+	testClusterName               = "test-cluster"
+	testNodePoolName              = "test-nodepool"
+	testExternalAuthName          = "test-external-auth"
+	testClusterServiceIDStr       = "/api/clusters_mgmt/v1/clusters/abc123"
+	testNodePoolIDStr             = "/api/clusters_mgmt/v1/clusters/abc123/node_pools/np123"
+	testExternalAuthIDStr         = "/api/clusters_mgmt/v1/clusters/abc123/external_auth_config/external_auths/ea123"
+	testBreakGlassCredentialIDStr = "/api/clusters_mgmt/v1/clusters/abc123/break_glass_credentials/bgc123"
+	testOperationName             = "test-operation-id"
+	testTenantID                  = "11111111-1111-1111-1111-111111111111"
+	testAzureLocation             = "eastus"
+	testClusterUID                = "00000000-0000-0000-0000-000000000000"
 )
 
 // clusterTestFixture contains common test objects for cluster operations
