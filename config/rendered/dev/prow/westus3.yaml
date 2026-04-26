@@ -198,6 +198,7 @@ clustersService:
     name: arohcp-prow-dbcs-j7654321
     password: TheBlurstOfTimes
     private: false
+    serverSku: Standard_D8s_v3
     serverStorageSizeGB: 128
     serverVersion: "17"
     zoneRedundantMode: Auto
@@ -509,6 +510,7 @@ maestro:
     name: arohcp-prow-dbmaestro-j7654321
     password: TheBlurstOfTimes
     private: false
+    serverSku: Standard_D2s_v3
     serverStorageSizeGB: 32
     serverVersion: "15"
     zoneRedundantMode: Auto

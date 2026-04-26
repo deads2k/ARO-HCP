@@ -46,6 +46,9 @@ param postgresServerVersion string
 ])
 param postgresServerStorageSizeGB int
 
+@description('The SKU of the Postgres server for Maestro')
+param postgresServerSku string
+
 param postgresServerPrivate bool
 
 param privateEndpointSubnetId string = ''
@@ -147,6 +150,7 @@ module maestroPostgres '../postgres/postgres.bicep' = if (deployPostgres) {
     backupRetentionDays: postgresBackupRetentionDays
     geoRedundantBackup: postgresGeoRedundantBackup
     storageSizeGB: postgresServerStorageSizeGB
+    sku: postgresServerSku
     private: postgresServerPrivate
     subnetId: privateEndpointSubnetId
     vnetId: privateEndpointVnetId
