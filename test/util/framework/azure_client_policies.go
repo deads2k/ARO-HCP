@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +30,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 
 	"github.com/Azure/ARO-HCP/internal/api/arm"
@@ -246,103 +244,6 @@ func (p *lroPollerRetryDeploymentNotFoundPolicy) backoff(attempt int) time.Durat
 	sleep := min(p.BaseBackoff<<attempt, p.MaxBackoff)
 	jitter := time.Duration(rand.Int63n(int64(max(p.BaseBackoff/2, time.Millisecond))))
 	return sleep + jitter
-}
-
-// throttleRetryPolicy is an outer PerCallPolicy that retries 429 (Too Many
-// Requests) responses with conservative exponential backoff.
-//
-// 429 is excluded from the SDK's inner retry StatusCodes so that throttle
-// responses bubble up here immediately (one request, no burst). This policy
-// applies exponential backoff floored by the server's Retry-After value,
-// ensuring we never retry faster than ARM asks and that delays grow across
-// successive attempts.
-type throttleRetryPolicy struct {
-	MaxRetries     int
-	BaseBackoff    time.Duration
-	MaxBackoff     time.Duration
-	MaxRetryWindow time.Duration
-}
-
-func NewThrottleRetryPolicy() *throttleRetryPolicy {
-	return &throttleRetryPolicy{
-		MaxRetries:     6,
-		BaseBackoff:    4 * time.Second,
-		MaxBackoff:     5 * time.Minute,
-		MaxRetryWindow: 2 * time.Minute,
-	}
-}
-
-func (p *throttleRetryPolicy) Do(req *policy.Request) (*http.Response, error) {
-	start := time.Now()
-
-	for attempt := 0; ; attempt++ {
-		retryReq := req.Clone(req.Raw().Context())
-		if err := retryReq.RewindBody(); err != nil {
-			return nil, err
-		}
-
-		resp, err := retryReq.Next()
-
-		if err != nil || resp == nil || resp.StatusCode != http.StatusTooManyRequests {
-			return resp, err
-		}
-
-		if attempt >= p.MaxRetries || time.Since(start) >= p.MaxRetryWindow {
-			return resp, err
-		}
-
-		retryAfter := parseRetryAfter(resp)
-		backoff := p.backoff(attempt)
-		delay := max(backoff, retryAfter)
-		runtime.Drain(resp)
-
-		ginkgo.GinkgoLogr.Info("429 throttled, backing off",
-			"attempt", attempt+1,
-			"delay", delay.String(),
-			"retryAfter", retryAfter.String(),
-			"url", req.Raw().URL.String())
-
-		select {
-		case <-time.After(delay):
-		case <-req.Raw().Context().Done():
-			return nil, req.Raw().Context().Err()
-		}
-	}
-}
-
-func (p *throttleRetryPolicy) backoff(attempt int) time.Duration {
-	sleep := min(p.BaseBackoff<<attempt, p.MaxBackoff)
-	jitter := time.Duration(rand.Int63n(int64(max(p.BaseBackoff/2, time.Millisecond))))
-	return sleep + jitter
-}
-
-// parseRetryAfter extracts the delay from Retry-After-Ms, x-ms-retry-after-ms,
-// or Retry-After (seconds / HTTP-date) headers, in priority order.
-func parseRetryAfter(resp *http.Response) time.Duration {
-	if d := parseRetryAfterMS(resp, "Retry-After-Ms"); d > 0 {
-		return d
-	}
-	if d := parseRetryAfterMS(resp, "X-Ms-Retry-After-Ms"); d > 0 {
-		return d
-	}
-	if ra := resp.Header.Get("Retry-After"); ra != "" {
-		if seconds, err := strconv.ParseInt(ra, 10, 64); err == nil && seconds > 0 {
-			return time.Duration(seconds) * time.Second
-		}
-		if t, err := time.Parse(time.RFC1123, ra); err == nil {
-			return time.Until(t)
-		}
-	}
-	return 0
-}
-
-func parseRetryAfterMS(resp *http.Response, header string) time.Duration {
-	if v := resp.Header.Get(header); v != "" {
-		if ms, err := strconv.ParseInt(v, 10, 64); err == nil && ms > 0 {
-			return time.Duration(ms) * time.Millisecond
-		}
-	}
-	return 0
 }
 
 // sanitizeAuthHeaderPolicy is a pipeline policy that redacts the Authorization
