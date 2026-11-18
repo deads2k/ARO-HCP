@@ -133,12 +133,16 @@ func (c *minorUpgradeNormalClusterDesiredVersionSyncer) SyncOnce(ctx context.Con
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get rollout %q: %w", yStreamChannel, err))
 	}
-	if effectiveExactVersion(&rollout.Spec) == nil {
+	if hasActiveRolloutPin(&rollout.Spec) {
+		logger.Info("Leaving minor upgrade desired version to forced assignment; control plane rollout pin is active")
+		return nil
+	}
+	if rollout.Spec.BestExactVersion == nil {
 		logger.Info("Waiting for best version", "ystreamChannel", yStreamChannel, "retryAfter", 10*time.Second)
 		c.enqueueAfter.EnqueueAfter(key, 10*time.Second)
 		return nil
 	}
-	best := *effectiveExactVersion(&rollout.Spec)
+	best := *rollout.Spec.BestExactVersion
 	if err := c.validateNodePoolSkew(ctx, key, best); err != nil {
 		return utils.TrackError(fmt.Errorf("cannot assign minor upgrade target %s: %w", best, err))
 	}

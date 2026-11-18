@@ -53,7 +53,9 @@ type ControlPlaneVersionRolloutSpec struct {
 	Version coreapi.VersionProfile `json:"version"`
 
 	// PinnedVersion overrides the rollout target until BestExactVersion is strictly
-	// newer than UntilExactVersion. A nil ExactVersion means no pin; a nil
+	// newer than UntilExactVersion. While active it is seeded onto channel member
+	// ServiceProviderCluster pins for immediate forced assignment; normal rollout
+	// controllers do not assign. A nil ExactVersion means no pin; a nil
 	// UntilExactVersion holds the pin indefinitely. An empty pin serializes as {}.
 	// Written by: Admin API RolloutVersionPinHandler (set/clear)
 	PinnedVersion ServiceProviderClusterPinnedVersion `json:"pinnedVersion,omitempty"`

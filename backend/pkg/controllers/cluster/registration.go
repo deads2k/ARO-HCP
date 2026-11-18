@@ -1255,6 +1255,21 @@ func instantiateForcedClusterDesiredVersionController(controllerContext controll
 	), nil
 }
 
+func registerControlPlaneRolloutPinnedVersionSeedingController() controllerconfig.ControllerRegistration {
+	return controllerconfig.ControllerRegistration{
+		Workers:     20,
+		Instantiate: controllerconfig.WithCacheSyncs(instantiateControlPlaneRolloutPinnedVersionSeedingController, false),
+	}
+}
+
+func instantiateControlPlaneRolloutPinnedVersionSeedingController(controllerContext controllerconfig.ControllerContext) (controllerconfig.Runnable, error) {
+	return rollout.NewControlPlaneRolloutPinnedVersionSeedingController(
+		controllerContext.ResourcesDBClient,
+		controllerContext.FleetInformers,
+		controllerContext.BackendInformers,
+	), nil
+}
+
 func registerControlPlaneVersionRolloutSeedingController() controllerconfig.ControllerRegistration {
 	return controllerconfig.ControllerRegistration{
 		Workers:     20,
@@ -1329,6 +1344,7 @@ func Register(registry map[string]controllerconfig.ControllerRegistration) {
 	registry[strings.ToLower(rollout.MinorUpgradeNormalClusterDesiredVersionControllerName)] = registerMinorUpgradeNormalClusterDesiredVersionController()
 	registry[strings.ToLower(rollout.ZStreamProgressiveDesiredVersionRolloutControllerName)] = registerZStreamProgressiveDesiredVersionRolloutController()
 	registry[strings.ToLower(rollout.ForcedClusterDesiredVersionControllerName)] = registerForcedClusterDesiredVersionController()
+	registry[strings.ToLower(rollout.ControlPlaneRolloutPinnedVersionSeedingControllerName)] = registerControlPlaneRolloutPinnedVersionSeedingController()
 	registry[strings.ToLower(rollout.RolloutSeedingControllerName)] = registerControlPlaneVersionRolloutSeedingController()
 	registry[strings.ToLower(rollout.CincinnatiSeedingControllerName)] = registerControlPlaneVersionCincinnatiSeedingController()
 	registry[strings.ToLower(rollout.RolloutRetirementControllerName)] = registerControlPlaneVersionRolloutRetirementController()

@@ -21,7 +21,9 @@ import (
 )
 
 // effectiveExactVersion returns the rollout target without changing the graph's
-// best version or the configured pin.
+// best version or the configured pin. Forced assignment uses this so Immediate
+// clusters follow an active channel pin; normal progressive assignment gates on
+// hasActiveRolloutPin instead and leaves pin-driven work to ForcedClusterDesiredVersion.
 func effectiveExactVersion(s *fleetapi.ControlPlaneVersionRolloutSpec) *semver.Version {
 	if hasActiveRolloutPin(s) {
 		return s.PinnedVersion.ExactVersion

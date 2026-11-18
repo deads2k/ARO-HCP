@@ -127,13 +127,17 @@ func (c *initialNormalClusterDesiredVersionSyncer) SyncOnce(ctx context.Context,
 	if err != nil {
 		return utils.TrackError(fmt.Errorf("failed to get rollout %q: %w", yStreamChannel, err))
 	}
-	if effectiveExactVersion(&rollout.Spec) == nil {
+	if hasActiveRolloutPin(&rollout.Spec) {
+		logger.Info("Leaving initial desired version to forced assignment; control plane rollout pin is active")
+		return nil
+	}
+	if rollout.Spec.BestExactVersion == nil {
 		logger.Info("Waiting for best version", "ystreamChannel", yStreamChannel, "retryAfter", 10*time.Second)
 		c.enqueueAfter.EnqueueAfter(key, 10*time.Second)
 		return nil
 	}
 	replacement := serviceProviderCluster.DeepCopy()
-	best := *effectiveExactVersion(&rollout.Spec)
+	best := *rollout.Spec.BestExactVersion
 	setDesiredVersion(replacement, &best, metav1.Time{Time: c.clock.Now()})
 	if _, err := c.resourcesDBClient.ServiceProviderClusters(key.SubscriptionID, key.ResourceGroupName, key.HCPClusterName).Replace(ctx, replacement, nil); cosmosstorageutils.IsPreconditionFailedError(err) {
 		logger.Info("Write conflicted; waiting for informer to provide current resource")

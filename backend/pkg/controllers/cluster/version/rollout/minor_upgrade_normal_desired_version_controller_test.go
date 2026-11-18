@@ -61,7 +61,7 @@ func TestMinorUpgradeNormalDesiredVersionNeedsWork(t *testing.T) {
 
 func TestMinorUpgradeNormalDesiredVersion(t *testing.T) {
 	for _, tc := range []struct {
-		name, requested, desired, want                        string
+		name, requested, desired, want, fleetPin              string
 		missingRollout, missingBest, concurrent, retry        bool
 		pinned, experimental                                  bool
 		nodePoolVersion, activeNodePoolVersion, errorContains string
@@ -81,6 +81,7 @@ func TestMinorUpgradeNormalDesiredVersion(t *testing.T) {
 		{name: "wait for best", requested: "4.22", desired: "4.21.6", want: "4.21.6", missingBest: true, retry: true},
 		{name: "preserve concurrent assignment", requested: "4.22", desired: "4.21.6", want: "4.22.9", concurrent: true},
 		{name: "pinned minor belongs to forced controller", requested: "4.22", desired: "4.21.6", want: "4.21.6", pinned: true},
+		{name: "fleet pin defers to forced assignment", requested: "4.22", desired: "4.21.6", want: "4.21.6", fleetPin: "4.22.1"},
 		{name: "experimental minor belongs to forced controller", requested: "4.22", desired: "4.21.6", want: "4.21.6", experimental: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -123,6 +124,9 @@ func TestMinorUpgradeNormalDesiredVersion(t *testing.T) {
 				FailedClusterCountByDesiredExactVersion: map[string]int64{"4.22.8": 100},
 				Conditions:                              []metav1.Condition{{Type: ConditionDegraded, Status: metav1.ConditionTrue, Reason: "Failure", Message: "existing condition"}},
 			})
+			if tc.fleetPin != "" {
+				rollout.Spec.PinnedVersion.ExactVersion = v(tc.fleetPin)
+			}
 			if tc.missingBest {
 				rollout.Spec.BestExactVersion = nil
 			}

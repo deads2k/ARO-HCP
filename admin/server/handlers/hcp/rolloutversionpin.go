@@ -29,8 +29,11 @@ import (
 )
 
 // RolloutVersionPinHandler sets or clears the channel rollout's version pin.
-// Unlike bulk cluster pinning, this changes the target used by normal rollout
-// assignment. BestExactVersion must strictly exceed UntilExactVersion before
+// An active pin is copied onto each channel member's ServiceProviderCluster pin
+// by ControlPlaneRolloutPinnedVersionSeeding so ForcedClusterDesiredVersion can
+// drive the fleet immediately. Normal rollout controllers (initial, minor
+// upgrade, and progressive) gate on the pin and skip their work while it is
+// active. BestExactVersion must strictly exceed UntilExactVersion before
 // selection resumes. Omitting exactVersion clears both pin fields.
 type RolloutVersionPinHandler struct {
 	fleetDBClient fleetcosmosstorage.FleetDBClient

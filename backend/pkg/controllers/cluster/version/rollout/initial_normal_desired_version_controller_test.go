@@ -48,7 +48,7 @@ func TestInitialNormalDesiredVersion(t *testing.T) {
 		missingRollout, missingBest, concurrent bool
 		pinned, experimental, backfill          bool
 	}{
-		{name: "fleet nightly pin", requested: "4.21", fleetPin: "4.21.0-0.nightly-2026-09-10-123456", want: "4.21.0-0.nightly-2026-09-10-123456"},
+		{name: "fleet pin defers to forced assignment", requested: "4.21", fleetPin: "4.21.0-0.nightly-2026-09-10-123456"},
 		{name: "initialize despite failed rollout", requested: "4.21", want: "4.21.6"},
 		{name: "requested exact version selects channel best", requested: "4.21.1", want: "4.21.6"},
 		{name: "preserve existing desired", requested: "4.21", desired: "4.21.1", want: "4.21.1"},

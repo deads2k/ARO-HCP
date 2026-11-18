@@ -439,3 +439,47 @@ func TestForcedClusterDesiredVersionSyncer_Immediate(t *testing.T) {
 		})
 	}
 }
+
+func TestImmediateChannelPinRollback(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		exact, until, best, want string
+	}{
+		{"active pin", "4.20.34", "", "4.20.36", "4.20.34"},
+		{"pin at threshold", "4.20.34", "4.20.36", "4.20.36", "4.20.34"},
+		{"expired pin", "4.20.34", "4.20.34", "4.20.35", "4.20.36"},
+		{"normal older best", "", "", "4.20.34", "4.20.36"},
+		{"until without pin", "", "4.20.38", "4.20.34", "4.20.36"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			cluster := newTestCluster("rollback", "stable", "4.20")
+			cluster.ServiceProviderProperties.ExperimentalFeatures.ZStreamUpdatePolicy = coreapi.ImmediateZStreamUpdatePolicy
+			provider := newTestServiceProviderCluster("rollback", v("4.20.36"), []coreapi.ServiceProviderClusterActiveVersion{completed("4.20.36")}, nil)
+			db, err := corecosmosstoragetesting.NewMockResourcesDBClientWithResources(ctx, []any{cluster, provider})
+			require.NoError(t, err)
+			rollout := newTestRollout("stable-4.20", v(tc.best), fleetapi.ControlPlaneVersionRolloutStatus{})
+			if tc.exact != "" {
+				rollout.Spec.PinnedVersion.ExactVersion = v(tc.exact)
+			}
+			if tc.until != "" {
+				rollout.Spec.PinnedVersion.UntilExactVersion = v(tc.until)
+			}
+			_, rolloutLister := newTestRolloutStore(t, rollout)
+			clusterLister := &corelistertesting.DBClusterLister{ResourcesDBClient: db}
+			providerLister := &corelistertesting.DBServiceProviderClusterLister{ResourcesDBClient: db}
+			syncer := &forcedClusterDesiredVersionSyncer{
+				clock: clocktesting.NewFakeClock(statusTestNow), resourcesDBClient: db,
+				clusterLister: clusterLister, serviceProviderClusterLister: providerLister, rolloutLister: rolloutLister,
+			}
+			require.NoError(t, syncer.SyncOnce(ctx, controllerutils.HCPClusterKey{SubscriptionID: testSubscriptionID, ResourceGroupName: testResourceGroupName, HCPClusterName: "rollback"}))
+			after, err := providerLister.Get(ctx, testSubscriptionID, testResourceGroupName, "rollback")
+			require.NoError(t, err)
+			require.Equal(t, v(tc.want), after.Spec.ControlPlaneVersion.DesiredVersion)
+			if tc.want != "4.20.36" {
+				require.NotNil(t, after.Spec.ControlPlaneVersion.DesiredVersionLastTransitionTime)
+				require.True(t, statusTestNow.Equal(after.Spec.ControlPlaneVersion.DesiredVersionLastTransitionTime.Time))
+			}
+		})
+	}
+}
